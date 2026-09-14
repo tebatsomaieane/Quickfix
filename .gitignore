@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Environment & secrets (never commit real secrets)
+.env
+.env.*
+!.env.example
+server/.env
+client/.env
+
+# Build output
+dist/
+build/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Runtime data
+coverage/
+.nyc_output/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# Docker
+docker-compose.override.yml
