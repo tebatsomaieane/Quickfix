@@ -51,6 +51,8 @@ services:
       LOG_FORMAT: ${LOG_FORMAT:-combined}
     expose:
       - "5000"
+    volumes:
+      - uploads_data:/app/uploads
 
   client:
     build:
@@ -58,7 +60,6 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL:-/api}
-        VITE_SHOW_DEMO: ${VITE_SHOW_DEMO:-false}
     container_name: quickfix-client
     restart: unless-stopped
     depends_on:
@@ -68,3 +69,4 @@ services:
 
 volumes:
   db_data:
+  uploads_data:

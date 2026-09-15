@@ -9,22 +9,15 @@ const BCRYPT_ROUNDS = 10;
 
 const COOKIE_OPTIONS = {
     httpOnly: true,
-    sameSite: "lax",
-    // sameSite: "lax" + httpOnly is our CSRF mitigation. For extra
-    // protection behind a cross-site deployment, set COOKIE_SAMESITE:
-    // "strict" is not supported across all browsers for OAuth, and
-    // "none" requires secure cookies everywhere.
+    // "lax" is the default and our CSRF mitigation for same-origin
+    // deployments. Cross-site clients (e.g. the app hosted on Vercel
+    // talking to this API on Railway) must set COOKIE_SAMESITE=none so
+    // the browser accepts and returns the session cookie.
+    sameSite: process.env.COOKIE_SAMESITE || "lax",
     secure: process.env.NODE_ENV === "production",
     maxAge: JWT_MAX_AGE * 1000,
     path: "/"
 };
-
-// Whether password-reset tokens may be returned in the API response.
-// Only enabled explicitly in development/demo environments; production
-// must always gate this off (tokens should be delivered by email).
-const DEV_RETURN_RESET_TOKEN =
-    process.env.NODE_ENV !== "production" &&
-    process.env.RETURN_RESET_TOKEN === "true";
 
 const register = async (req, res) => {
     try {
@@ -286,6 +279,70 @@ const login = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Server error during login"
+        });
+    }
+};
+
+
+// SOFT SESSION CHECK
+// Same as /me but never 401s: returns { success:false, user:null } for
+// guests instead of an error status, so the client's global 401
+// interceptor does not bounce public pages to /login.
+const session = async (req, res) => {
+    try {
+        let token = null;
+
+        if (req.cookies && req.cookies.token) {
+            token = req.cookies.token;
+        }
+
+        if (!token) {
+            const authHeader = req.headers.authorization;
+
+            if (authHeader) {
+                const parts = authHeader.split(" ");
+
+                if (parts.length === 2 && parts[0] === "Bearer") {
+                    token = parts[1];
+                }
+            }
+        }
+
+        if (!token) {
+            return res.json({ success: false, user: null });
+        }
+
+        let decoded;
+
+        try {
+            decoded = jwt.verify(token, process.env.JWT_SECRET);
+        } catch {
+            res.clearCookie("token", COOKIE_OPTIONS);
+
+            return res.json({ success: false, user: null });
+        }
+
+        const [users] = await db.query(
+            `SELECT id, first_name, last_name, email, phone,
+                    role, email_verified, is_active
+             FROM users
+             WHERE id = ?`,
+            [decoded.id]
+        );
+
+        if (users.length === 0 || !users[0].is_active) {
+            res.clearCookie("token", COOKIE_OPTIONS);
+
+            return res.json({ success: false, user: null });
+        }
+
+        res.json({ success: true, user: users[0] });
+    } catch (error) {
+        console.error("Error checking session:", error);
+
+        res.status(500).json({
+            success: false,
+            message: "Server error while checking session"
         });
     }
 };
@@ -568,19 +625,6 @@ const requestPasswordReset = async (req, res) => {
             [users[0].id, tokenHash]
         );
 
-        // When no email provider is configured, the token is only returned
-        // to the client in non-production + explicitly-enabled demo mode.
-        if (DEV_RETURN_RESET_TOKEN) {
-            return res.json({
-                success: true,
-                message: "Demo mode: use the token below to reset your password.",
-                data: {
-                    reset_token: token,
-                    reset_url: `${process.env.CLIENT_ORIGIN || "http://localhost:5173"}/reset-password?token=${token}`
-                }
-            });
-        }
-
         return res.json({
             success: true,
             message: "If that email exists, a reset link has been sent."
@@ -675,6 +719,7 @@ module.exports = {
     register,
     login,
     me,
+    session,
     updateProfile,
     logout,
     changePassword,

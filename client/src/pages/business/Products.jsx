@@ -13,6 +13,7 @@ import Textarea from "../../components/ui/Textarea";
 import Spinner from "../../components/ui/Spinner";
 import EmptyState from "../../components/ui/EmptyState";
 import SmartImage from "../../components/ui/SmartImage";
+import FileUpload from "../../components/ui/FileUpload";
 import { formatCurrency, formatDate } from "../../lib/format";
 import { getProductImage } from "../../lib/visuals";
 
@@ -122,7 +123,12 @@ function Products() {
                             <Textarea id="description" name="description" rows="3" value={form.description} onChange={handleChange} />
                         </div>
                         <Input label="Price" id="price" name="price" type="number" min="0" step="0.01" value={form.price} onChange={handleChange} required />
-                        <Input label="Image URL" id="image" name="image" type="url" placeholder="https://images.unsplash.com/..." value={form.image} onChange={handleChange} />
+                        <FileUpload
+                            label="Product photo"
+                            kind="image"
+                            value={form.image}
+                            onChange={(url) => setForm({ ...form, image: url })}
+                        />
                         <div className="flex gap-3">
                             <Button type="submit" loading={submitting}>{editId ? "Update" : "Create"}</Button>
                             <Button variant="secondary" type="button" onClick={resetForm}>Cancel</Button>

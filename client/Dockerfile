@@ -14,9 +14,7 @@ COPY . .
 
 # VITE_API_URL defaults to "/api" (served same-origin via nginx).
 ARG VITE_API_URL=/api
-ARG VITE_SHOW_DEMO=false
 ENV VITE_API_URL=$VITE_API_URL
-ENV VITE_SHOW_DEMO=$VITE_SHOW_DEMO
 
 RUN npm run build
 

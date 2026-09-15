@@ -236,6 +236,13 @@ const ICON_PATHS = {
             <path d="M10 11v6M14 11v6" />
         </>
     ),
+    image: (
+        <>
+            <rect x="3" y="4" width="18" height="16" rx="2" />
+            <circle cx="8.5" cy="9.5" r="1.5" />
+            <path d="M21 15l-5-5-9 9" />
+        </>
+    ),
 };
 
 const STROKE_ICONS = new Set([
@@ -245,7 +252,7 @@ const STROKE_ICONS = new Set([
     "bell", "mail", "chat", "file", "chart", "settings", "logout",
     "search", "inbox", "briefcase", "shield", "megaphone", "building", "eye",
     "heart", "sparkles", "phone", "send", "trendUp", "wallet", "checkBadge",
-    "layers", "plug", "filter", "arrowLeft", "thumbsUp", "trash"
+    "layers", "plug", "filter", "arrowLeft", "thumbsUp", "trash", "image"
 ]);
 
 function Icon({ name, className = "h-5 w-5" }) {

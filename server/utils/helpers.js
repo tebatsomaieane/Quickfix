@@ -4,13 +4,20 @@ const db = require("../config/db");
 // Insert a notification for a user.
 // When an active transaction connection is provided, the write uses it so the
 // notification commits/rolls back with the surrounding transaction.
-const createNotification = async (userId, title, message, type, connection) => {
+const createNotification = async (
+    userId,
+    title,
+    message,
+    type,
+    connection,
+    link
+) => {
     const target = connection || db;
 
     await target.query(
-        `INSERT INTO notifications (user_id, title, message, type)
-         VALUES (?, ?, ?, ?)`,
-        [userId, title, message, type]
+        `INSERT INTO notifications (user_id, title, message, type, link)
+         VALUES (?, ?, ?, ?, ?)`,
+        [userId, title, message, type, link || null]
     );
 };
 

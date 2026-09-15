@@ -18,10 +18,10 @@ entire lifecycle through jobs, messaging, reviews, and complaints.
 | Layer | Technology |
 |-------|-----------|
 | Client | React 19, Vite 8, Tailwind CSS 4, Axios, React Router v7 |
-| Server | Node.js 22+, Express 5, MySQL 8 (mysql2) |
+| Server | Node.js 22+, Express 5, MySQL 8 (mysql2), Multer (media uploads) |
 | Auth | JWT stored in httpOnly cookies (sameSite=lax, secure in prod) |
 | Database | MySQL 8 with connection pooling |
-| Deployment | Docker Compose, nginx reverse proxy, PM2 (alternative) |
+| Deployment | Cloudflare Pages (frontend), Docker Compose / PM2 (API + DB) |
 
 ---
 
@@ -46,6 +46,21 @@ open http://localhost      # client (nginx)
 Docker Compose starts three services: **client** (nginx), **server** (Node),
 and **MySQL**. The database is auto-initialised from `database/schema.sql`
 and seeded with `database/seed.sql`.
+
+> **Seed data** is intentionally minimal: the only pre-created account is the
+> **administrator**. Everyone else (customers, providers, business owners)
+> registers themselves through the public sign-up page, so every person on
+> the marketplace is a real, registered Basotho user.
+
+### Initial Admin Account
+
+| Field | Value |
+|-------|-------|
+| Email | `admin@quickfix.co.ls` |
+| Phone | `+266 5779 9537` |
+| Password | **(see seed.sql — change immediately after first login)** |
+
+Log in with the admin account, then change the password from **Settings**.
 
 ### Useful Commands
 
@@ -87,6 +102,53 @@ npm run dev                          # starts on http://localhost:5173
 ```
 
 The Vite dev server proxies `/api` to `http://localhost:5000` automatically.
+
+---
+
+## Quick Start — Cloudflare Pages (frontend) + External API
+
+Cloudflare Pages is a **static host with no persistent disk**, so it serves
+only the React app. The API (and all uploaded media) must live on a separate
+server that has durable storage.
+
+```bash
+# 1. Deploy the API + MySQL with Docker Compose on your server
+cp .env.example .env                # full values, incl. JWT_SECRET
+docker compose up -d --build        # brings up db + server (API on :5000)
+
+# 2. Build and preview the client locally
+cd client
+npm ci
+npm run build                       # output in client/dist
+npx serve dist                      # optionally preview
+
+# 3. Create a Cloudflare Pages project "quickfix" linked to this repo
+#    Build command:            npm --prefix client ci && npm --prefix client run build
+#    Build output directory:   client/dist
+#    Environment variable:     VITE_API_URL=https://your-api-domain.example
+```
+
+The repo ships `wrangler.toml`, `client/public/_redirects` (SPA fallback)
+and `client/public/_headers` (security headers) already configured. The API
+server must have your Pages domain in `CLIENT_ORIGIN` for the cookie-based
+session to be accepted cross-origin.
+
+---
+
+## Media Uploads
+
+All photos and videos are **uploaded by real users** and stored on the API
+server's disk (persisted with a Docker volume / server filesystem):
+
+- `POST /api/uploads` — upload one image or video (multipart field `file`,
+  max 50 MB, authenticated). Returns `{ url, filename, size, mimeType, kind }`.
+- Uploaded files are served from `/uploads/...`, and reference URLs use
+  `PUBLIC_API_URL` when set (important behind a proxy/CDN).
+- Request attachments are persisted in `request_attachments` and shown to
+  both the customer and offering providers.
+
+There is **no stock photography anywhere** in the app. Until a user uploads
+their own photo, the UI shows a branded gradient or their initials instead.
 
 ---
 
@@ -134,14 +196,13 @@ See `deploy/deploy.sh` (or `deploy.ps1` on Windows) for the Docker workflow.
 | `NODE_ENV` | No | `development` | `development` / `production` / `test` |
 | `CLIENT_ORIGIN` | No | `http://localhost:5173` | Comma-separated CORS origins |
 | `LOG_FORMAT` | No | `combined` | Morgan log format |
-| `RETURN_RESET_TOKEN` | No | `false` | Expose reset tokens in API (demo only) |
+| `PUBLIC_API_URL` | No | derived from request | Absolute base used when building uploaded-file URLs |
 
 ### Client (`client/.env`, build-time)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `VITE_API_URL` | `/api` | API base URL (set if API is on a different origin) |
-| `VITE_SHOW_DEMO` | `false` | Show demo quick-login buttons (dev: `true`, prod: `false`) |
+| `VITE_API_URL` | `/api` | API base URL (set if API is on a different origin, e.g. Cloudflare Pages) |
 
 ### Docker Compose (`.env` at root)
 
@@ -161,18 +222,19 @@ quickfix/
 │   │   ├── pages/        route pages (public, customer, provider, business, admin)
 │   │   ├── services/     API client and service functions
 │   │   └── layouts/      layout shells (public, dashboard)
-│   └── nginx.conf        production nginx config
+│   └── nginx.conf        production nginx config (Docker)
 │
 ├── server/            Express API
 │   ├── config/           DB connection pool
 │   ├── controllers/      route handlers
 │   ├── middleware/        auth (JWT), rate limiting
 │   ├── routes/           express Router definitions
+│   ├── uploads/          user-uploaded media (runtime, git-ignored)
 │   └── utils/            helpers (notifications, profile resolvers)
 │
 ├── database/
 │   ├── schema.sql        full DDL (23 tables, indexes, constraints)
-│   └── seed.sql          demo data for development
+│   └── seed.sql          minimal production seed (admin + catalogue)
 │
 ├── deploy/
 │   ├── deploy.sh         Docker Compose launcher (Linux)
@@ -180,7 +242,8 @@ quickfix/
 │   └── init-db.sh        MySQL initialiser (non-Docker)
 │
 ├── docker-compose.yml
-├── .env.example          compose environment template
+├── wrangler.toml           Cloudflare Pages configuration
+├── .env.example            compose environment template
 └── README.md
 ```
 
@@ -306,6 +369,12 @@ All API routes are prefixed with `/api`. Responses follow the format:
 | GET | `/api/health` | Server status + timestamp |
 | GET | `/` | Service name + uptime |
 
+### Media Uploads
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/uploads` | ✔ | Upload one image/video (multipart `file`, max 50 MB) |
+| GET | `/uploads/*` | — | Static hosting of uploaded media |
+
 ---
 
 ## Security Notes
@@ -320,8 +389,17 @@ All API routes are prefixed with `/api`. Responses follow the format:
 - Helmet adds security headers (HSTS, nosniff, X-Frame-Options, etc.).
 - Business advertisements and promotions default to **PENDING** status;
   only admins may approve them for public visibility.
-- The password-reset API never reveals the reset token in production.
-  Tokens must be delivered by email in a real deployment.
+- Password-reset tokens are hashed in storage and never leaked through the
+  API; they are delivered by email in a real deployment.
+
+---
+
+## Contact
+
+For support or business enquiries:
+- Phone / WhatsApp: **+266 5779 9537**
+- Email: support@quickfix.co.ls
+- Location: Maseru, Lesotho
 
 ---
 

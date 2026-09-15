@@ -1,13 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchServices } from "../../services/catalogueService";
 import { createRequest } from "../../services/requestService";
+import { uploadMedia } from "../../services/uploadService";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import Input from "../../components/ui/Input";
 import Textarea from "../../components/ui/Textarea";
 import Select from "../../components/ui/Select";
 import Spinner from "../../components/ui/Spinner";
+import Icon from "../../components/ui/Icon";
+
+const MAX_ATTACHMENTS = 6;
 
 function CreateRequest() {
     const navigate = useNavigate();
@@ -28,6 +32,46 @@ function CreateRequest() {
 
     const [error, setError] = useState("");
     const [submitting, setSubmitting] = useState(false);
+
+    const [attachments, setAttachments] = useState([]);
+    const [uploadingMedia, setUploadingMedia] = useState(false);
+    const mediaInputRef = useRef(null);
+
+    const addFiles = async (files) => {
+        const selected = Array.from(files || []).slice(
+            0,
+            MAX_ATTACHMENTS - attachments.length
+        );
+
+        if (selected.length === 0) {
+            setError("You can attach up to 6 photos or videos.");
+            return;
+        }
+
+        setError("");
+        setUploadingMedia(true);
+
+        try {
+            const uploaded = [];
+
+            for (const file of selected) {
+                const kind = String(file.type || "").startsWith("video/")
+                    ? "video"
+                    : "image";
+                const record = await uploadMedia(file);
+                uploaded.push({ ...record, kind: record.kind || kind });
+            }
+
+            setAttachments((previous) => [...previous, ...uploaded]);
+        } catch (err) {
+            setError(
+                err.response?.data?.message ||
+                    "One or more files failed to upload."
+            );
+        } finally {
+            setUploadingMedia(false);
+        }
+    };
 
     useEffect(() => {
         let cancelled = false;
@@ -110,7 +154,12 @@ function CreateRequest() {
                 preferred_date: formData.preferred_date || null,
                 preferred_time: formData.preferred_time || null,
                 budget_min: budgetMin,
-                budget_max: budgetMax
+                budget_max: budgetMax,
+                attachments: attachments.map((attachment) => ({
+                    url: attachment.url,
+                    filename: attachment.filename,
+                    mimeType: attachment.mimeType
+                }))
             });
 
             if (data.success) {
@@ -243,6 +292,86 @@ function CreateRequest() {
                             placeholder="e.g. 1000"
                             value={formData.budget_max}
                             onChange={handleChange}
+                        />
+                    </div>
+
+                    <div>
+                        <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                            Photos & videos
+                        </span>
+                        <p className="mb-3 text-sm text-slate-500">
+                            Show the problem clearly — photos or short videos help
+                            providers send accurate offers (up to 6 files, 50 MB each).
+                        </p>
+
+                        {attachments.length > 0 && (
+                            <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                                {attachments.map((attachment, index) => (
+                                    <div
+                                        key={`${attachment.filename || attachment.url}-${index}`}
+                                        className="group relative overflow-hidden rounded-lg border border-slate-200"
+                                    >
+                                        {attachment.kind === "video" ? (
+                                            <video
+                                                src={attachment.url}
+                                                className="h-28 w-full bg-black object-contain"
+                                                controls
+                                            />
+                                        ) : (
+                                            <img
+                                                src={attachment.url}
+                                                alt="Attachment preview"
+                                                className="h-28 w-full object-cover"
+                                            />
+                                        )}
+                                        <button
+                                            type="button"
+                                            aria-label="Remove attachment"
+                                            onClick={() =>
+                                                setAttachments((previous) =>
+                                                    previous.filter((_, i) => i !== index)
+                                                )
+                                            }
+                                            className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-slate-900/70 text-white transition hover:bg-red-600"
+                                        >
+                                            <Icon name="trash" className="h-3.5 w-3.5" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {attachments.length < MAX_ATTACHMENTS && (
+                            <button
+                                type="button"
+                                disabled={uploadingMedia}
+                                onClick={() => mediaInputRef.current?.click()}
+                                className="inline-flex items-center gap-2 rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-600 transition hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-600 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                {uploadingMedia ? (
+                                    <>
+                                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+                                        Uploading...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Icon name="plus" className="h-4 w-4" />
+                                        Add photo or video
+                                    </>
+                                )}
+                            </button>
+                        )}
+
+                        <input
+                            ref={mediaInputRef}
+                            type="file"
+                            accept="image/*,video/*"
+                            multiple
+                            className="hidden"
+                            onChange={(e) => {
+                                addFiles(e.target.files);
+                                e.target.value = "";
+                            }}
                         />
                     </div>
 

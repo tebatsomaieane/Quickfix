@@ -219,6 +219,7 @@ CREATE TABLE service_requests (
 
     customer_id INT NOT NULL,
     service_id INT NOT NULL,
+    preferred_provider_id INT,
 
     title VARCHAR(200) NOT NULL,
     description TEXT NOT NULL,
@@ -253,7 +254,12 @@ CREATE TABLE service_requests (
     CONSTRAINT fk_request_service
         FOREIGN KEY (service_id)
         REFERENCES services(id)
-        ON DELETE RESTRICT
+        ON DELETE RESTRICT,
+
+    CONSTRAINT fk_request_preferred_provider
+        FOREIGN KEY (preferred_provider_id)
+        REFERENCES provider_profiles(id)
+        ON DELETE SET NULL
 );
 
 
@@ -444,6 +450,7 @@ CREATE TABLE notifications (
     message TEXT NOT NULL,
 
     type VARCHAR(100),
+    link VARCHAR(255),
 
     is_read BOOLEAN NOT NULL DEFAULT FALSE,
 

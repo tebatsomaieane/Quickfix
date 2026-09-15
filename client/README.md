@@ -24,11 +24,12 @@ See `.env.example`. All variables are optional:
 
 - `VITE_API_URL` — base URL for API requests. Leave unset (`/api`) when the
   app is served behind a reverse proxy that forwards `/api` to the server.
-- `VITE_SHOW_DEMO` — set `true` to show the demo-account quick-login buttons.
-  Defaults to `true` in development and `false` in production builds.
+  On Cloudflare Pages set it to the API origin, e.g. `https://api.quickfix.co.ls`.
 
 ## Deploying
 
-The static `dist/` output is served by nginx (or any static host). The nginx
-config at the repository root forwards `/api` to the Node server. See the
-[repository README](../README.md) for full deployment instructions.
+The static `dist/` output is deployed via **Cloudflare Pages** (see the
+repo's `wrangler.toml`, `public/_redirects` and `public/_headers`). Media
+uploaded by users is never stored on the static host — it lives on the API
+server and is served from `/uploads`. See the [repository README](../README.md)
+for full deployment instructions.

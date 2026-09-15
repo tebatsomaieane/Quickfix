@@ -7,7 +7,6 @@ import Input from "../../components/ui/Input";
 function ForgotPassword() {
     const [email, setEmail] = useState("");
     const [message, setMessage] = useState("");
-    const [devToken, setDevToken] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
@@ -15,7 +14,6 @@ function ForgotPassword() {
         e.preventDefault();
         setMessage("");
         setError("");
-        setDevToken("");
         setLoading(true);
 
         try {
@@ -23,17 +21,6 @@ function ForgotPassword() {
 
             if (data.success) {
                 setMessage(data.message);
-                // The server only returns a reset token in demo builds;
-                // production never exposes it in the API response.
-                if (
-                    import.meta.env.DEV &&
-                    import.meta.env.VITE_SHOW_DEMO !== "false" &&
-                    data.data?.reset_token
-                ) {
-                    setDevToken(data.data.reset_token);
-                } else {
-                    window.location.href = "/login";
-                }
             }
         } catch (err) {
             setError(
@@ -69,22 +56,7 @@ function ForgotPassword() {
                         </div>
                     )}
 
-                    {devToken && (
-                        <div className="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                            <p className="font-medium">Demo email preview</p>
-                            <p className="mt-1 break-all font-mono text-xs">
-                                {devToken}
-                            </p>
-                            <Link
-                                to={`/reset-password?token=${devToken}`}
-                                className="mt-2 inline-block font-medium text-indigo-600 hover:text-indigo-700"
-                            >
-                                Continue to reset
-                            </Link>
-                        </div>
-                    )}
-
-                    {!devToken && (
+                    {!message && (
                         <form
                             onSubmit={handleSubmit}
                             className="mt-5 space-y-4"

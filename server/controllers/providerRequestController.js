@@ -104,7 +104,16 @@ const getById = async (req, res) => {
             [id, providerId]
         );
 
+        const [attachments] = await db.query(
+            `SELECT id, file_name, file_url, file_type, created_at
+             FROM request_attachments
+             WHERE request_id = ?
+             ORDER BY id ASC`,
+            [id]
+        );
+
         request.my_offer = offers[0] || null;
+        request.attachments = attachments;
 
         return res.json({ success: true, data: request });
     } catch (error) {

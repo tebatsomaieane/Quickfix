@@ -41,9 +41,8 @@ This manual covers every feature of the QuickFix platform, organized by role.
 
 1. On the login screen, click **Forgot your password?**
 2. Enter the email address registered to your account.
-3. Follow the instructions sent to your email (in development mode the reset
-   token may be displayed directly — this is disabled in production).
-4. Enter your email, the reset token, and a new password.
+3. Follow the instructions sent to your email.
+4. Open the reset link and enter a new password.
 
 ### Account Deactivation
 
@@ -91,6 +90,10 @@ Your dashboard shows:
    - **Preferred date** — when you'd like the work done
    - **Attachments** — any photos or documents (optional)
 3. Click **Submit**. Providers will be notified and can send you offers.
+
+> **Uploading photos & videos:** you can attach up to 6 photos or short
+> videos when posting a request. Uploads are stored securely by QuickFix and
+> shown to providers so they can quote accurately.
 
 ### View & Cancel a Request
 
@@ -150,7 +153,8 @@ Your dashboard shows:
 ### Managing Your Profile
 
 **My Profile** (`/provider/profile`):
-- Update your description, profile image, experience years, location, and service area.
+- Update your description, profile photo, experience years, location, and service area.
+- Choose a clear photo of your face — customers trust verified-looking profiles.
 - Click **Save** after editing.
 
 ### Managing Your Services
@@ -228,13 +232,14 @@ Your dashboard shows:
 ### Business Profile
 
 **My Profile** (`/business/profile`):
-- Update your business name, description, logo, cover image, contact details, and operating hours.
+- Update your business name, description, logo, cover photo, contact details, and operating hours.
 - Changes take effect immediately.
 
 ### Managing Products
 
 **My Products** (`/business/products`):
-- **Create** a new product by clicking **+ New product** and filling in name, description, price, category (optional), and image URL.
+- **Create** a new product by clicking **+ New product** and filling in name,
+  description, price, category (optional), and an uploaded product photo.
 - **Edit** an existing product inline.
 - **Delete** a product (irreversible).
 - Products appear on the marketplace once your business is verified.
@@ -380,10 +385,22 @@ PATCH /api/admin/promotions/:id       { "status": "ACTIVE" | "REJECTED" | "PAUSE
 - Advertisements and promotions require admin approval.
 - They will remain PENDING until an admin reviews and sets the status to ACTIVE.
 
-### Images not loading
+### Photos not loading
 
-- Use publicly accessible image URLs (e.g., from image hosting services).
-- Uploaded images are not yet supported in v1 — use direct image links.
+- Photos are uploaded by users through the app and served from the API server.
+- If images appear blank, check that the API server is reachable at its
+  configured URL (`VITE_API_URL` on the frontend, `PUBLIC_API_URL` on the
+  server).
+- Until a user uploads their own photo, the app shows a gradient or their
+  initials — this is normal and by design.
+
+---
+
+## Contact
+
+- Phone / WhatsApp: **+266 5779 9537**
+- Email: support@quickfix.co.ls
+- Location: Maseru, Lesotho
 
 ---
 

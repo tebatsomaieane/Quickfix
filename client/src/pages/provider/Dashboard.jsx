@@ -17,7 +17,7 @@ import {
     statusColor,
     statusLabel
 } from "../../lib/format";
-import { IMAGES, getProviderPortrait } from "../../lib/visuals";
+import { getProviderPortrait } from "../../lib/visuals";
 
 function ProviderDashboard() {
     const [profile, setProfile] = useState(null);
@@ -190,12 +190,12 @@ function ProviderDashboard() {
                                 </div>
                             </div>
                             <div className="relative hidden lg:block">
-                                <SmartImage
-                                    src={IMAGES.heroTools}
-                                    alt="Tools of the trade"
-                                    seed="provider workbench"
-                                    icon="wrench"
-                                    className="h-full min-h-[16rem] w-full object-cover"
+<SmartImage
+                                    src={null}
+                                    alt="Tools of a working provider"
+                                    seed="provider tools"
+                                    icon="tools"
+                                    className="h-full w-full object-cover"
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-r from-slate-900 to-transparent" />
                             </div>

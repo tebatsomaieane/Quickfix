@@ -21,6 +21,9 @@ npm-debug.log*
 coverage/
 .nyc_output/
 
+# User-uploaded media (stored on the API server's disk)
+server/uploads/
+
 # OS / editor cruft
 .DS_Store
 Thumbs.db

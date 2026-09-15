@@ -47,9 +47,12 @@ export const logoutUser = async () => {
 
 // ==========================================
 // FETCH CURRENT USER (via session cookie)
+// /auth/session never 401s for guests — it returns
+// { success:false, user:null }, so a logged-out visit
+// won't bounce public pages to /login.
 // ==========================================
 export const fetchCurrentUser = async () => {
-    const response = await api.get("/auth/me");
+    const response = await api.get("/auth/session");
 
     if (response.data.success) {
         cacheUser(response.data.user);

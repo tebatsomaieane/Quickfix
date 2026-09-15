@@ -11,6 +11,7 @@ import Input from "../../components/ui/Input";
 import Textarea from "../../components/ui/Textarea";
 import Spinner from "../../components/ui/Spinner";
 import SmartImage from "../../components/ui/SmartImage";
+import FileUpload from "../../components/ui/FileUpload";
 
 const VERIFICATION_COLORS = {
     PENDING: "amber",
@@ -138,8 +139,22 @@ function Profile() {
                             <Input label="Operating hours" id="operating_hours" name="operating_hours" value={form.operating_hours} onChange={handleChange} placeholder="Mon–Fri: 8:00–17:00" />
                         </div>
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <Input label="Logo image URL" id="logo" name="logo" type="url" value={form.logo} onChange={handleChange} placeholder="https://..." />
-                            <Input label="Cover image URL" id="cover_image" name="cover_image" type="url" value={form.cover_image} onChange={handleChange} placeholder="https://..." />
+                            <FileUpload
+                                label="Logo"
+                                kind="image"
+                                value={form.logo}
+                                onChange={(url) =>
+                                    setForm({ ...form, logo: url })
+                                }
+                            />
+                            <FileUpload
+                                label="Cover photo"
+                                kind="image"
+                                value={form.cover_image}
+                                onChange={(url) =>
+                                    setForm({ ...form, cover_image: url })
+                                }
+                            />
                         </div>
                         <div className="flex gap-3">
                             <Button type="submit" loading={saving}>Save</Button>

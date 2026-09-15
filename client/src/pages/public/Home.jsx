@@ -6,7 +6,6 @@ import Spinner from "../../components/ui/Spinner";
 import SmartImage from "../../components/ui/SmartImage";
 import { fetchCategories, fetchMarketOverview } from "../../services/catalogueService";
 import {
-    IMAGES,
     getCategoryImage,
     getServiceImage
 } from "../../lib/visuals";
@@ -14,21 +13,21 @@ import {
 const OFFERINGS = [
     {
         icon: "wrench",
-        image: IMAGES.heroEngineer,
+        seed: "Request a service",
         title: "Request a service",
         description:
             "Post what you need done — plumbing, electrical, cleaning or tech — and verified providers send you offers within hours."
     },
     {
         icon: "users",
-        image: IMAGES.heroTeam,
+        seed: "Hire a provider",
         title: "Hire a provider",
         description:
             "Browse vetted professionals, compare reviews and prices, and hire the right person for the job."
     },
     {
         icon: "inbox",
-        image: IMAGES.cafe,
+        seed: "Products from stores & cafés",
         title: "Products from stores & cafés",
         description:
             "Stores and cafés advertise what they sell. Browse the adverts, then contact the shop directly to buy."
@@ -77,30 +76,6 @@ const STORE_FEATURES = [
     }
 ];
 
-const TESTIMONIALS = [
-    {
-        quote:
-            "Posting a request took two minutes. Three providers quoted, I compared reviews and hired the best one — the leak was fixed the same week.",
-        name: "Palesa Motaung",
-        role: "Customer, Maseru",
-        initials: "PM"
-    },
-    {
-        quote:
-            "QuickFix has filled my calendar. The verification badge makes customers trust me before we even speak.",
-        name: "Kabelo Rama",
-        role: "IT support provider, Maseru",
-        initials: "KR"
-    },
-    {
-        quote:
-            "We advertise our products on QuickFix and enquiries come in every week. It feels like a real local marketplace.",
-        name: "Keletso Mofokeng",
-        role: "Business owner, Leribe",
-        initials: "KM"
-    }
-];
-
 function Home() {
     const navigate = useNavigate();
     const [categories, setCategories] = useState([]);
@@ -112,7 +87,7 @@ function Home() {
         fetchCategories({ withServices: true })
             .then((data) => {
                 if (!cancelled) {
-                    setCategories(data.data);
+                    setCategories(Array.isArray(data?.data) ? data.data : []);
                 }
             })
             .catch(() => {
@@ -124,7 +99,11 @@ function Home() {
         fetchMarketOverview()
             .then((data) => {
                 if (!cancelled) {
-                    setOverview(data.data);
+                    setOverview(
+                        data?.data && typeof data.data === "object"
+                            ? data.data
+                            : null
+                    );
                 }
             })
             .catch(() => {
@@ -169,7 +148,7 @@ function Home() {
             : null;
 
     const serviceImages = [];
-    categories.forEach((category) => {
+    (categories ?? []).forEach((category) => {
         if (category.services) {
             category.services.forEach((service) => serviceImages.push(service));
         }
@@ -254,7 +233,6 @@ function Home() {
                         <div className="relative mx-auto max-w-md lg:max-w-none">
                             <div className="overflow-hidden rounded-3xl shadow-2xl shadow-indigo-200/60 ring-1 ring-slate-900/10">
                                 <SmartImage
-                                    src={IMAGES.heroEngineer}
                                     alt="Trained provider repairing a kitchen"
                                     seed="hero engineer"
                                     icon="wrench"
@@ -310,9 +288,8 @@ function Home() {
                         >
                             <div className="relative h-36 overflow-hidden">
                                 <SmartImage
-                                    src={offering.image}
                                     alt={offering.title}
-                                    seed={offering.title}
+                                    seed={offering.seed}
                                     icon={offering.icon}
                                     className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                                 />
@@ -441,7 +418,6 @@ function Home() {
                 <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 lg:grid lg:grid-cols-2">
                     <div className="relative">
                         <SmartImage
-                            src={IMAGES.shop}
                             alt="A local store advertising its products"
                             seed="storefront"
                             icon="building"
@@ -498,51 +474,6 @@ function Home() {
                                 Log in as a business
                             </Button>
                         </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* ============================== TESTIMONIALS ============================== */}
-            <section className="bg-slate-50 py-16 sm:py-20">
-                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                    <div className="text-center">
-                        <p className="text-xs font-bold uppercase tracking-widest text-indigo-600">
-                            Real stories
-                        </p>
-                        <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
-                            Loved by customers and providers alike
-                        </h2>
-                    </div>
-
-                    <div className="mt-10 grid gap-6 lg:grid-cols-3">
-                        {TESTIMONIALS.map((testimonial) => (
-                            <figure
-                                key={testimonial.name}
-                                className="flex flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
-                            >
-                                <div className="flex gap-1 text-amber-400">
-                                    {Array.from({ length: 5 }).map((_, i) => (
-                                        <Icon key={i} name="star" className="h-4 w-4 fill-amber-400" />
-                                    ))}
-                                </div>
-                                <blockquote className="mt-4 flex-1 text-sm leading-relaxed text-slate-600">
-                                    "{testimonial.quote}"
-                                </blockquote>
-                                <figcaption className="mt-5 flex items-center gap-3 border-t border-slate-100 pt-4">
-                                    <span className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-sm font-bold text-white shadow">
-                                        {testimonial.initials}
-                                    </span>
-                                    <div>
-                                        <p className="text-sm font-bold text-slate-900">
-                                            {testimonial.name}
-                                        </p>
-                                        <p className="text-xs text-slate-500">
-                                            {testimonial.role}
-                                        </p>
-                                    </div>
-                                </figcaption>
-                            </figure>
-                        ))}
                     </div>
                 </div>
             </section>

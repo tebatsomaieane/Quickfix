@@ -1,11 +1,12 @@
 # ──────────────────────────────────────────────
 # QuickFix API server image
+# Build context is repo root, server lives in server/
 # ──────────────────────────────────────────────
 FROM node:22-alpine AS deps
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY server/package*.json ./
 RUN npm ci --omit=dev
 
 # ──────────────────────────────────────────────
@@ -14,11 +15,13 @@ FROM node:22-alpine
 ENV NODE_ENV=production
 WORKDIR /app
 
-# Run as a non-root user
 RUN addgroup -S app && adduser -S app -G app
 
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY server/ .
+
+# Uploaded media directory (persisted via a named volume in compose).
+RUN mkdir -p /app/uploads && chown -R app:app /app/uploads
 
 USER app
 

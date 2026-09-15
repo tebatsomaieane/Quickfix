@@ -3,10 +3,8 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
-import Icon from "../../components/ui/Icon";
 import Logo from "../../components/ui/Logo";
 import AuthShell from "../../components/auth/AuthShell";
-import { IMAGES } from "../../lib/visuals";
 
 const ROLE_PATHS = {
     CUSTOMER: "/customer/dashboard",
@@ -14,33 +12,6 @@ const ROLE_PATHS = {
     BUSINESS_OWNER: "/business/dashboard",
     ADMIN: "/admin/dashboard"
 };
-
-const DEMO_ACCOUNTS = [
-    {
-        label: "Customer",
-        icon: "user",
-        email: "palesa.motaung@example.com",
-        token: "customer"
-    },
-    {
-        label: "Provider",
-        icon: "wrench",
-        email: "john.mokoena@example.com",
-        token: "provider"
-    },
-    {
-        label: "Admin",
-        icon: "shield",
-        email: "admin@quickfix.com",
-        token: "admin"
-    }
-];
-
-// Demo accounts are bundled in dev only. For a production build set
-// VITE_SHOW_DEMO=true explicitly if you still want them available.
-const SHOW_DEMO_ACCOUNTS =
-    import.meta.env.VITE_SHOW_DEMO === "true" ||
-    (import.meta.env.DEV && import.meta.env.VITE_SHOW_DEMO !== "false");
 
 const HIGHLIGHTS = [
     "Compare offers from verified providers",
@@ -73,11 +44,6 @@ function Login() {
         });
     };
 
-    const fillDemo = (email) => {
-        setError("");
-        setFormData((previous) => ({ ...previous, email, password: "Password@123" }));
-    };
-
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -102,7 +68,6 @@ function Login() {
 
     return (
         <AuthShell
-            image={IMAGES.heroEngineer}
             imageSeed="login engineer"
             imageIcon="wrench"
             highlights={HIGHLIGHTS}
@@ -156,31 +121,6 @@ function Login() {
                             {loggingIn ? "Logging in..." : "Log in"}
                         </Button>
                     </form>
-
-                    <div className="mt-6">
-                        {SHOW_DEMO_ACCOUNTS && (<>
-                            <p className="text-center text-xs font-medium uppercase tracking-wide text-slate-400">
-                                Try a demo account
-                            </p>
-                            <div className="mt-3 grid grid-cols-3 gap-2">
-                                {DEMO_ACCOUNTS.map((account) => (
-                                    <button
-                                        key={account.token}
-                                        type="button"
-                                        onClick={() => fillDemo(account.email)}
-                                        className="flex flex-col items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-2 py-3 text-xs font-semibold text-slate-700 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700"
-                                    >
-                                        <Icon name={account.icon} className="h-4 w-4" />
-                                        {account.label}
-                                    </button>
-                                ))}
-                            </div>
-                            <p className="mt-2 text-center text-[11px] text-slate-400">
-                                One click fills the credentials (password:{" "}
-                                <code className="font-mono">Password@123</code>)
-                            </p>
-                        </>)}
-                    </div>
 
                     <p className="mt-6 text-center text-sm text-slate-600">
                         Don't have an account?{" "}

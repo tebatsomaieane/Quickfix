@@ -4,6 +4,7 @@ const {
     register,
     login,
     me,
+    session,
     updateProfile,
     logout,
     changePassword,
@@ -22,6 +23,7 @@ const router = express.Router();
 router.post("/register", rateLimit({ max: 10 }), register);
 router.post("/login", rateLimit({ max: 20 }), login);
 router.get("/me", protect, me);
+router.get("/session", session);
 router.patch("/profile", protect, updateProfile);
 router.post("/logout", logout);
 router.post("/change-password", protect, changePassword);

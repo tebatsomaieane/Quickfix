@@ -2,6 +2,7 @@ require("dotenv").config();
 
 const app = require("./app");
 const db = require("./config/db");
+const ensureSchema = require("./utils/ensureSchema");
 
 const PORT = process.env.PORT || 5000;
 
@@ -37,6 +38,8 @@ async function startServer() {
         console.log("MySQL connected successfully");
 
         connection.release();
+
+        await ensureSchema();
 
         const server = app.listen(PORT, () => {
             console.log(`QuickFix server running on http://localhost:${PORT}`);

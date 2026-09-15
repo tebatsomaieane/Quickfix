@@ -22,7 +22,7 @@ import {
     statusColor,
     statusLabel
 } from "../../lib/format";
-import { IMAGES, getCategoryImage, getBusinessImage } from "../../lib/visuals";
+import { getCategoryImage, getBusinessImage } from "../../lib/visuals";
 
 function CustomerDashboard() {
     const { user } = useAuth();
@@ -154,7 +154,6 @@ function CustomerDashboard() {
                     </div>
                     <div className="relative hidden lg:block">
                         <SmartImage
-                            src={IMAGES.heroEngineer}
                             alt="A provider at work"
                             seed="customer welcome"
                             icon="wrench"

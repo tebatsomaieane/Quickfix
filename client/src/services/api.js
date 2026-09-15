@@ -27,12 +27,16 @@ api.interceptors.response.use(
         const url = error.config?.url || "";
 
         // Only treat real session failures as needing a login bounce.
+        // /auth/session and /auth/me are passive session probes — they
+        // legitimately report "not logged in" and must never redirect.
         if (
             status === 401 &&
             !url.includes("/auth/login") &&
             !url.includes("/auth/register") &&
             !url.includes("/auth/forgot-password") &&
-            !url.includes("/auth/reset-password")
+            !url.includes("/auth/reset-password") &&
+            !url.includes("/auth/session") &&
+            !url.includes("/auth/me")
         ) {
             if (!redirectingToLogin && !window.location.pathname.startsWith("/login")) {
                 redirectingToLogin = true;

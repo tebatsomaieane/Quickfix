@@ -13,6 +13,7 @@ import Badge from "../../components/ui/Badge";
 import Input from "../../components/ui/Input";
 import Textarea from "../../components/ui/Textarea";
 import Spinner from "../../components/ui/Spinner";
+import FileUpload from "../../components/ui/FileUpload";
 
 const DAYS = [
     "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY",
@@ -206,14 +207,14 @@ function ProviderProfile() {
                                 />
                             </div>
 
-                            <Input
-                                label="Profile image URL"
-                                id="profile_image"
-                                name="profile_image"
-                                type="url"
+                            <FileUpload
+                                label="Profile photo"
+                                kind="image"
                                 value={form.profile_image}
-                                onChange={handleChange}
-                                placeholder="https://..."
+                                onChange={(url) =>
+                                    setForm({ ...form, profile_image: url })
+                                }
+                                hint="A clear photo of your face builds trust with customers."
                             />
 
                             <Input

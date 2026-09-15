@@ -6,7 +6,6 @@ import Input from "../../components/ui/Input";
 import Select from "../../components/ui/Select";
 import Logo from "../../components/ui/Logo";
 import AuthShell from "../../components/auth/AuthShell";
-import { IMAGES } from "../../lib/visuals";
 
 const ROLE_OPTIONS = [
     { value: "CUSTOMER", label: "I need services" },
@@ -111,7 +110,6 @@ function Register() {
 
     return (
         <AuthShell
-            image={IMAGES.heroTeam}
             imageSeed="register providers"
             imageIcon="users"
             highlights={HIGHLIGHTS}

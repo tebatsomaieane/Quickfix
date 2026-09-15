@@ -85,8 +85,8 @@ function Footer() {
                         </h3>
                         <ul className="mt-3 space-y-2 text-sm text-slate-500">
                             <li>Maseru, Lesotho</li>
-                            <li>support@quickfix.com</li>
-                            <li>+266 0000 0000</li>
+                            <li>support@quickfix.co.ls</li>
+                            <li>+266 5779 9537</li>
                         </ul>
                     </div>
                 </div>

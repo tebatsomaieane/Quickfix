@@ -214,6 +214,38 @@ function ProviderRequestDetail() {
                         </dd>
                     </div>
                 </dl>
+
+                {request.attachments?.length > 0 && (
+                    <div className="mt-6">
+                        <p className="text-sm font-medium text-slate-500">
+                            Photos & videos
+                        </p>
+                        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                            {request.attachments.map((attachment) => (
+                                <div
+                                    key={attachment.id}
+                                    className="overflow-hidden rounded-lg border border-slate-200"
+                                >
+                                    {String(
+                                        attachment.file_type || ""
+                                    ).startsWith("video/") ? (
+                                        <video
+                                            src={attachment.file_url}
+                                            controls
+                                            className="h-32 w-full bg-black object-contain"
+                                        />
+                                    ) : (
+                                        <img
+                                            src={attachment.file_url}
+                                            alt={attachment.file_name}
+                                            className="h-32 w-full object-cover"
+                                        />
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </Card>
 
             {/* Offer form */}

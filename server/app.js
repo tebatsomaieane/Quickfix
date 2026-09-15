@@ -24,6 +24,7 @@ const complaintRoutes = require("./routes/complaintRoutes");
 const businessRoutes = require("./routes/businessRoutes");
 const providerVerificationRoutes = require("./routes/providerVerificationRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const uploadRoutes = require("./routes/uploadRoutes");
 
 const app = express();
 
@@ -101,6 +102,14 @@ app.use(express.json({ limit: "100kb" }));
 app.use(express.urlencoded({ extended: true, limit: "100kb" }));
 app.use(cookieParser());
 
+// User-uploaded media (photos/videos) stored on the API server's disk.
+const uploadsDir = path.join(__dirname, "uploads");
+app.use("/uploads", express.static(uploadsDir, {
+    dotfiles: "deny",
+    index: false,
+    maxAge: "7d"
+}));
+
 // Home route (development only - in production the built client is served)
 if (process.env.NODE_ENV !== "production") {
     app.get("/", (req, res) => {
@@ -175,6 +184,9 @@ app.use("/api/provider/verification", providerVerificationRoutes);
 
 // Admin routes
 app.use("/api/admin", adminRoutes);
+
+// Media uploads
+app.use("/api/uploads", uploadRoutes);
 
 // Production single-process deployment: serve the built React client.
 if (process.env.NODE_ENV === "production") {

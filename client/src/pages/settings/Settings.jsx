@@ -4,6 +4,7 @@ import { changePassword, updateProfile } from "../../services/authService";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import Input from "../../components/ui/Input";
+import FileUpload from "../../components/ui/FileUpload";
 
 function Settings() {
     const { user, setUser } = useAuth();
@@ -11,7 +12,9 @@ function Settings() {
     const [profileForm, setProfileForm] = useState({
         first_name: user?.first_name || "",
         last_name: user?.last_name || "",
-        phone: user?.phone || ""
+        phone: user?.phone || "",
+        profile_image: user?.profile_image || "",
+        location: user?.location || ""
     });
     const [profileMessage, setProfileMessage] = useState("");
     const [profileError, setProfileError] = useState("");
@@ -40,7 +43,9 @@ function Settings() {
             const data = await updateProfile({
                 first_name: profileForm.first_name,
                 last_name: profileForm.last_name,
-                phone: profileForm.phone
+                phone: profileForm.phone,
+                profile_image: profileForm.profile_image,
+                location: profileForm.location
             });
 
             if (data.success) {
@@ -162,6 +167,29 @@ function Settings() {
                             onChange={handleProfileChange}
                             required
                             maxLength="30"
+                        />
+
+                        <Input
+                            label="Location"
+                            id="location"
+                            name="location"
+                            value={profileForm.location}
+                            onChange={handleProfileChange}
+                            placeholder="e.g. Maseru"
+                            maxLength="255"
+                        />
+
+                        <FileUpload
+                            label="Profile photo"
+                            kind="image"
+                            value={profileForm.profile_image}
+                            onChange={(url) =>
+                                setProfileForm({
+                                    ...profileForm,
+                                    profile_image: url
+                                })
+                            }
+                            hint="Your photo lets customers see who they are talking to."
                         />
 
                         <Button type="submit" loading={profileLoading}>

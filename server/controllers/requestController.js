@@ -116,30 +116,81 @@ const create = async (req, res) => {
             });
         }
 
-        // 5. Create the request
-        const [result] = await db.query(
-            `INSERT INTO service_requests
-             (customer_id, service_id, title, description, location,
-              preferred_date, preferred_time, budget_min, budget_max, status)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN')`,
-            [
-                customerId,
-                service_id,
-                title.trim(),
-                description.trim(),
-                location.trim(),
-                preferred_date || null,
-                preferred_time || null,
-                bMin,
-                bMax
-            ]
-        );
+        // 5. Create the request (with optional photo/video attachments)
+        const attachments = Array.isArray(req.body.attachments)
+            ? req.body.attachments
+            : [];
 
-        res.status(201).json({
-            success: true,
-            message: "Service request posted successfully",
-            data: { id: result.insertId }
-        });
+        const connection = await db.getConnection();
+
+        try {
+            await connection.beginTransaction();
+
+            const [result] = await connection.query(
+                `INSERT INTO service_requests
+                 (customer_id, service_id, title, description, location,
+                  preferred_date, preferred_time, budget_min, budget_max, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN')`,
+                [
+                    customerId,
+                    service_id,
+                    title.trim(),
+                    description.trim(),
+                    location.trim(),
+                    preferred_date || null,
+                    preferred_time || null,
+                    bMin,
+                    bMax
+                ]
+            );
+
+            for (const attachment of attachments) {
+                const fileUrl = String(
+                    attachment.url || attachment.file_url || ""
+                ).trim();
+                const fileName = String(
+                    attachment.filename ||
+                        attachment.file_name ||
+                        `attachment-${result.insertId}`
+                ).trim();
+
+                if (!fileUrl || fileUrl.length > 500) {
+                    await connection.rollback();
+
+                    return res.status(400).json({
+                        success: false,
+                        message:
+                            "Each attachment needs a valid file URL (max 500 characters)"
+                    });
+                }
+
+                await connection.query(
+                    `INSERT INTO request_attachments
+                     (request_id, file_name, file_url, file_type)
+                     VALUES (?, ?, ?, ?)`,
+                    [
+                        result.insertId,
+                        fileName,
+                        fileUrl,
+                        attachment.mimeType || attachment.file_type || null
+                    ]
+                );
+            }
+
+            await connection.commit();
+
+            return res.status(201).json({
+                success: true,
+                message: "Service request posted successfully",
+                data: { id: result.insertId }
+            });
+        } catch (error) {
+            await connection.rollback();
+
+            throw error;
+        } finally {
+            connection.release();
+        }
     } catch (error) {
         console.error("Error creating request:", error);
 
@@ -264,8 +315,17 @@ const getById = async (req, res) => {
             [id]
         );
 
+        const [attachments] = await db.query(
+            `SELECT id, file_name, file_url, file_type, created_at
+             FROM request_attachments
+             WHERE request_id = ?
+             ORDER BY id ASC`,
+            [id]
+        );
+
         request.offers = offers;
         request.jobs = jobs;
+        request.attachments = attachments;
 
         res.json({ success: true, data: request });
     } catch (error) {

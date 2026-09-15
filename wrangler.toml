@@ -1,0 +1,17 @@
+# Cloudflare Pages configuration.
+#
+# Git-integrated deploy (recommended):
+#   1. In the Cloudflare dashboard create a Pages project "quickfix"
+#      linked to this repository.
+#   2. Framework preset: Vite
+#      Build command: npm --prefix client ci && npm --prefix client run build
+#      Build output directory: client/dist
+#   3. Set the build environment variable VITE_API_URL to your API origin,
+#      e.g. https://api.quickfix.co.ls (or leave unset if /api is proxied
+#      on the same host in production).
+#
+# Direct CLI deploy (alternative):
+#   npm --prefix client ci && npm --prefix client run build
+#   wrangler pages deploy client/dist --project-name quickfix
+name = "quickfix"
+pages_build_output_dir = "client/dist"
