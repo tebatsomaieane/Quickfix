@@ -3,6 +3,7 @@ require("dotenv").config();
 const app = require("./app");
 const db = require("./config/db");
 const ensureSchema = require("./utils/ensureSchema");
+const { startUploadCleanup } = require("./utils/cleanupUploads");
 
 const PORT = process.env.PORT || 5000;
 
@@ -40,6 +41,8 @@ async function startServer() {
         connection.release();
 
         await ensureSchema();
+
+        startUploadCleanup();
 
         const server = app.listen(PORT, () => {
             console.log(`QuickFix server running on http://localhost:${PORT}`);

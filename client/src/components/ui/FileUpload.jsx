@@ -125,7 +125,7 @@ function FileUpload({
                             : "Choose a photo"}
                     </span>
                     <span className="text-xs text-slate-400">
-                        Uploads are stored securely by QuickFix (max 50 MB)
+                        Uploads are stored securely by QuickFix (photos up to 10 MB, videos up to 50 MB)
                     </span>
                 </button>
             )}

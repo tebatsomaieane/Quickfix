@@ -2,6 +2,7 @@ const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const db = require("../config/db");
+const { sendPasswordResetEmail } = require("../utils/email");
 
 const JWT_MAX_AGE = 60 * 60 * 24; // 1 day in seconds
 
@@ -624,6 +625,8 @@ const requestPasswordReset = async (req, res) => {
              VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 1 HOUR))`,
             [users[0].id, tokenHash]
         );
+
+        await sendPasswordResetEmail(users[0].email, token);
 
         return res.json({
             success: true,

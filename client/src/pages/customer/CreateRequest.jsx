@@ -301,7 +301,7 @@ function CreateRequest() {
                         </span>
                         <p className="mb-3 text-sm text-slate-500">
                             Show the problem clearly — photos or short videos help
-                            providers send accurate offers (up to 6 files, 50 MB each).
+                            providers send accurate offers (up to 6 files, photos 10 MB / videos 50 MB each).
                         </p>
 
                         {attachments.length > 0 && (
