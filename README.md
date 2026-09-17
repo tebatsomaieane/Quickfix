@@ -130,39 +130,36 @@ cp .env.example .env                # full values, incl. JWT_SECRET
 docker compose up -d --build        # db + server + nginx ingress on :80
 ```
 
-### Deploy the client (Cloudflare Pages Git integration — recommended)
+### Deploy the client (GitHub Actions — recommended)
 
-Connect the repository once and Cloudflare builds & deploys on every push:
+`.github/workflows/deploy.yml` builds `client/` and publishes `client/dist`
+to the `quickfix` Pages project on every push to `main`. Pull requests run
+lint + build only.
 
-1. **Cloudflare dashboard → Workers & Pages → Create → Pages →
-   Connect to Git**, and select this repository.
-2. Build settings:
-   - **Framework preset**: Vite
-   - **Build command**: `npm --prefix client ci && npm --prefix client run build`
-   - **Build output directory**: `client/dist`
-   - **Environment variable**: `VITE_API_URL` = `https://api.your-domain`
-     (the API origin from above; required — without it requests go to
-     `/api` on the Pages domain and auth breaks)
-   - Node version is pinned by `.nvmrc` (22).
-3. **Save and Deploy**, then add your custom domain under
-   **Pages → quickfix → Custom domains**.
+One-time setup:
 
-`.github/workflows/deploy.yml` runs the same install/lint/build as a
-verification check on pushes and pull requests, so a broken build is caught
-before Cloudflare builds it.
+1. Create an API token in **Cloudflare dashboard → My Profile → API Tokens**
+   with the *Cloudflare Pages: Edit* permission, and copy the **Account ID**
+   from the dashboard sidebar.
+2. In GitHub → **Settings → Secrets and variables → Actions**:
+   - *Secrets*: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
+   - *Variables*: `VITE_API_URL` = `https://api.your-domain`
+     (optional `CF_PAGES_PROJECT`, defaults to `quickfix`)
+3. Push to `main` (or run the workflow manually). The first run creates the
+   Pages project if it does not exist.
+4. Add your custom domain under **Pages → quickfix → Custom domains**.
 
-### Deploy the client (GitHub Actions — optional, manual)
+### Deploy the client (Cloudflare Git integration — alternative)
 
-To publish from GitHub Actions instead of Cloudflare's builder, run the
-**Client build & Cloudflare Pages** workflow manually (Actions → *Run
-workflow*). It needs these repo settings under
-**Settings → Secrets and variables → Actions**:
+Instead of Actions, you can let Cloudflare build from GitHub directly:
+**Workers & Pages → Create → Pages → Connect to Git**, pick this repository,
+then set framework preset **Vite**, build command
+`npm --prefix client ci && npm --prefix client run build`, output directory
+`client/dist`, and environment variable `VITE_API_URL`.
 
-- *Secrets*: `CLOUDFLARE_API_TOKEN` (Pages: Edit), `CLOUDFLARE_ACCOUNT_ID`
-- *Variables*: `VITE_API_URL`, optional `CF_PAGES_PROJECT` (default `quickfix`)
-
-Use one automatic deployment path only. If Cloudflare's Git integration is
-enabled, this workflow stays manual to avoid duplicate deployments.
+Use **one** automatic deployment path. If Cloudflare's Git integration is
+enabled, remove/disable the push trigger in `.github/workflows/deploy.yml`
+so each push does not deploy twice.
 
 ### Deploy the client (local one-off)
 

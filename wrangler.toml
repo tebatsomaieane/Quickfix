@@ -1,18 +1,19 @@
 # Cloudflare Pages configuration.
 #
-# Primary method — Cloudflare Pages Git integration (recommended):
-#   1. Dashboard → Workers & Pages → Create → Pages → Connect to Git,
-#      and select this repository.
+# Primary method — GitHub Actions (.github/workflows/deploy.yml):
+#   Every push to main builds client/ and deploys client/dist to the
+#   "quickfix" Pages project. Requires CLOUDFLARE_API_TOKEN and
+#   CLOUDFLARE_ACCOUNT_ID secrets plus the VITE_API_URL variable.
+#
+# Alternative — Cloudflare Pages Git integration:
+#   1. Dashboard → Workers & Pages → Create → Pages → Connect to Git.
 #   2. Framework preset: Vite
 #      Build command: npm --prefix client ci && npm --prefix client run build
 #      Build output directory: client/dist
 #   3. Set the build environment variable VITE_API_URL to your API origin,
 #      e.g. https://api.quickfix.co.ls
-#   Node is pinned by .nvmrc (22).
-#
-# Alternative — GitHub Actions (manual dispatch only):
-#   See .github/workflows/deploy.yml. Requires CLOUDFLARE_API_TOKEN,
-#   CLOUDFLARE_ACCOUNT_ID secrets and the VITE_API_URL variable.
+#   Node is pinned by .nvmrc (22). Do not enable this together with the
+#   Actions deploy, or each push would deploy twice.
 #
 # Alternative — direct CLI deploy from the repo root:
 #   npm --prefix client ci && npm --prefix client run build
