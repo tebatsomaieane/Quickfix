@@ -121,14 +121,58 @@ PUBLIC_API_URL=https://api.your-domain    # used for uploaded-media URLs
 PUBLIC_APP_URL=https://quickfix.pages.dev # password-reset email links
 ```
 
-Then bring up the API + MySQL. The compose `client` container (nginx) acts as
-the API ingress: it proxies both `/api/` and `/uploads/` to the Node server.
-Point your API domain (`api.your-domain`) at that host behind TLS.
+Pick where the API runs:
+
+**Self-hosted (Docker Compose)** — the compose `client` container (nginx) acts
+as the API ingress and proxies both `/api/` and `/uploads/` to the Node server.
+Point your API domain at that host behind TLS:
 
 ```bash
 cp .env.example .env                # full values, incl. JWT_SECRET
 docker compose up -d --build        # db + server + nginx ingress on :80
 ```
+
+**Railway (no server to manage)** — see *Deploy the API (Railway)* below.
+
+### Deploy the API (Railway)
+
+The repo ships `server/Dockerfile` and `server/railway.json`, so the API builds
+with no extra configuration. Railway also provides the MySQL database and a free
+`*.up.railway.app` subdomain.
+
+1. **railway.app → New Project → Deploy from GitHub repo → `Quickfix`.**
+2. Open the service → **Settings → Source → Root Directory** = `server`.
+3. **New → Database → MySQL** to add the database.
+4. Service → **Variables → Raw Editor**, add:
+   ```
+   NODE_ENV=production
+   JWT_SECRET=<48-char random hex>
+   DB_HOST=${{MySQL.MYSQLHOST}}
+   DB_PORT=${{MySQL.MYSQLPORT}}
+   DB_USER=${{MySQL.MYSQLUSER}}
+   DB_PASSWORD=${{MySQL.MYSQLPASSWORD}}
+   DB_NAME=${{MySQL.MYSQLDATABASE}}
+   CLIENT_ORIGIN=https://quickfix.pages.dev
+   COOKIE_SAMESITE=none
+   PUBLIC_API_URL=https://<your-service>.up.railway.app
+   PUBLIC_APP_URL=https://quickfix.pages.dev
+   ```
+5. **Settings → Networking → Generate Domain** → that
+   `https://<name>.up.railway.app` URL is your `VITE_API_URL`.
+6. Add a **Volume** mounted at `/app/uploads` so uploaded media survives deploys.
+7. Load the schema once (from the repo root, with the Railway CLI and a local
+   MySQL client) — or paste `database/schema.sql` into the MySQL service's
+   *Data → Query* tab:
+   ```bash
+   railway link      # select the project + service
+   railway run sh -c 'mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" < database/schema.sql'
+   railway run sh -c 'mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" < database/seed.sql'
+   ```
+8. Set `VITE_API_URL` to that domain and redeploy the client.
+
+> Free tiers that "sleep" (Render, Koyeb) provide Postgres rather than MySQL and
+> no free persistent disk, so Railway's Hobby plan (~$5/mo) is the
+> least-friction option for this stack.
 
 ### Deploy the client (GitHub Actions — recommended)
 
@@ -273,7 +317,9 @@ quickfix/
 │   ├── middleware/        auth (JWT), rate limiting
 │   ├── routes/           express Router definitions
 │   ├── uploads/          user-uploaded media (runtime, git-ignored)
-│   └── utils/            helpers (notifications, profile resolvers)
+│   ├── utils/            helpers (notifications, profile resolvers)
+│   ├── Dockerfile        production image (build context: server/)
+│   └── railway.json      Railway service config
 │
 ├── database/
 │   ├── schema.sql        full DDL (23 tables, indexes, constraints)
