@@ -1,0 +1,74 @@
+# ─────────────────────────────────────────────────────────────
+# Deploy the QuickFix React client to Cloudflare Pages.
+#
+# One-time setup (repo → Settings → Secrets and variables → Actions):
+#   Secrets:   CLOUDFLARE_API_TOKEN   (Pages: Edit permission)
+#              CLOUDFLARE_ACCOUNT_ID
+#   Variables: VITE_API_URL           e.g. https://api.quickfix.co.ls
+#              CF_PAGES_PROJECT        optional, defaults to "quickfix"
+#
+# The Pages project must NOT be connected to this repository via the
+# Cloudflare dashboard git integration — pick one deployment method.
+# ─────────────────────────────────────────────────────────────
+name: Deploy client to Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "client/**"
+      - "wrangler.toml"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Validate VITE_API_URL is configured
+        shell: bash
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+        run: |
+          if [ -z "$VITE_API_URL" ]; then
+            echo "::error::VITE_API_URL repository variable is not set."
+            echo "Set it under Settings → Secrets and variables → Actions → Variables."
+            exit 1
+          fi
+
+      - name: Install client dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Build client
+        working-directory: client
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+        run: npm run build
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: client
+          command: >-
+            pages deploy dist
+            --project-name ${{ vars.CF_PAGES_PROJECT || 'quickfix' }}
+            --branch ${{ github.ref_name }}

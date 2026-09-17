@@ -105,33 +105,64 @@ The Vite dev server proxies `/api` to `http://localhost:5000` automatically.
 
 ---
 
-## Quick Start — Cloudflare Pages (frontend) + External API
+## Deployment — Cloudflare Pages (frontend) + External API
 
 Cloudflare Pages is a **static host with no persistent disk**, so it serves
 only the React app. The API (and all uploaded media) must live on a separate
-server that has durable storage.
+server that has durable storage (see the Docker Compose / PM2 sections).
+
+Because the app and the API are on **different origins**, the session cookie
+must be sent cross-site. Set these on the **API server** (e.g. in `.env`):
 
 ```bash
-# 1. Deploy the API + MySQL with Docker Compose on your server
-cp .env.example .env                # full values, incl. JWT_SECRET
-docker compose up -d --build        # brings up db + server (API on :5000)
+CLIENT_ORIGIN=https://quickfix.pages.dev,https://your-custom-domain
+COOKIE_SAMESITE=none          # browsers require this for cross-site cookies
+PUBLIC_API_URL=https://api.your-domain    # used for uploaded-media URLs
+PUBLIC_APP_URL=https://quickfix.pages.dev # password-reset email links
+```
 
-# 2. Build and preview the client locally
+Then bring up the API + MySQL. The compose `client` container (nginx) acts as
+the API ingress: it proxies both `/api/` and `/uploads/` to the Node server.
+Point your API domain (`api.your-domain`) at that host behind TLS.
+
+```bash
+cp .env.example .env                # full values, incl. JWT_SECRET
+docker compose up -d --build        # db + server + nginx ingress on :80
+```
+
+### Deploy the client (GitHub Actions — recommended)
+
+`.github/workflows/deploy.yml` builds `client/` and publishes `client/dist`
+to the `quickfix` Pages project on every push to `main`.
+
+One-time setup:
+
+1. Create an API token (**Cloudflare dashboard → My Profile → API Tokens**
+   → *Edit Cloudflare Workers* template, or a token with **Cloudflare Pages:
+   Edit**). Copy the **Account ID** from the dashboard sidebar.
+2. In GitHub → **Settings → Secrets and variables → Actions**:
+   - *Secrets*: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
+   - *Variables*: `VITE_API_URL` = `https://api.your-domain`
+     (optional `CF_PAGES_PROJECT`, defaults to `quickfix`)
+3. Push to `main` (or run the workflow manually). The first run creates the
+   Pages project if it does not exist.
+4. Add your custom domain under **Pages → quickfix → Custom domains**.
+
+> The Pages project must **not** also be connected to this repo through the
+> dashboard git integration — choose one deployment method to avoid conflicts.
+
+### Deploy the client (local one-off)
+
+```bash
 cd client
 npm ci
-npm run build                       # output in client/dist
-npx serve dist                      # optionally preview
-
-# 3. Create a Cloudflare Pages project "quickfix" linked to this repo
-#    Build command:            npm --prefix client ci && npm --prefix client run build
-#    Build output directory:   client/dist
-#    Environment variable:     VITE_API_URL=https://your-api-domain.example
+VITE_API_URL=https://api.your-domain npm run build   # or set it in client/.env
+npx wrangler login                                   # once
+npm run deploy                                       # deploys dist/
 ```
 
 The repo ships `wrangler.toml`, `client/public/_redirects` (SPA fallback)
-and `client/public/_headers` (security headers) already configured. The API
-server must have your Pages domain in `CLIENT_ORIGIN` for the cookie-based
-session to be accepted cross-origin.
+and `client/public/_headers` (security headers) already configured.
 
 ---
 
@@ -195,8 +226,10 @@ See `deploy/deploy.sh` (or `deploy.ps1` on Windows) for the Docker workflow.
 | `PORT` | No | `5000` | API server listen port |
 | `NODE_ENV` | No | `development` | `development` / `production` / `test` |
 | `CLIENT_ORIGIN` | No | `http://localhost:5173` | Comma-separated CORS origins |
+| `COOKIE_SAMESITE` | No | `lax` | Session cookie SameSite; use `none` when the frontend is on another origin |
 | `LOG_FORMAT` | No | `combined` | Morgan log format |
 | `PUBLIC_API_URL` | No | derived from request | Absolute base used when building uploaded-file URLs |
+| `PUBLIC_APP_URL` | No | `CLIENT_ORIGIN` | Frontend origin used in password-reset email links |
 
 ### Client (`client/.env`, build-time)
 
@@ -207,7 +240,7 @@ See `deploy/deploy.sh` (or `deploy.ps1` on Windows) for the Docker workflow.
 ### Docker Compose (`.env` at root)
 
 See `.env.example` — covers MySQL credentials, `JWT_SECRET`, public
-port, and client build args.
+port, `COOKIE_SAMESITE`, public URLs, and client build args.
 
 ---
 
@@ -240,6 +273,9 @@ quickfix/
 │   ├── deploy.sh         Docker Compose launcher (Linux)
 │   ├── deploy.ps1        Docker Compose launcher (Windows)
 │   └── init-db.sh        MySQL initialiser (non-Docker)
+│
+├── .github/workflows/
+│   └── deploy.yml        CI: build + deploy client to Cloudflare Pages
 │
 ├── docker-compose.yml
 ├── wrangler.toml           Cloudflare Pages configuration

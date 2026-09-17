@@ -49,6 +49,14 @@ services:
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env or the shell}
       CLIENT_ORIGIN: ${CLIENT_ORIGIN:-http://localhost}
       LOG_FORMAT: ${LOG_FORMAT:-combined}
+      # Cross-site deployments (frontend on Cloudflare Pages, API here) require
+      # SameSite=none so the browser sends the session cookie to this API.
+      # Keep lax for the same-origin compose setup.
+      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-lax}
+      # Absolute public base used for uploaded-media URLs and password-reset
+      # email links when this API sits behind a proxy / second origin.
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-}
     expose:
       - "5000"
     volumes:
