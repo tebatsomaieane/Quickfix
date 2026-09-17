@@ -265,6 +265,38 @@ See `deploy/deploy.sh` (or `deploy.ps1` on Windows) for the Docker workflow.
 
 ---
 
+## Quick Start — VPS (Docker Compose + Caddy HTTPS)
+
+Full stack on one server with automatic TLS from Let's Encrypt:
+
+```bash
+# 1. Point a DNS A record for DOMAIN at the server's public IP.
+# 2. Configure environment.
+cp .env.example .env
+#   Set DOMAIN, ACME_EMAIL, JWT_SECRET, and the MySQL credentials.
+#   For a same-origin deployment also set CLIENT_ORIGIN and PUBLIC_APP_URL
+#   to https://<DOMAIN>.
+# 3. Build and start (from the repo root).
+docker compose -f deploy/docker-compose.prod.yml up -d --build
+```
+
+Caddy terminates HTTPS on 80/443 and proxies to the client container (nginx),
+which serves the SPA and forwards `/api` and `/uploads` to the API. The database
+is initialised from `database/schema.sql` + `seed.sql` on first boot.
+
+---
+
+## Deploy the API — Render (alternative)
+
+The repo ships `render.yaml`. In Render: **New → Blueprint → select this
+repository**, then supply the `DB_*` values for an external MySQL database
+(Render only offers managed PostgreSQL). Load `database/schema.sql` into it, and
+use the generated `https://quickfix-api.onrender.com` URL as `VITE_API_URL` on
+Cloudflare Pages. The free plan sleeps when idle and has no persistent disk, so
+uploads are ephemeral unless you attach a disk.
+
+---
+
 ## Environment Variables
 
 ### Server (`server/.env`)
@@ -328,12 +360,15 @@ quickfix/
 ├── deploy/
 │   ├── deploy.sh         Docker Compose launcher (Linux)
 │   ├── deploy.ps1        Docker Compose launcher (Windows)
-│   └── init-db.sh        MySQL initialiser (non-Docker)
+│   ├── init-db.sh        MySQL initialiser (non-Docker)
+│   ├── docker-compose.prod.yml   VPS stack (MySQL + API + nginx + Caddy)
+│   └── Caddyfile         Caddy HTTPS reverse-proxy config
 │
 ├── .github/workflows/
 │   └── deploy.yml        CI: build + deploy client to Cloudflare Pages
 │
 ├── docker-compose.yml
+├── render.yaml             Render blueprint for the API
 ├── wrangler.toml           Cloudflare Pages configuration
 ├── .nvmrc                  Node version for Cloudflare / CI builds
 ├── .env.example            compose environment template

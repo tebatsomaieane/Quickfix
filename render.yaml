@@ -1,0 +1,46 @@
+# ─────────────────────────────────────────────────────────────
+# Render blueprint for the QuickFix API (server/).
+#
+#   1. Push this repo to GitHub.
+#   2. Render dashboard → New → Blueprint → select this repository.
+#   3. When prompted, fill the DB_* values for an external MySQL database
+#      (Render only offers managed PostgreSQL, e.g. use Aiven's free MySQL).
+#   4. Load database/schema.sql (and optionally seed.sql) into that database.
+#   5. Use the generated https://quickfix-api.onrender.com URL as
+#      VITE_API_URL for the Cloudflare Pages build.
+#
+# Free plan notes: the service sleeps after ~15 min idle, and there is no
+# persistent disk, so uploaded media is lost on redeploy. Attach a disk
+# (paid) or object storage for durable uploads.
+# ─────────────────────────────────────────────────────────────
+services:
+  - type: web
+    name: quickfix-api
+    runtime: docker
+    dockerContext: ./server
+    dockerfilePath: ./server/Dockerfile
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_NAME
+        value: quickfix
+      - key: CLIENT_ORIGIN
+        sync: false
+      - key: COOKIE_SAMESITE
+        value: none
+      - key: PUBLIC_API_URL
+        sync: false
+      - key: PUBLIC_APP_URL
+        sync: false

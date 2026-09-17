@@ -1,0 +1,19 @@
+# Caddy reverse proxy for the QuickFix production stack.
+# Serves everything over HTTPS for $DOMAIN (Let's Encrypt) and forwards to
+# the client container (nginx), which serves the SPA and proxies /api and
+# /uploads to the API.
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode gzip
+
+	# Upload limit for request attachments (matches the API's 50 MB cap).
+	request_body {
+		max_size 55MB
+	}
+
+	reverse_proxy client:80
+}
