@@ -65,6 +65,8 @@ app.use((req, res, next) => {
 });
 
 // CORS — CLIENT_ORIGIN may be a single origin or a comma-separated list.
+// A leading "*." entry is treated as a wildcard suffix (any subdomain), e.g.
+// "https://*.vercel.app" so Vercel preview deployments are allowed too.
 const allowedOrigins = (process.env.CLIENT_ORIGIN || "http://localhost:5173")
     .split(",")
     .map((origin) => origin.trim())
@@ -90,7 +92,16 @@ app.use((req, res, next) => {
 
     return cors({
         origin(requestOrigin, callback) {
-            if (!requestOrigin || allowedOrigins.includes(requestOrigin)) {
+            if (!requestOrigin) {
+                return callback(null, true);
+            }
+            if (
+                allowedOrigins.includes(requestOrigin) ||
+                allowedOrigins.some((pattern) =>
+                    pattern.startsWith("*.") &&
+                    requestOrigin.endsWith(pattern.slice(1))
+                )
+            ) {
                 return callback(null, true);
             }
             return callback(new Error("Not allowed by CORS"));
