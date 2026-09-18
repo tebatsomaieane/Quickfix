@@ -72,6 +72,21 @@ const allowedOrigins = (process.env.CLIENT_ORIGIN || "http://localhost:5173")
     .map((origin) => origin.trim())
     .filter(Boolean);
 
+// Exact match, or a "https://*.vercel.app" style wildcard (any FQDN directly
+// under the wildcard host). Blocked so that another TLD sharing the suffix
+// (e.g. evilvercel.app) is NOT accepted.
+const originMatches = (pattern, origin) => {
+    if (pattern === origin) return true;
+    const wildcard = pattern.indexOf("*.");
+    if (wildcard === -1) return false;
+    const wildcardHost = pattern.slice(wildcard + 2);
+    try {
+        return new URL(origin).hostname.endsWith(`.${wildcardHost}`);
+    } catch {
+        return false;
+    }
+};
+
 // Same-origin requests (the built app served by this API) need no CORS
 // headers, so they skip the middleware entirely. Cross-origin requests are
 // checked against the allowlist below.
@@ -92,15 +107,9 @@ app.use((req, res, next) => {
 
     return cors({
         origin(requestOrigin, callback) {
-            if (!requestOrigin) {
-                return callback(null, true);
-            }
             if (
-                allowedOrigins.includes(requestOrigin) ||
-                allowedOrigins.some((pattern) =>
-                    pattern.startsWith("*.") &&
-                    requestOrigin.endsWith(pattern.slice(1))
-                )
+                !requestOrigin ||
+                allowedOrigins.some((pattern) => originMatches(pattern, requestOrigin))
             ) {
                 return callback(null, true);
             }
