@@ -350,7 +350,7 @@ quickfix/
 │   ├── routes/           express Router definitions
 │   ├── uploads/          user-uploaded media (runtime, git-ignored)
 │   ├── utils/            helpers (notifications, profile resolvers)
-│   ├── Dockerfile        production image (build context: server/)
+│   ├── Dockerfile        production image (repo-root build context)
 │   └── railway.json      Railway service config
 │
 ├── database/

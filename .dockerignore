@@ -1,0 +1,16 @@
+# Repo-root build context (server/Dockerfile builds from the repository root).
+# Keep node_modules, build output and runtime media out of the context.
+**/node_modules
+**/dist
+**/.git
+.git
+.env
+**/.env
+**/*.log
+**/.wrangler
+server/uploads
+deploy
+database
+.github
+wrangler.toml
+README.md

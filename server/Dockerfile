@@ -1,14 +1,16 @@
 # ──────────────────────────────────────────────
 # QuickFix API server image
-# Build context is the server/ directory
-# (docker-compose.yml sets `context: ./server`; Railway/Render use the
-# same directory as the service root).
+# Build context is the repository root.
+#   - Railway:      root context, Dockerfile at server/Dockerfile
+#   - Render:       dockerContext ".", dockerfilePath server/Dockerfile
+#   - docker-compose: context ".", dockerfile server/Dockerfile
+# A root .dockerignore keeps node_modules/dist out of the build context.
 # ──────────────────────────────────────────────
 FROM node:22-alpine AS deps
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY server/package*.json ./
 RUN npm ci --omit=dev
 
 # ──────────────────────────────────────────────
@@ -20,7 +22,7 @@ WORKDIR /app
 RUN addgroup -S app && adduser -S app -G app
 
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY server/ ./
 
 # Uploaded media directory (persisted via a named volume in compose /
 # a mounted volume on Railway).

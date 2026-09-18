@@ -35,8 +35,8 @@ services:
 
   server:
     build:
-      context: ../server
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: server/Dockerfile
     container_name: quickfix-server
     restart: unless-stopped
     depends_on:
