@@ -9,7 +9,9 @@ const {
     logout,
     changePassword,
     requestPasswordReset,
-    resetPassword
+    resetPassword,
+    verifyEmail,
+    resendVerification
 } = require("../controllers/authController");
 
 const {
@@ -29,5 +31,7 @@ router.post("/logout", logout);
 router.post("/change-password", protect, changePassword);
 router.post("/forgot-password", rateLimit({ max: 5 }), requestPasswordReset);
 router.post("/reset-password", rateLimit({ max: 5 }), resetPassword);
+router.get("/verify-email", rateLimit({ max: 20 }), verifyEmail);
+router.post("/resend-verification", rateLimit({ max: 5 }), resendVerification);
 
 module.exports = router;

@@ -22,9 +22,11 @@ const {
     authorize
 } = require("../middleware/authMiddleware");
 
+const rateLimit = require("../middleware/rateLimit");
+
 const router = express.Router();
 
-router.use(protect, authorize("ADMIN"));
+router.use(protect, authorize("ADMIN"), rateLimit({ max: 600 }));
 
 router.get("/stats", stats);
 router.get("/users", listUsers);

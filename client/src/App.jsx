@@ -1,3 +1,4 @@
+import { Suspense, lazy } from "react";
 import { Link } from "react-router-dom";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
@@ -6,43 +7,45 @@ import Login from "./pages/public/Login";
 import Register from "./pages/public/Register";
 import ForgotPassword from "./pages/public/ForgotPassword";
 import ResetPassword from "./pages/public/ResetPassword";
+import VerifyEmail from "./pages/public/VerifyEmail";
+import NotFound from "./pages/public/NotFound";
 
-import CustomerDashboard from "./pages/customer/Dashboard";
-import MyRequests from "./pages/customer/MyRequests";
-import CreateRequest from "./pages/customer/CreateRequest";
-import RequestDetail from "./pages/customer/RequestDetail";
-import Services from "./pages/customer/Services";
-import Products from "./pages/customer/Products";
-import Providers from "./pages/customer/Providers";
-import ProviderProfile from "./pages/customer/ProviderProfile";
-import Jobs from "./pages/customer/Jobs";
-import JobDetail from "./pages/job/JobDetail";
-import ReviewJob from "./pages/customer/Review";
-import Messages from "./pages/messages/Messages";
-import Notifications from "./pages/notifications/Notifications";
-import Complaints from "./pages/complaints/Complaints";
+const CustomerDashboard = lazy(() => import("./pages/customer/Dashboard"));
+const MyRequests = lazy(() => import("./pages/customer/MyRequests"));
+const CreateRequest = lazy(() => import("./pages/customer/CreateRequest"));
+const RequestDetail = lazy(() => import("./pages/customer/RequestDetail"));
+const Services = lazy(() => import("./pages/customer/Services"));
+const Products = lazy(() => import("./pages/customer/Products"));
+const Providers = lazy(() => import("./pages/customer/Providers"));
+const ProviderProfile = lazy(() => import("./pages/customer/ProviderProfile"));
+const Jobs = lazy(() => import("./pages/customer/Jobs"));
+const JobDetail = lazy(() => import("./pages/job/JobDetail"));
+const ReviewJob = lazy(() => import("./pages/customer/Review"));
+const Messages = lazy(() => import("./pages/messages/Messages"));
+const Notifications = lazy(() => import("./pages/notifications/Notifications"));
+const Complaints = lazy(() => import("./pages/complaints/Complaints"));
 
-import ProviderDashboard from "./pages/provider/Dashboard";
-import ProviderProfileEdit from "./pages/provider/Profile";
-import ProviderServices from "./pages/provider/Services";
-import ProviderJobs from "./pages/provider/Jobs";
-import AvailableRequests from "./pages/provider/AvailableRequests";
-import ProviderRequestDetail from "./pages/provider/ProviderRequestDetail";
-import MyOffers from "./pages/provider/MyOffers";
-import Verification from "./pages/provider/Verification";
-import BusinessDashboard from "./pages/business/Dashboard";
-import BusinessProfile from "./pages/business/Profile";
-import BusinessProducts from "./pages/business/Products";
-import BusinessAdvertisements from "./pages/business/Advertisements";
-import BusinessPromotions from "./pages/business/Promotions";
-import BusinessAnalytics from "./pages/business/Analytics";
-import AdminDashboard from "./pages/admin/Dashboard";
-import AdminComplaints from "./pages/admin/Complaints";
-import AdminVerification from "./pages/admin/Verification";
-import AdminBusinesses from "./pages/admin/Businesses";
-import AdminUsers from "./pages/admin/Users";
-import AdminProviders from "./pages/admin/Providers";
-import Settings from "./pages/settings/Settings";
+const ProviderDashboard = lazy(() => import("./pages/provider/Dashboard"));
+const ProviderProfileEdit = lazy(() => import("./pages/provider/Profile"));
+const ProviderServices = lazy(() => import("./pages/provider/Services"));
+const ProviderJobs = lazy(() => import("./pages/provider/Jobs"));
+const AvailableRequests = lazy(() => import("./pages/provider/AvailableRequests"));
+const ProviderRequestDetail = lazy(() => import("./pages/provider/ProviderRequestDetail"));
+const MyOffers = lazy(() => import("./pages/provider/MyOffers"));
+const Verification = lazy(() => import("./pages/provider/Verification"));
+const BusinessDashboard = lazy(() => import("./pages/business/Dashboard"));
+const BusinessProfile = lazy(() => import("./pages/business/Profile"));
+const BusinessProducts = lazy(() => import("./pages/business/Products"));
+const BusinessAdvertisements = lazy(() => import("./pages/business/Advertisements"));
+const BusinessPromotions = lazy(() => import("./pages/business/Promotions"));
+const BusinessAnalytics = lazy(() => import("./pages/business/Analytics"));
+const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
+const AdminComplaints = lazy(() => import("./pages/admin/Complaints"));
+const AdminVerification = lazy(() => import("./pages/admin/Verification"));
+const AdminBusinesses = lazy(() => import("./pages/admin/Businesses"));
+const AdminUsers = lazy(() => import("./pages/admin/Users"));
+const AdminProviders = lazy(() => import("./pages/admin/Providers"));
+const Settings = lazy(() => import("./pages/settings/Settings"));
 
 import MainLayout from "./layouts/MainLayout";
 import DashboardLayout from "./layouts/DashboardLayout";
@@ -50,6 +53,8 @@ import ProtectedRoute from "./routes/ProtectedRoute";
 
 import Button from "./components/ui/Button";
 import Icon from "./components/ui/Icon";
+import Spinner from "./components/ui/Spinner";
+import ErrorBoundary from "./components/ui/ErrorBoundary";
 
 import {
     CUSTOMER_NAV,
@@ -57,6 +62,14 @@ import {
     BUSINESS_NAV,
     ADMIN_NAV
 } from "./constants/navigation";
+
+function PageLoader() {
+    return (
+        <div className="flex min-h-[50vh] items-center justify-center">
+            <Spinner />
+        </div>
+    );
+}
 
 function FeaturePlaceholder() {
     return (
@@ -79,21 +92,28 @@ function FeaturePlaceholder() {
 function App() {
     return (
         <BrowserRouter>
-                <Routes>
-                    {/* Public routes */}
-                    <Route element={<MainLayout />}>
-                        <Route path="/" element={<Home />} />
-                        <Route path="/login" element={<Login />} />
-                        <Route path="/register" element={<Register />} />
-                        <Route
-                            path="/forgot-password"
-                            element={<ForgotPassword />}
-                        />
-                        <Route
-                            path="/reset-password"
-                            element={<ResetPassword />}
-                        />
-                    </Route>
+            <ErrorBoundary>
+                <Suspense fallback={<PageLoader />}>
+                    <Routes>
+                        {/* Public routes */}
+                        <Route element={<MainLayout />}>
+                            <Route path="/" element={<Home />} />
+                            <Route path="/login" element={<Login />} />
+                            <Route path="/register" element={<Register />} />
+                            <Route
+                                path="/verify-email"
+                                element={<VerifyEmail />}
+                            />
+                            <Route
+                                path="/forgot-password"
+                                element={<ForgotPassword />}
+                            />
+                            <Route
+                                path="/reset-password"
+                                element={<ResetPassword />}
+                            />
+                            <Route path="*" element={<NotFound />} />
+                        </Route>
 
                     {/* Customer */}
                     <Route
@@ -356,11 +376,10 @@ function App() {
                             />
                         </Route>
                     </Route>
-
-                    {/* Fallback */}
-                    <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
-            </BrowserRouter>
+            </Suspense>
+            </ErrorBoundary>
+        </BrowserRouter>
     );
 }
 

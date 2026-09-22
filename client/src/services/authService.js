@@ -138,3 +138,25 @@ export const resetPassword = async (data) => {
 
     return response.data;
 };
+
+
+// ==========================================
+// VERIFY EMAIL (public, via emailed link)
+// ==========================================
+export const verifyEmail = async (email, token) => {
+    const response = await api.get("/auth/verify-email", {
+        params: { email, token }
+    });
+
+    return response.data;
+};
+
+
+// ==========================================
+// RESEND VERIFICATION EMAIL (public)
+// ==========================================
+export const resendVerification = async (email) => {
+    const response = await api.post("/auth/resend-verification", { email });
+
+    return response.data;
+};

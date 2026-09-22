@@ -9,7 +9,9 @@ function SmartImage({
     icon = "grid",
     emoji,
     seed = "",
-    eager = false
+    eager = false,
+    fetchPriority,
+    decoding
 }) {
     const [failed, setFailed] = useState(false);
 
@@ -43,6 +45,8 @@ function SmartImage({
             src={src}
             alt={alt}
             loading={eager ? "eager" : "lazy"}
+            decoding={decoding || (eager ? "sync" : "async")}
+            fetchPriority={fetchPriority}
             onError={() => setFailed(true)}
             className={className}
         />

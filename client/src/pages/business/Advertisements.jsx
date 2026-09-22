@@ -12,6 +12,7 @@ import Input from "../../components/ui/Input";
 import Textarea from "../../components/ui/Textarea";
 import Spinner from "../../components/ui/Spinner";
 import EmptyState from "../../components/ui/EmptyState";
+import SmartImage from "../../components/ui/SmartImage";
 import { formatDate } from "../../lib/format";
 
 function Advertisements() {
@@ -133,22 +134,43 @@ function Advertisements() {
             ) : ads.length === 0 ? (
                 <EmptyState title="No advertisements yet" description="Create your first advertisement to reach more customers." />
             ) : (
-                <Card className="overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm">
-                            <thead className="border-b bg-slate-50 text-xs font-semibold tracking-wide text-slate-500">
-                                <tr>
-                                    <th className="px-4 py-3">Title</th>
-                                    <th className="px-4 py-3">Period</th>
-                                    <th className="px-4 py-3">Status</th>
-                                    <th className="px-4 py-3">Created</th>
-                                    <th className="px-4 py-3 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {ads.map((ad) => (
+                <>
+                    <Card className="hidden overflow-hidden md:block">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm">
+                                <thead className="border-b bg-slate-50 text-xs font-semibold tracking-wide text-slate-500">
+                                    <tr>
+                                <th className="px-4 py-3">Advertisement</th>
+                                <th className="px-4 py-3">Period</th>
+                                <th className="px-4 py-3">Status</th>
+                                <th className="px-4 py-3">Created</th>
+                                <th className="px-4 py-3 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {ads.map((ad) => (
                                     <tr key={ad.id} className="hover:bg-slate-50">
-                                        <td className="px-4 py-3 font-medium text-slate-900">{ad.title}</td>
+                                        <td className="px-4 py-3">
+                                            <div className="flex items-center gap-3">
+                                                <SmartImage
+                                                    src={ad.image}
+                                                    alt={ad.title}
+                                                    seed={ad.title}
+                                                    icon="megaphone"
+                                                    className="h-11 w-11 shrink-0 rounded-xl object-cover"
+                                                />
+                                                <span className="min-w-0">
+                                                    <span className="block truncate font-medium text-slate-900">
+                                                        {ad.title}
+                                                    </span>
+                                                    {ad.description && (
+                                                        <span className="block truncate text-xs text-slate-500">
+                                                            {ad.description}
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            </div>
+                                        </td>
                                         <td className="px-4 py-3 text-slate-500 text-xs">
                                             {ad.start_date?.slice(0,10)} — {ad.end_date?.slice(0,10)}
                                         </td>
@@ -166,10 +188,63 @@ function Advertisements() {
                                         </td>
                                     </tr>
                                 ))}
-                            </tbody>
-                        </table>
+                                </tbody>
+                            </table>
+                        </div>
+                    </Card>
+
+                    <div className="space-y-3 md:hidden">
+                        {ads.map((ad) => (
+                            <Card key={ad.id} className="overflow-hidden p-0">
+                                <SmartImage
+                                    src={ad.image}
+                                    alt={ad.title}
+                                    seed={ad.title}
+                                    icon="megaphone"
+                                    className="h-36 w-full object-cover"
+                                />
+                                <div className="p-4">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <h3 className="min-w-0 font-semibold leading-snug text-slate-900">
+                                            {ad.title}
+                                        </h3>
+                                        <Badge color={ad.status === "ACTIVE" ? "green" : ad.status === "PENDING" ? "amber" : "gray"}>
+                                            {ad.status.toLowerCase()}
+                                        </Badge>
+                                    </div>
+                                    {ad.description && (
+                                        <p className="mt-1 line-clamp-2 text-sm text-slate-500">
+                                            {ad.description}
+                                        </p>
+                                    )}
+                                    <p className="mt-2 text-xs text-slate-400">
+                                        {ad.start_date?.slice(0, 10)} — {ad.end_date?.slice(0, 10)}
+                                        {" · "}Created {formatDate(ad.created_at)}
+                                    </p>
+                                    <div className="mt-3 flex gap-2 border-t border-slate-100 pt-3">
+                                        <Button
+                                            size="md"
+                                            variant="secondary"
+                                            className="flex-1"
+                                            onClick={() => handleEdit(ad)}
+                                        >
+                                            Edit
+                                        </Button>
+                                        <Button
+                                            size="md"
+                                            variant="danger"
+                                            className="flex-1"
+                                            loading={deleting === ad.id}
+                                            onClick={() => handleDelete(ad.id)}
+                                        >
+                                            Delete
+                                        </Button>
+                                    </div>
+                                </div>
+                            </Card>
+                        ))}
                     </div>
-                </Card>
+                </>
             )}
         </div>
     );

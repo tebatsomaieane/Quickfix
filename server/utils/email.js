@@ -53,6 +53,52 @@ const sendMail = async ({ to, subject, text, html }) => {
     });
 };
 
+const sendVerificationEmail = async (to, verificationToken) => {
+    const verifyUrl = `${APP_URL}/verify-email?token=${verificationToken}&email=${encodeURIComponent(to)}`;
+
+    if (!isEmailConfigured()) {
+        console.warn(
+            "[mail] SMTP not configured - verification link for",
+            to,
+            "not sent. Link:",
+            verifyUrl
+        );
+        return null;
+    }
+
+    const text = [
+        "Welcome to QuickFix!",
+        "",
+        "Confirm your email address to keep your account secure.",
+        "Click the link below to verify your email (valid for 24 hours):",
+        "",
+        verifyUrl,
+        "",
+        "If you did not create a QuickFix account, you can safely ignore this email.",
+        "",
+        "QuickFix - Maseru, Lesotho"
+    ].join("\n");
+
+    const html = [
+        "<div style=\"font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto\">",
+        "<h2 style=\"color:#1e293b\">Confirm your email address</h2>",
+        "<p style=\"color:#475569\">Welcome to QuickFix! Click the button below to verify your email (valid for 24 hours):</p>",
+        `<p style=\"text-align:center;margin:24px 0\"><a href="${verifyUrl}" style=\"background:#4f46e5;color:#ffffff;padding:12px 20px;border-radius:8px;text-decoration:none\">Verify email</a></p>`,
+        "<p style=\"color:#64748b;font-size:13px\">If the button does not work, copy and paste this link into your browser:</p>",
+        `<p style=\"color:#4f46e5;font-size:13px;word-break:break-all\">${verifyUrl}</p>`,
+        "<p style=\"color:#64748b;font-size:13px\">If you did not create a QuickFix account, you can safely ignore this email.</p>",
+        "<p style=\"color:#94a3b8;font-size:12px\">QuickFix &middot; Maseru, Lesotho</p>",
+        "</div>"
+    ].join("\n");
+
+    return sendMail({
+        to,
+        subject: "Confirm your QuickFix email",
+        text,
+        html
+    });
+};
+
 const sendPasswordResetEmail = async (to, resetToken) => {
     const resetUrl = `${APP_URL}/reset-password?token=${resetToken}`;
 
@@ -102,5 +148,6 @@ const sendPasswordResetEmail = async (to, resetToken) => {
 module.exports = {
     isEmailConfigured,
     sendMail,
+    sendVerificationEmail,
     sendPasswordResetEmail
 };

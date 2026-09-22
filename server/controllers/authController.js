@@ -2,11 +2,18 @@ const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const db = require("../config/db");
-const { sendPasswordResetEmail } = require("../utils/email");
+const {
+    sendPasswordResetEmail,
+    sendVerificationEmail,
+    isEmailConfigured
+} = require("../utils/email");
 
 const JWT_MAX_AGE = 60 * 60 * 24; // 1 day in seconds
 
 const BCRYPT_ROUNDS = 10;
+
+const REQUIRE_EMAIL_VERIFICATION =
+    String(process.env.REQUIRE_EMAIL_VERIFICATION || "").toLowerCase() === "true";
 
 const COOKIE_OPTIONS = {
     httpOnly: true,
@@ -18,6 +25,44 @@ const COOKIE_OPTIONS = {
     secure: process.env.NODE_ENV === "production",
     maxAge: JWT_MAX_AGE * 1000,
     path: "/"
+};
+
+
+// Create a fresh verification token for a user and try to email it.
+// Returns "sent" | "skipped". Never throws - registration must succeed
+// even when SMTP is not configured yet (a resend endpoint is available).
+const issueVerificationEmail = async (dbTarget, userId, email) => {
+    const token = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto
+        .createHash("sha256")
+        .update(token)
+        .digest("hex");
+
+    const target = dbTarget || db;
+
+    await target.query(
+        `DELETE FROM email_verification_tokens WHERE user_id = ?`,
+        [userId]
+    );
+
+    await target.query(
+        `INSERT INTO email_verification_tokens
+            (user_id, token_hash, expires_at)
+         VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 24 HOUR))`,
+        [userId, tokenHash]
+    );
+
+    if (!isEmailConfigured()) {
+        console.warn(
+            `[verify] SMTP not configured - verification link for ${email} not sent`
+        );
+
+        return "skipped";
+    }
+
+    await sendVerificationEmail(email, token);
+
+    return "sent";
 };
 
 const register = async (req, res) => {
@@ -159,9 +204,16 @@ const register = async (req, res) => {
 
             await connection.commit();
 
+            const verification = await issueVerificationEmail(
+                connection,
+                userId,
+                emailValue
+            );
+
             res.status(201).json({
                 success: true,
                 message: "Registration successful",
+                verification,
                 user: {
                     id: userId,
                     first_name: firstName,
@@ -242,7 +294,16 @@ const login = async (req, res) => {
             });
         }
 
-        // 5. Create JWT
+        // 5. Enforce email verification when turned on (admin/user toggle).
+        if (REQUIRE_EMAIL_VERIFICATION && !user.email_verified) {
+            return res.status(403).json({
+                success: false,
+                code: "EMAIL_NOT_VERIFIED",
+                message: "Please verify your email address before logging in. Check your inbox (and spam) for the verification link."
+            });
+        }
+
+        // 6. Create JWT
         const token = jwt.sign(
             {
                 id: user.id,
@@ -255,10 +316,10 @@ const login = async (req, res) => {
             }
         );
 
-        // 6. Set the session token as an httpOnly cookie
+        // 7. Set the session token as an httpOnly cookie
         res.cookie("token", token, COOKIE_OPTIONS);
 
-        // 7. Return user + token
+        // 8. Return user + token
         res.json({
             success: true,
             message: "Login successful",
@@ -718,6 +779,145 @@ const resetPassword = async (req, res) => {
 };
 
 
+// GET /api/auth/verify-email?token=...&email=...  (public)
+// Validate a verification token and mark the account as verified.
+const verifyEmail = async (req, res) => {
+    try {
+        const token = req.query.token;
+        const email = req.query.email ? req.query.email.trim().toLowerCase() : "";
+
+        if (!token || !email) {
+            return res.status(400).json({
+                success: false,
+                message: "Verification token and email are required"
+            });
+        }
+
+        if (email.length > 255) {
+            return res.status(400).json({
+                success: false,
+                message: "Email must be 255 characters or fewer"
+            });
+        }
+
+        const tokenHash = crypto
+            .createHash("sha256")
+            .update(token)
+            .digest("hex");
+
+        const [rows] = await db.query(
+            `SELECT evt.id AS token_id, u.id AS user_id, u.email,
+                    u.email_verified
+             FROM email_verification_tokens evt
+             JOIN users u ON u.id = evt.user_id
+             WHERE evt.token_hash = ?
+               AND evt.used = FALSE
+               AND evt.expires_at > NOW()`,
+            [tokenHash]
+        );
+
+        if (rows.length === 0) {
+            return res.status(400).json({
+                success: false,
+                code: "INVALID_VERIFICATION_TOKEN",
+                message: "Verification link is invalid or has expired. Request a new one."
+            });
+        }
+
+        if (rows[0].email !== email) {
+            return res.status(400).json({
+                success: false,
+                code: "INVALID_VERIFICATION_TOKEN",
+                message: "Verification link is invalid or has expired. Request a new one."
+            });
+        }
+
+        if (!rows[0].email_verified) {
+            await db.query("UPDATE users SET email_verified = TRUE WHERE id = ?", [
+                rows[0].user_id
+            ]);
+        }
+
+        await db.query(
+            "UPDATE email_verification_tokens SET used = TRUE WHERE id = ?",
+            [rows[0].token_id]
+        );
+
+        return res.json({
+            success: true,
+            message: "Email verified successfully. You can now log in."
+        });
+    } catch (error) {
+        console.error("Email verification error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Server error while verifying email"
+        });
+    }
+};
+
+
+// POST /api/auth/resend-verification  (public, body { email })
+const resendVerification = async (req, res) => {
+    try {
+        const email = req.body && req.body.email
+            ? String(req.body.email).trim().toLowerCase()
+            : "";
+
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                message: "Email is required"
+            });
+        }
+
+        if (email.length > 255) {
+            return res.status(400).json({
+                success: false,
+                message: "Email must be 255 characters or fewer"
+            });
+        }
+
+        // Never reveal whether an account exists (prevents enumeration).
+        const [users] = await db.query(
+            `SELECT id, email, email_verified
+             FROM users
+             WHERE LOWER(email) = ? AND is_active = TRUE`,
+            [email]
+        );
+
+        if (users.length === 0 || users[0].email_verified) {
+            return res.json({
+                success: true,
+                message: "If that email exists and is unverified, a new verification link has been sent."
+            });
+        }
+
+        const result = await issueVerificationEmail(null, users[0].id, users[0].email);
+
+        if (result === "skipped") {
+            return res.status(503).json({
+                success: false,
+                message: "Verification emails are temporarily unavailable. Please try again later."
+            });
+        }
+
+        return res.json({
+            success: true,
+            message: "A new verification link has been sent to your email."
+        });
+    } catch (error) {
+        console.error("Resend verification error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Server error while resending verification link"
+        });
+    }
+};
+
+
 module.exports = {
     register,
     login,
@@ -727,5 +927,7 @@ module.exports = {
     logout,
     changePassword,
     requestPasswordReset,
-    resetPassword
+    resetPassword,
+    verifyEmail,
+    resendVerification
 };

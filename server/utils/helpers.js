@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const { pushToUser } = require("./realtime");
 
 
 // Insert a notification for a user.
@@ -19,6 +20,10 @@ const createNotification = async (
          VALUES (?, ?, ?, ?, ?)`,
         [userId, title, message, type, link || null]
     );
+
+    // Real-time hint: tell any open stream for this user that something new
+    // arrived. Best-effort - the client refetches on receipt.
+    pushToUser(userId, "notification", { title, type });
 };
 
 

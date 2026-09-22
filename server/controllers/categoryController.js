@@ -7,7 +7,7 @@ const getAll = async (req, res) => {
     try {
         const { with: withParam } = req.query;
 
-        let query = `
+        const query = `
             SELECT c.id, c.name, c.description, c.image, c.status,
                    (SELECT COUNT(*)
                     FROM services s

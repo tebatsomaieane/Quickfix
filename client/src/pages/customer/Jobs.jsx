@@ -72,6 +72,8 @@ function Jobs() {
                 <EmptyState
                     title="No jobs yet"
                     description="Once you accept an offer, the job appears here and you can track it."
+                    icon="briefcase"
+                    tone="emerald"
                 />
             ) : (
                 <div className="space-y-4">

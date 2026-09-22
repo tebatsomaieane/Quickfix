@@ -148,7 +148,7 @@ function Notifications() {
                                 </p>
                             </div>
 
-                            <div className="flex shrink-0 items-center gap-1">
+                            <div className="flex shrink-0 items-center gap-1.5">
                                 {!notification.is_read && (
                                     <button
                                         type="button"
@@ -157,11 +157,11 @@ function Notifications() {
                                         }
                                         title="Mark as read"
                                         aria-label="Mark as read"
-                                        className="rounded-lg p-2 text-slate-400 transition hover:bg-indigo-50 hover:text-indigo-600"
+                                        className="rounded-lg p-2.5 text-slate-400 transition hover:bg-indigo-50 hover:text-indigo-600"
                                     >
                                         <Icon
                                             name="check"
-                                            className="h-4 w-4"
+                                            className="h-5 w-5"
                                         />
                                     </button>
                                 )}
@@ -172,9 +172,9 @@ function Notifications() {
                                     }
                                     title="Delete notification"
                                     aria-label="Delete notification"
-                                    className="rounded-lg p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+                                    className="rounded-lg p-2.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
                                 >
-                                    <Icon name="trash" className="h-4 w-4" />
+                                    <Icon name="trash" className="h-5 w-5" />
                                 </button>
                             </div>
                         </Card>

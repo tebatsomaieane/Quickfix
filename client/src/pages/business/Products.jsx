@@ -142,56 +142,114 @@ function Products() {
             ) : products.length === 0 ? (
                 <EmptyState title="No products yet" description="Create your first product to advertise it on the marketplace." />
             ) : (
-                <Card className="overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm">
-                            <thead className="border-b bg-slate-50 text-xs font-semibold tracking-wide text-slate-500">
-                                <tr>
-                                    <th className="px-4 py-3">Name</th>
-                                    <th className="px-4 py-3">Price</th>
-                                    <th className="px-4 py-3">Category</th>
-                                    <th className="px-4 py-3">Status</th>
-                                    <th className="px-4 py-3">Created</th>
-                                    <th className="px-4 py-3 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {products.map((product) => (
-                                    <tr key={product.id} className="hover:bg-slate-50">
-                                        <td className="px-4 py-3">
-                                            <div className="flex items-center gap-3">
-                                                <SmartImage
-                                                    src={getProductImage(product, product.id)}
-                                                    alt={product.name}
-                                                    seed={product.name}
-                                                    icon="inbox"
-                                                    className="h-10 w-10 shrink-0 rounded-lg object-cover"
-                                                />
-                                                <span className="font-medium text-slate-900">
-                                                    {product.name}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3 text-slate-700">{formatCurrency(product.price)}</td>
-                                        <td className="px-4 py-3 text-slate-500">{product.category_name || "—"}</td>
-                                        <td className="px-4 py-3">
+                <>
+                    <Card className="hidden overflow-hidden md:block">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm">
+                                <thead className="border-b bg-slate-50 text-xs font-semibold tracking-wide text-slate-500">
+                                    <tr>
+                                        <th className="px-4 py-3">Name</th>
+                                        <th className="px-4 py-3">Price</th>
+                                        <th className="px-4 py-3">Category</th>
+                                        <th className="px-4 py-3">Status</th>
+                                        <th className="px-4 py-3">Created</th>
+                                        <th className="px-4 py-3 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {products.map((product) => (
+                                        <tr key={product.id} className="hover:bg-slate-50">
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center gap-3">
+                                                    <SmartImage
+                                                        src={getProductImage(product, product.id)}
+                                                        alt={product.name}
+                                                        seed={product.name}
+                                                        icon="inbox"
+                                                        className="h-10 w-10 shrink-0 rounded-lg object-cover"
+                                                    />
+                                                    <span className="font-medium text-slate-900">
+                                                        {product.name}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-slate-700">{formatCurrency(product.price)}</td>
+                                            <td className="px-4 py-3 text-slate-500">{product.category_name || "—"}</td>
+                                            <td className="px-4 py-3">
+                                                <Badge color={product.status === "ACTIVE" ? "green" : "gray"}>
+                                                    {product.status.toLowerCase()}
+                                                </Badge>
+                                            </td>
+                                            <td className="px-4 py-3 text-slate-400">{formatDate(product.created_at)}</td>
+                                            <td className="px-4 py-3 text-right">
+                                                <div className="flex justify-end gap-2">
+                                                    <Button size="sm" variant="secondary" onClick={() => handleEdit(product)}>Edit</Button>
+                                                    <Button size="sm" variant="danger" loading={deleting === product.id} onClick={() => handleDelete(product.id)}>Delete</Button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </Card>
+
+                    <div className="space-y-3 md:hidden">
+                        {products.map((product) => (
+                            <Card key={product.id} className="overflow-hidden">
+                                <div className="flex items-start gap-3 p-4">
+                                    <SmartImage
+                                        src={getProductImage(product, product.id)}
+                                        alt={product.name}
+                                        seed={product.name}
+                                        icon="inbox"
+                                        className="h-16 w-16 shrink-0 rounded-xl object-cover"
+                                    />
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <h3 className="font-semibold leading-snug text-slate-900">
+                                                {product.name}
+                                            </h3>
+                                            <span className="shrink-0 font-bold text-slate-900">
+                                                {formatCurrency(product.price)}
+                                            </span>
+                                        </div>
+                                        <p className="mt-0.5 truncate text-sm text-slate-500">
+                                            {product.category_name || "Uncategorised"}
+                                        </p>
+                                        <div className="mt-2 flex flex-wrap items-center gap-2">
                                             <Badge color={product.status === "ACTIVE" ? "green" : "gray"}>
                                                 {product.status.toLowerCase()}
                                             </Badge>
-                                        </td>
-                                        <td className="px-4 py-3 text-slate-400">{formatDate(product.created_at)}</td>
-                                        <td className="px-4 py-3 text-right">
-                                            <div className="flex justify-end gap-2">
-                                                <Button size="sm" variant="secondary" onClick={() => handleEdit(product)}>Edit</Button>
-                                                <Button size="sm" variant="danger" loading={deleting === product.id} onClick={() => handleDelete(product.id)}>Delete</Button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                            <span className="text-xs text-slate-400">
+                                                Added {formatDate(product.created_at)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2 border-t border-slate-100 p-3">
+                                    <Button
+                                        size="md"
+                                        variant="secondary"
+                                        className="flex-1"
+                                        onClick={() => handleEdit(product)}
+                                    >
+                                        Edit
+                                    </Button>
+                                    <Button
+                                        size="md"
+                                        variant="danger"
+                                        className="flex-1"
+                                        loading={deleting === product.id}
+                                        onClick={() => handleDelete(product.id)}
+                                    >
+                                        Delete
+                                    </Button>
+                                </div>
+                            </Card>
+                        ))}
                     </div>
-                </Card>
+                </>
             )}
         </div>
     );

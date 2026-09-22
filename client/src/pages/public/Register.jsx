@@ -6,12 +6,33 @@ import Input from "../../components/ui/Input";
 import Select from "../../components/ui/Select";
 import Logo from "../../components/ui/Logo";
 import AuthShell from "../../components/auth/AuthShell";
+import customerRoleImage from "../../assets/servicerequestperson.jpg";
+import providerRoleImage from "../../assets/electrician.jpg";
+import businessRoleImage from "../../assets/restaurant.jpg";
 
 const ROLE_OPTIONS = [
     { value: "CUSTOMER", label: "I need services" },
     { value: "PROVIDER", label: "I provide services" },
     { value: "BUSINESS_OWNER", label: "I own a service business" }
 ];
+
+const ROLE_CREATIVE = {
+    CUSTOMER: {
+        image: customerRoleImage,
+        eyebrow: "Request any service, close to home.",
+        seed: "A customer sharing what needs fixing"
+    },
+    PROVIDER: {
+        image: providerRoleImage,
+        eyebrow: "Turn your skill into a steady income.",
+        seed: "A verified provider on the job"
+    },
+    BUSINESS_OWNER: {
+        image: businessRoleImage,
+        eyebrow: "Put your store or café on the map.",
+        seed: "A local store customers discover on QuickFix"
+    }
+};
 
 const HIGHLIGHTS = [
     "Create a free account in under a minute",
@@ -79,7 +100,13 @@ function Register() {
             const data = await registerUser(payload);
 
             if (data.success) {
-                setSuccess("Registration successful! Redirecting to login...");
+                if (data.verification === "sent") {
+                    setSuccess(
+                        "Registration successful! A verification link was sent to your email. Please verify your email, then log in."
+                    );
+                } else {
+                    setSuccess("Registration successful! Redirecting to login...");
+                }
 
                 setFormData({
                     first_name: "",
@@ -92,7 +119,7 @@ function Register() {
 
                 setTimeout(() => {
                     navigate("/login");
-                }, 1500);
+                }, 3000);
             } else {
                 setError(
                     data.message || "Registration failed. Please try again."
@@ -108,10 +135,14 @@ function Register() {
         }
     };
 
+    const creative = ROLE_CREATIVE[formData.role] || ROLE_CREATIVE.CUSTOMER;
+
     return (
         <AuthShell
-            imageSeed="register providers"
+            image={creative.image}
+            imageSeed={creative.seed}
             imageIcon="users"
+            eyebrow={creative.eyebrow}
             highlights={HIGHLIGHTS}
         >
             <div>

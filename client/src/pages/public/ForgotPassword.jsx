@@ -3,6 +3,15 @@ import { Link } from "react-router-dom";
 import { forgotPassword } from "../../services/authService";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
+import Logo from "../../components/ui/Logo";
+import AuthShell from "../../components/auth/AuthShell";
+import forgotImage from "../../assets/cleaner.jpg";
+
+const HIGHLIGHTS = [
+    "We'll email you a secure reset link",
+    "New password, same trusted marketplace",
+    "Back in your dashboard within minutes"
+];
 
 function ForgotPassword() {
     const [email, setEmail] = useState("");
@@ -33,25 +42,32 @@ function ForgotPassword() {
     };
 
     return (
-        <div className="bg-slate-50 py-16 sm:py-24">
-            <div className="mx-auto w-full max-w-md px-4">
-                <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-                    <h1 className="text-2xl font-bold text-slate-900">
-                        Reset your password
-                    </h1>
-                    <p className="mt-2 text-sm text-slate-600">
-                        Enter the email address linked to your account and we
-                        will send you a reset link.
-                    </p>
+        <AuthShell
+            image={forgotImage}
+            imageSeed="A friendly provider ready to lend a hand"
+            imageIcon="wrench"
+            eyebrow="We'll help you back in."
+            highlights={HIGHLIGHTS}
+        >
+            <div>
+                <Logo size="lg" brand="Quick" accent="Fix" />
+                <h1 className="mt-6 text-3xl font-extrabold tracking-tight text-slate-900">
+                    Reset your password
+                </h1>
+                <p className="mt-2 text-sm text-slate-600">
+                    Enter the email address linked to your account and we will
+                    send you a reset link.
+                </p>
 
+                <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
                     {message && (
-                        <div className="mt-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
+                        <div className="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
                             {message}
                         </div>
                     )}
 
                     {error && (
-                        <div className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+                        <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
                             {error}
                         </div>
                     )}
@@ -59,7 +75,7 @@ function ForgotPassword() {
                     {!message && (
                         <form
                             onSubmit={handleSubmit}
-                            className="mt-5 space-y-4"
+                            className="space-y-4"
                         >
                             <Input
                                 label="Email address"
@@ -94,7 +110,7 @@ function ForgotPassword() {
                     </p>
                 </div>
             </div>
-        </div>
+        </AuthShell>
     );
 }
 

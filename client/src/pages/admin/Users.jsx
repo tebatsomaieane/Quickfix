@@ -108,61 +108,126 @@ function AdminUsers() {
             ) : users.length === 0 ? (
                 <EmptyState title="No users found" description="Try adjusting your search or filters." />
             ) : (
-                <Card className="overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm">
-                            <thead className="border-b bg-slate-50 text-xs font-semibold tracking-wide text-slate-500">
-                                <tr>
-                                    <th className="px-4 py-3">Name</th>
-                                    <th className="px-4 py-3">Email</th>
-                                    <th className="px-4 py-3">Role</th>
-                                    <th className="px-4 py-3">Status</th>
-                                    <th className="px-4 py-3">Verified</th>
-                                    <th className="px-4 py-3">Joined</th>
-                                    <th className="px-4 py-3 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {users.map((user) => (
-                                    <tr key={user.id} className="hover:bg-slate-50">
-                                        <td className="px-4 py-3 font-medium text-slate-900">
+                <>
+                    <Card className="hidden overflow-hidden md:block">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm">
+                                <thead className="border-b bg-slate-50 text-xs font-semibold tracking-wide text-slate-500">
+                                    <tr>
+                                        <th className="px-4 py-3">Name</th>
+                                        <th className="px-4 py-3">Email</th>
+                                        <th className="px-4 py-3">Role</th>
+                                        <th className="px-4 py-3">Status</th>
+                                        <th className="px-4 py-3">Verified</th>
+                                        <th className="px-4 py-3">Joined</th>
+                                        <th className="px-4 py-3 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {users.map((user) => (
+                                        <tr key={user.id} className="hover:bg-slate-50">
+                                            <td className="px-4 py-3 font-medium text-slate-900">
+                                                {user.first_name} {user.last_name}
+                                            </td>
+                                            <td className="px-4 py-3 text-slate-500">{user.email}</td>
+                                            <td className="px-4 py-3">
+                                                <Badge color={ROLE_COLORS[user.role] || "slate"}>
+                                                    {user.role.toLowerCase().replace("_", " ")}
+                                                </Badge>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <Badge color={user.is_active ? "green" : "red"}>
+                                                    {user.is_active ? "active" : "disabled"}
+                                                </Badge>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {user.email_verified ? (
+                                                    <Badge color="green">verified</Badge>
+                                                ) : (
+                                                    <Badge color="amber">pending</Badge>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 text-xs text-slate-400">{formatDate(user.created_at)}</td>
+                                            <td className="px-4 py-3 text-right">
+                                                <Button
+                                                    size="sm"
+                                                    variant={user.is_active ? "danger" : "secondary"}
+                                                    loading={savingId === user.id}
+                                                    onClick={() => handleToggleActive(user)}
+                                                >
+                                                    {user.is_active ? "Disable" : "Enable"}
+                                                </Button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </Card>
+
+                    <div className="space-y-3 md:hidden">
+                        {users.map((user) => (
+                            <Card key={user.id} className="p-4">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <p className="truncate font-semibold text-slate-900">
                                             {user.first_name} {user.last_name}
-                                        </td>
-                                        <td className="px-4 py-3 text-slate-500">{user.email}</td>
-                                        <td className="px-4 py-3">
+                                        </p>
+                                        <p className="mt-0.5 truncate text-sm text-slate-500">
+                                            {user.email}
+                                        </p>
+                                    </div>
+                                    <Badge color={user.is_active ? "green" : "red"}>
+                                        {user.is_active ? "active" : "disabled"}
+                                    </Badge>
+                                </div>
+
+                                <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                                    <div>
+                                        <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                                            Role
+                                        </p>
+                                        <div className="mt-1">
                                             <Badge color={ROLE_COLORS[user.role] || "slate"}>
                                                 {user.role.toLowerCase().replace("_", " ")}
                                             </Badge>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <Badge color={user.is_active ? "green" : "red"}>
-                                                {user.is_active ? "active" : "disabled"}
-                                            </Badge>
-                                        </td>
-                                        <td className="px-4 py-3">
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                                            Email verified
+                                        </p>
+                                        <div className="mt-1">
                                             {user.email_verified ? (
                                                 <Badge color="green">verified</Badge>
                                             ) : (
                                                 <Badge color="amber">pending</Badge>
                                             )}
-                                        </td>
-                                        <td className="px-4 py-3 text-xs text-slate-400">{formatDate(user.created_at)}</td>
-                                        <td className="px-4 py-3 text-right">
-                                            <Button
-                                                size="sm"
-                                                variant={user.is_active ? "danger" : "secondary"}
-                                                loading={savingId === user.id}
-                                                onClick={() => handleToggleActive(user)}
-                                            >
-                                                {user.is_active ? "Disable" : "Enable"}
-                                            </Button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                        </div>
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                                            Joined
+                                        </p>
+                                        <p className="mt-1 text-slate-600">
+                                            {formatDate(user.created_at)}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="mt-4 flex justify-end border-t border-slate-100 pt-3">
+                                    <Button
+                                        variant={user.is_active ? "danger" : "secondary"}
+                                        loading={savingId === user.id}
+                                        onClick={() => handleToggleActive(user)}
+                                    >
+                                        {user.is_active ? "Disable" : "Enable"}
+                                    </Button>
+                                </div>
+                            </Card>
+                        ))}
                     </div>
-                </Card>
+                </>
             )}
         </div>
     );

@@ -12,6 +12,9 @@ import Icon from "../components/ui/Icon";
 import CustomerSidebar from "../components/sidebars/CustomerSidebar";
 import ProviderSidebar from "../components/sidebars/ProviderSidebar";
 import GenericSidebar from "../components/sidebars/GenericSidebar";
+import MobileTabBar from "../components/sidebars/MobileTabBar";
+import { useToast } from "../components/ui/ToastProvider";
+import { onEvent } from "../services/realtimeService";
 
 const SIDEBARS = {
     CUSTOMER: CustomerSidebar,
@@ -20,10 +23,40 @@ const SIDEBARS = {
     ADMIN: GenericSidebar
 };
 
+const ROLE_TAB_ORDER = {
+    CUSTOMER: [
+        "/customer/dashboard",
+        "/customer/requests/new",
+        "/customer/requests",
+        "/customer/jobs",
+        "/customer/messages"
+    ],
+    PROVIDER: [
+        "/provider/dashboard",
+        "/provider/requests",
+        "/provider/jobs",
+        "/provider/offers",
+        "/provider/messages"
+    ],
+    BUSINESS_OWNER: [
+        "/business/dashboard",
+        "/business/products",
+        "/business/promotions",
+        "/business/analytics"
+    ],
+    ADMIN: [
+        "/admin/dashboard",
+        "/admin/users",
+        "/admin/providers",
+        "/admin/complaints"
+    ]
+};
+
 function DashboardLayout({ navItems }) {
     const { user, logout } = useAuth();
     const location = useLocation();
     const role = user?.role;
+    const { showToast } = useToast();
 
     const Sidebar = SIDEBARS[role] || GenericSidebar;
 
@@ -72,11 +105,20 @@ function DashboardLayout({ navItems }) {
 
         const timer = setInterval(refresh, 30000);
 
+        const unsubscribe = onEvent("notification", (payload) => {
+            refresh();
+
+            if (payload?.title) {
+                showToast(payload.title, "info");
+            }
+        });
+
         return () => {
             active = false;
             clearInterval(timer);
+            unsubscribe();
         };
-    }, [notificationsPath]);
+    }, [notificationsPath, showToast]);
 
     useEffect(() => {
         if (role !== "PROVIDER") {
@@ -225,12 +267,20 @@ function DashboardLayout({ navItems }) {
                 </header>
 
                 {/* Content */}
-                <main className="flex-1 p-4 sm:p-6 lg:p-8">
+                <main className="flex-1 p-4 pb-24 sm:p-6 lg:p-8 md:pb-6">
                     <div className="mx-auto max-w-6xl">
                         <Outlet />
                     </div>
                 </main>
             </div>
+
+            {/* Mobile bottom navigation */}
+            <MobileTabBar
+                navItems={navItems}
+                unread={unread}
+                notificationsPath={notificationsPath}
+                order={ROLE_TAB_ORDER[role]}
+            />
         </div>
     );
 }

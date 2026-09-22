@@ -3,6 +3,76 @@ import Icon from "./Icon";
 import Button from "./Button";
 import { uploadMedia } from "../../services/uploadService";
 
+const MAX_DIMENSION = 1600;
+const MAX_INLINE_BYTES = 750 * 1024;
+
+// Downscale + re-encode large photos in the browser so uploads don't waste
+// the user's data and the server's bandwidth. Gives identity/cert photos
+// plenty of resolution while keeping typical uploads well under 1MB.
+// Falls back to the original file on any failure - the upload must never
+// be blocked by this.
+const compressImage = (file) =>
+    new Promise((resolve) => {
+        if (file.type !== "image/jpeg" && file.type !== "image/png") {
+            resolve(file);
+
+            return;
+        }
+
+        if (file.size <= MAX_INLINE_BYTES) {
+            resolve(file);
+
+            return;
+        }
+
+        const url = URL.createObjectURL(file);
+        const image = new Image();
+
+        image.onload = () => {
+            const { width, height } = image;
+
+            if (width <= MAX_DIMENSION && height <= MAX_DIMENSION) {
+                URL.revokeObjectURL(url);
+                resolve(file);
+
+                return;
+            }
+
+            const scale = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height);
+            const canvas = document.createElement("canvas");
+
+            canvas.width = Math.round(width * scale);
+            canvas.height = Math.round(height * scale);
+
+            const context = canvas.getContext("2d");
+
+            if (!context) {
+                URL.revokeObjectURL(url);
+                resolve(file);
+
+                return;
+            }
+
+            context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+            canvas.toBlob(
+                (blob) => {
+                    URL.revokeObjectURL(url);
+                    resolve(blob || file);
+                },
+                "image/jpeg",
+                0.82
+            );
+        };
+
+        image.onerror = () => {
+            URL.revokeObjectURL(url);
+            resolve(file);
+        };
+
+        image.src = url;
+    });
+
 // Reusable photo/video uploader. Uploads go straight to the QuickFix API
 // (which stores media on its own disk) and the resulting public URL is
 // reported back through `onChange`.
@@ -36,7 +106,10 @@ function FileUpload({
         setUploading(true);
 
         try {
-            const record = await uploadMedia(file, setProgress);
+            const payload =
+                kind === "image" ? await compressImage(file) : file;
+
+            const record = await uploadMedia(payload, setProgress);
             onChange(record.url);
         } catch (err) {
             setError(
@@ -125,7 +198,9 @@ function FileUpload({
                             : "Choose a photo"}
                     </span>
                     <span className="text-xs text-slate-400">
-                        Uploads are stored securely by QuickFix (photos up to 10 MB, videos up to 50 MB)
+                        {kind === "video"
+                            ? "Videos are uploaded as-is (up to 50 MB)"
+                            : "Photos are auto-compressed to save your data (originals up to 10 MB)"}
                     </span>
                 </button>
             )}

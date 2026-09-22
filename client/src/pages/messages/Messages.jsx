@@ -12,6 +12,7 @@ import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 import Spinner from "../../components/ui/Spinner";
 import Icon from "../../components/ui/Icon";
+import { onEvent } from "../../services/realtimeService";
 
 function Messages() {
     const { user } = useAuth();
@@ -131,6 +132,37 @@ function Messages() {
         };
     }, [conversationId]);
 
+    // Near-instant updates via the real-time stream; the interval poll above
+    // stays as a safety net when the stream is unavailable.
+    useEffect(() => {
+        const refreshThread = async () => {
+            if (!conversationId) {
+                loadList();
+
+                return;
+            }
+
+            try {
+                const data = await fetchConversation(conversationId);
+
+                setActive(data.data);
+
+                if (data.data.unread_count > 0) {
+                    await markConversationRead(conversationId);
+                    loadList();
+                }
+            } catch {
+                // ignore - the poll will retry
+            }
+        };
+
+        const unsubscribe = onEvent("conversation", () => {
+            refreshThread();
+        });
+
+        return unsubscribe;
+    }, [conversationId]);
+
     const scrollToBottom = () => {
         requestAnimationFrame(() => {
             threadEndRef.current?.scrollIntoView({ block: "end" });
@@ -195,8 +227,12 @@ function Messages() {
             )}
 
             <div className="grid gap-4 lg:grid-cols-3">
-                {/* Conversation list */}
-                <Card className="overflow-hidden lg:col-span-1">
+                {/* Conversation list — hidden on phones while a thread is open */}
+                <Card
+                    className={`overflow-hidden lg:col-span-1 ${
+                        conversationId ? "hidden lg:block" : ""
+                    }`}
+                >
                     <div className="border-b border-slate-100 px-4 py-3 text-sm font-medium text-slate-500">
                         Conversations
                     </div>
@@ -253,7 +289,11 @@ function Messages() {
                 </Card>
 
                 {/* Thread */}
-                <div className="lg:col-span-2">
+                <div
+                    className={`${
+                        !conversationId ? "hidden lg:block lg:col-span-2" : "lg:col-span-2"
+                    }`}
+                >
                     {!conversationId || (loading && !active) ? (
                         <Card className="flex min-h-[420px] flex-col items-center justify-center p-8 text-center text-slate-400">
                             <Icon
@@ -283,7 +323,7 @@ function Messages() {
                             </Link>
                         </Card>
                     ) : (
-                        <Card className="flex min-h-[420px] flex-col">
+                        <Card className="flex h-[max(320px,calc(100dvh-18.5rem))] flex-col lg:h-auto lg:min-h-[420px]">
                             {/* Header */}
                             <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
                                 <Link

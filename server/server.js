@@ -3,6 +3,7 @@ require("dotenv").config();
 const app = require("./app");
 const db = require("./config/db");
 const ensureSchema = require("./utils/ensureSchema");
+const { startScheduler } = require("./utils/stateScheduler");
 const { startUploadCleanup } = require("./utils/cleanupUploads");
 
 const PORT = process.env.PORT || 5000;
@@ -43,6 +44,11 @@ async function startServer() {
         await ensureSchema();
 
         startUploadCleanup();
+
+        // Expire stale offers/ads/promotions and close abandoned requests.
+        startScheduler(
+            Number(process.env.SCHEDULER_INTERVAL_MINUTES) || 15
+        );
 
         const server = app.listen(PORT, () => {
             console.log(`QuickFix server running on http://localhost:${PORT}`);

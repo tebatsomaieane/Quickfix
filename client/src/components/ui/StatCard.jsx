@@ -16,7 +16,7 @@ function StatCard({ icon, label, value, tone = "indigo", hint, className = "" })
     return (
         <div
             className={[
-                "group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm",
+                "group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5",
                 "transition hover:shadow-md hover:-translate-y-0.5",
                 className
             ].join(" ")}
@@ -27,7 +27,7 @@ function StatCard({ icon, label, value, tone = "indigo", hint, className = "" })
             <div className="flex items-center gap-3">
                 <span
                     className={[
-                        "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ring-4 ring-transparent transition",
+                        "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-4 ring-transparent transition sm:h-11 sm:w-11",
                         toneStyles.bg,
                         toneStyles.ring
                     ].join(" ")}
@@ -35,10 +35,10 @@ function StatCard({ icon, label, value, tone = "indigo", hint, className = "" })
                     <Icon name={icon} className="h-5 w-5" />
                 </span>
                 <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-slate-500">
+                    <p className="truncate text-[13px] font-medium text-slate-500 sm:text-sm">
                         {label}
                     </p>
-                    <p className="text-2xl font-bold tracking-tight text-slate-900">
+                    <p className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
                         {value}
                     </p>
                 </div>

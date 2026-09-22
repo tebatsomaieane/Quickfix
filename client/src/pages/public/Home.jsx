@@ -5,29 +5,67 @@ import Icon from "../../components/ui/Icon";
 import Spinner from "../../components/ui/Spinner";
 import SmartImage from "../../components/ui/SmartImage";
 import { fetchCategories, fetchMarketOverview } from "../../services/catalogueService";
-import {
-    getCategoryImage,
-    getServiceImage
-} from "../../lib/visuals";
+import { getCategoryImage } from "../../lib/visuals";
+
+// Real Lesotho imagery. Local files are first-party photos from the app;
+// the hero uses a public-domain shot of Maletsunyane Falls near Semonkong.
+import heroEngineerImage from "../../assets/electrician.jpg";
+import offerServiceImage from "../../assets/servicerequestperson.jpg";
+import offerProviderImage from "../../assets/cleaner.jpg";
+import offerStoreImage from "../../assets/restaurant.jpg";
+import categoryHomeImage from "../../assets/cleaner2.jpg";
+import categoryAutomotiveImage from "../../assets/CarRepair.jpg";
+import categoryTechnologyImage from "../../assets/programmer.jpg";
+import categoryBeautyImage from "../../assets/salon.jpg";
+import businessImage from "../../assets/business.jpg";
+
+const HERO_IMAGE_URL =
+    "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8d/Maletsunyanefalls.JPG/1920px-Maletsunyanefalls.JPG";
+
+const HERO_IMAGE_SRC_SET =
+    "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8d/Maletsunyanefalls.JPG/960px-Maletsunyanefalls.JPG 960w, https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8d/Maletsunyanefalls.JPG/1920px-Maletsunyanefalls.JPG 1920w";
+
+const DISTRICTS = [
+    "Maseru",
+    "Berea",
+    "Leribe",
+    "Mafeteng",
+    "Butha-Buthe",
+    "Mohale's Hoek"
+];
+
+// A category without a real photo renders branded gradient + icon.
+const CATEGORY_VISUAL = {
+    "Home Services": { src: categoryHomeImage, icon: "broom", obj: "object-[center_35%]" },
+    "Automotive": { src: categoryAutomotiveImage, icon: "car", obj: "object-[center_35%]" },
+    "Technology": { src: categoryTechnologyImage, icon: "monitor", obj: "object-center" },
+    "Beauty & Personal Care": { src: categoryBeautyImage, icon: "scissors", obj: "object-[center_35%]" }
+};
 
 const OFFERINGS = [
     {
         icon: "wrench",
+        image: offerServiceImage,
         seed: "Request a service",
+        obj: "object-[center_30%]",
         title: "Request a service",
         description:
             "Post what you need done — plumbing, electrical, cleaning or tech — and verified providers send you offers within hours."
     },
     {
         icon: "users",
+        image: offerProviderImage,
         seed: "Hire a provider",
+        obj: "object-[center_30%]",
         title: "Hire a provider",
         description:
             "Browse vetted professionals, compare reviews and prices, and hire the right person for the job."
     },
     {
         icon: "inbox",
+        image: offerStoreImage,
         seed: "Products from stores & cafés",
+        obj: "object-center",
         title: "Products from stores & cafés",
         description:
             "Stores and cafés advertise what they sell. Browse the adverts, then contact the shop directly to buy."
@@ -147,57 +185,53 @@ function Home() {
             ? Number(overview.avgRating)
             : null;
 
-    const serviceImages = [];
-    (categories ?? []).forEach((category) => {
-        if (category.services) {
-            category.services.forEach((service) => serviceImages.push(service));
-        }
-    });
-
     return (
         <div className="overflow-hidden">
             {/* ============================== HERO ============================== */}
-            <section className="relative">
-                <div
-                    className="absolute inset-0 bg-gradient-to-b from-indigo-50 via-white to-white"
-                    aria-hidden="true"
+            <section className="relative isolate overflow-hidden bg-slate-950">
+                {/* Background: Maletsunyane Falls, Semonkong, Lesotho */}
+                <img
+                    src={HERO_IMAGE_URL}
+                    srcSet={HERO_IMAGE_SRC_SET}
+                    sizes="100vw"
+                    alt="Maletsunyane Falls near Semonkong, Lesotho"
+                    loading="eager"
+                    fetchpriority="high"
+                    decoding="async"
+                    className="absolute inset-0 h-full w-full object-cover"
                 />
-                <div
-                    className="absolute -left-32 top-10 h-80 w-80 rounded-full bg-violet-200/40 blur-3xl"
-                    aria-hidden="true"
-                />
-                <div
-                    className="absolute -right-24 top-40 h-96 w-96 rounded-full bg-indigo-200/40 blur-3xl"
-                    aria-hidden="true"
-                />
+                <div className="absolute inset-0 bg-gradient-to-r from-slate-950/95 via-slate-950/80 to-indigo-950/40" />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-slate-950/40" />
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(2,6,23,0.35)_100%)]" />
 
-                <div className="relative mx-auto grid max-w-7xl gap-12 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:items-center lg:gap-8 lg:px-8 lg:py-24">
+                <div className="relative mx-auto grid max-w-7xl gap-12 px-4 py-14 sm:px-6 lg:grid-cols-2 lg:items-center lg:gap-10 lg:px-8 lg:py-24">
                     {/* Copy */}
                     <div>
-                        <span className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-white/80 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-indigo-700 shadow-sm">
+                        <span className="qf-rise inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-indigo-100 shadow-sm backdrop-blur">
                             <Icon name="sparkles" className="h-3.5 w-3.5" />
                             Lesotho's local service marketplace
                         </span>
 
-                        <h1 className="mt-6 text-4xl font-extrabold leading-tight tracking-tight text-slate-900 sm:text-5xl lg:text-[3.4rem]">
+                        <h1 className="qf-rise mt-6 text-4xl font-extrabold leading-tight tracking-tight text-white sm:text-5xl lg:text-[3.4rem]" style={{ animationDelay: "0.06s" }}>
                             Find a trusted provider for any job,{" "}
-                            <span className="bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 bg-clip-text text-transparent">
+                            <span className="bg-gradient-to-r from-indigo-300 via-violet-300 to-fuchsia-300 bg-clip-text text-transparent">
                                 close to home.
                             </span>
                         </h1>
 
-                        <p className="mt-6 max-w-xl text-lg leading-relaxed text-slate-600">
-                            QuickFix connects you with service providers for
-                            home repairs, electrical work, plumbing, auto care,
-                            technology and beauty. Request a service, compare
-                            offers and hire with confidence.
+                        <p className="qf-rise mt-6 max-w-xl text-lg leading-relaxed text-slate-200" style={{ animationDelay: "0.12s" }}>
+                            QuickFix connects you with verified Basotho service
+                            providers for home repairs, electrical work,
+                            plumbing, auto care, technology and beauty. Request a
+                            service, compare offers and hire with confidence —
+                            all across Maseru, Berea, Leribe and beyond.
                         </p>
 
-                        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                        <div className="qf-rise mt-8 flex flex-col gap-3 sm:flex-row" style={{ animationDelay: "0.18s" }}>
                             <Button
                                 size="lg"
                                 onClick={() => navigate("/register")}
-                                className="shadow-lg shadow-indigo-300/40"
+                                className="w-full shadow-lg shadow-indigo-500/30 sm:w-auto"
                             >
                                 Get started — it's free
                                 <Icon name="arrowRight" className="h-4 w-4" />
@@ -205,21 +239,44 @@ function Home() {
                             <Button
                                 size="lg"
                                 variant="outline"
+                                className="w-full border-white/30 bg-white/10 text-white hover:border-white/50 hover:bg-white/15 sm:w-auto"
                                 onClick={() => navigate("/login")}
                             >
                                 Log in to the marketplace
                             </Button>
                         </div>
 
+                        {/* Districts */}
+                        <div className="qf-rise mt-8 flex flex-wrap items-center gap-2 border-t border-white/10 pt-5" style={{ animationDelay: "0.24s" }}>
+                            <span className="text-xs font-semibold uppercase tracking-widest text-indigo-300">
+                                Serving
+                            </span>
+                            {DISTRICTS.map((district) => (
+                                <span
+                                    key={district}
+                                    className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-medium text-indigo-100 backdrop-blur"
+                                >
+                                    <Icon
+                                        name="location"
+                                        className="h-3 w-3 text-indigo-300"
+                                    />
+                                    {district}
+                                </span>
+                            ))}
+                        </div>
+
                         {/* Stats */}
                         {stats.length > 0 && (
-                            <dl className="mt-10 grid grid-cols-2 gap-6 sm:grid-cols-4">
+                            <dl className="qf-rise mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4" style={{ animationDelay: "0.3s" }}>
                                 {stats.map((stat) => (
-                                    <div key={stat.label}>
-                                        <dt className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
+                                    <div
+                                        key={stat.label}
+                                        className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur"
+                                    >
+                                        <dt className="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
                                             {stat.value}
                                         </dt>
-                                        <dd className="mt-0.5 text-xs font-medium uppercase tracking-wide text-slate-500">
+                                        <dd className="mt-0.5 text-xs font-medium uppercase tracking-wide text-indigo-100/80">
                                             {stat.label}
                                         </dd>
                                     </div>
@@ -230,27 +287,32 @@ function Home() {
 
                     {/* Visual */}
                     <div className="relative">
-                        <div className="relative mx-auto max-w-md lg:max-w-none">
-                            <div className="overflow-hidden rounded-3xl shadow-2xl shadow-indigo-200/60 ring-1 ring-slate-900/10">
+                        <div className="qf-rise relative mx-auto max-w-md lg:max-w-none" style={{ animationDelay: "0.2s" }}>
+                            <div className="overflow-hidden rounded-3xl shadow-2xl shadow-black/40 ring-1 ring-white/20">
                                 <SmartImage
-                                    alt="Trained provider repairing a kitchen"
-                                    seed="hero engineer"
-                                    icon="wrench"
+                                    src={heroEngineerImage}
+                                    alt="Verified electrician working on a job in Lesotho"
+                                    seed="engineer at work"
+                                    icon="bolt"
                                     eager
-                                    className="h-80 w-full object-cover sm:h-[26rem] lg:h-[30rem]"
+                                    fetchPriority="high"
+                                    className="h-80 w-full object-cover object-[center_25%] sm:h-[26rem] lg:h-[30rem]"
                                 />
                             </div>
 
                             {/* Floating card: verified */}
-                            <div className="absolute -left-4 top-8 hidden gap-3 rounded-2xl border border-slate-100 bg-white/95 p-4 shadow-xl backdrop-blur sm:flex">
-                                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-                                    <Icon name="checkBadge" className="h-6 w-6" />
+                            <div className="absolute -left-3 top-8 hidden gap-3 rounded-2xl border border-white/15 bg-slate-900/85 p-4 shadow-xl backdrop-blur sm:flex">
+                                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-300">
+                                    <Icon
+                                        name="checkBadge"
+                                        className="h-6 w-6"
+                                    />
                                 </span>
                                 <div>
-                                    <p className="text-sm font-bold text-slate-900">
+                                    <p className="text-sm font-bold text-white">
                                         Fully verified
                                     </p>
-                                    <p className="text-xs text-slate-500">
+                                    <p className="text-xs text-slate-300">
                                         Background & trade checked
                                     </p>
                                 </div>
@@ -258,15 +320,15 @@ function Home() {
 
                             {/* Floating card: rating */}
                             {rating !== null && (
-                                <div className="absolute -bottom-5 right-4 flex items-center gap-3 rounded-2xl border border-slate-100 bg-white/95 p-4 shadow-xl backdrop-blur">
-                                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50 text-amber-500">
+                                <div className="absolute -bottom-5 right-4 flex items-center gap-3 rounded-2xl border border-white/15 bg-slate-900/85 p-4 shadow-xl backdrop-blur">
+                                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-500/20 text-amber-300">
                                         <Icon name="star" className="h-6 w-6" />
                                     </span>
                                     <div>
-                                        <p className="text-sm font-bold text-slate-900">
+                                        <p className="text-sm font-bold text-white">
                                             {rating.toFixed(1)} / 5
                                         </p>
-                                        <p className="text-xs text-slate-500">
+                                        <p className="text-xs text-slate-300">
                                             From {overview.completedJobs} completed
                                             jobs
                                         </p>
@@ -279,21 +341,22 @@ function Home() {
             </section>
 
             {/* ============================== OFFERINGS ============================== */}
-            <section className="mx-auto max-w-7xl px-4 pb-4 sm:px-6 lg:px-8">
+            <section className="mx-auto max-w-7xl px-4 pb-4 sm:px-6 lg:px-8 -mt-6 sm:-mt-10 md:-mt-14 relative z-10">
                 <div className="grid gap-6 lg:grid-cols-3">
                     {OFFERINGS.map((offering) => (
                         <div
                             key={offering.title}
-                            className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+                            className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg ring-1 ring-slate-900/5 transition hover:-translate-y-1 hover:shadow-xl"
                         >
-                            <div className="relative h-36 overflow-hidden">
+                            <div className="relative h-52 overflow-hidden">
                                 <SmartImage
+                                    src={offering.image}
                                     alt={offering.title}
                                     seed={offering.seed}
                                     icon={offering.icon}
-                                    className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                                    className={`h-full w-full object-cover transition duration-500 group-hover:scale-105 ${offering.obj ?? "object-center"}`}
                                 />
-                                <div className="absolute inset-0 bg-gradient-to-t from-slate-900/50 to-transparent" />
+                                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent" />
                                 <span className="absolute left-4 top-4 flex h-11 w-11 items-center justify-center rounded-xl bg-white/95 text-indigo-600 shadow-lg">
                                     <Icon name={offering.icon} className="h-6 w-6" />
                                 </span>
@@ -341,34 +404,38 @@ function Home() {
                     </div>
                 ) : (
                     <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                        {categories.map((category) => (
-                            <div
-                                key={category.id}
-                                className="group relative h-44 overflow-hidden rounded-2xl shadow-sm transition hover:shadow-xl"
-                            >
-                                <SmartImage
-                                    src={getCategoryImage(category)}
-                                    alt={category.name}
-                                    seed={category.name}
-                                    icon="grid"
-                                    className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-900/20 to-transparent" />
-                                <div className="absolute inset-x-0 bottom-0 p-4">
-                                    <h3 className="text-lg font-bold text-white">
-                                        {category.name}
-                                    </h3>
-                                    <p className="mt-0.5 text-xs text-slate-200 line-clamp-1">
-                                        {category.description}
-                                    </p>
+                        {categories.map((category) => {
+                            const visual = CATEGORY_VISUAL[category.name] || {};
+                            const image = visual.src || getCategoryImage(category);
+                            return (
+                                <div
+                                    key={category.id}
+                                    className="group relative h-44 overflow-hidden rounded-2xl shadow-sm transition hover:shadow-xl"
+                                >
+                                    <SmartImage
+                                        src={image}
+                                        alt={category.name}
+                                        seed={category.name}
+                                        icon={visual.icon || "grid"}
+                                        className={`h-full w-full object-cover transition duration-500 group-hover:scale-105 ${visual.obj ?? "object-center"}`}
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-900/20 to-transparent" />
+                                    <div className="absolute inset-x-0 bottom-0 p-4">
+                                        <h3 className="text-lg font-bold text-white">
+                                            {category.name}
+                                        </h3>
+                                        <p className="mt-0.5 text-xs text-slate-200 line-clamp-1">
+                                            {category.description}
+                                        </p>
+                                    </div>
+                                    {category.services?.length > 0 && (
+                                        <span className="absolute right-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-bold text-indigo-700 shadow">
+                                            {category.services.length} services
+                                        </span>
+                                    )}
                                 </div>
-                                {category.services?.length > 0 && (
-                                    <span className="absolute right-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-bold text-indigo-700 shadow">
-                                        {category.services.length} services
-                                    </span>
-                                )}
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </section>
@@ -416,12 +483,13 @@ function Home() {
             {/* ============================== FOR BUSINESSES ============================== */}
             <section id="for-businesses" className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 sm:py-20">
                 <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 lg:grid lg:grid-cols-2">
-                    <div className="relative">
+                    <div className="relative max-h-96 lg:max-h-none">
                         <SmartImage
-                            alt="A local store advertising its products"
+                            src={businessImage}
+                            alt="A local store advertising the products they sell on QuickFix"
                             seed="storefront"
                             icon="building"
-                            className="h-56 w-full object-cover lg:h-full"
+                            className="h-56 w-full object-cover object-center lg:h-full"
                         />
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent to-slate-900/40" />
                     </div>
@@ -545,31 +613,6 @@ function Home() {
                     </div>
                 </div>
             </section>
-
-            {/* Preview strip of real service imagery (uses fetched catalogue when available) */}
-            {serviceImages.length > 0 && (
-                <section className="mx-auto max-w-7xl px-4 pb-20 sm:px-6 lg:px-8">
-                    <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8">
-                            {serviceImages.slice(0, 8).map((service) => (
-                                <div key={service.id} className="group relative h-28 overflow-hidden sm:h-32">
-                                    <SmartImage
-                                        src={getServiceImage(service)}
-                                        alt={service.name}
-                                        seed={service.name}
-                                        icon="wrench"
-                                        className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                                    />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 to-transparent" />
-                                    <p className="absolute inset-x-0 bottom-0 p-2 text-xs font-semibold text-white">
-                                        {service.name}
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </section>
-            )}
         </div>
     );
 }

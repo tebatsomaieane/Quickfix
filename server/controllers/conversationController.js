@@ -3,6 +3,7 @@ const {
     getProviderId,
     getCustomerId
 } = require("../utils/helpers");
+const { pushConversation } = require("../utils/realtime");
 
 
 const CONVERSATION_LIST_JOIN = `
@@ -240,7 +241,7 @@ const getById = async (req, res) => {
             });
         }
 
-        const { error, conversation } = await ensureParticipant(req, res, id);
+        const { error } = await ensureParticipant(req, res, id);
 
         if (error) {
             return res.status(error.status).json({
@@ -328,6 +329,26 @@ const sendMessage = async (req, res) => {
              FROM messages WHERE id = ?`,
             [result.insertId]
         );
+
+        // Real-time hint for both participants so their open thread/list
+        // refreshes instantly instead of waiting for the next poll.
+        const [participants] = await db.query(
+            `SELECT cu.id AS customer_user_id, pu.id AS provider_user_id
+             FROM conversations v
+             JOIN customer_profiles cp ON cp.id = v.customer_id
+             JOIN users cu ON cu.id = cp.user_id
+             JOIN provider_profiles pp ON pp.id = v.provider_id
+             JOIN users pu ON pu.id = pp.user_id
+             WHERE v.id = ?`,
+            [id]
+        );
+
+        if (participants.length > 0) {
+            const { customer_user_id, provider_user_id } = participants[0];
+
+            pushConversation(customer_user_id, id, messages[0]);
+            pushConversation(provider_user_id, id, messages[0]);
+        }
 
         return res.status(201).json({
             success: true,

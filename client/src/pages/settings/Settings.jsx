@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { changePassword, updateProfile } from "../../services/authService";
+import { changePassword, resendVerification, updateProfile } from "../../services/authService";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import Input from "../../components/ui/Input";
@@ -28,6 +28,27 @@ function Settings() {
     const [message, setMessage] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    const [verifySent, setVerifySent] = useState(false);
+    const [verifyError, setVerifyError] = useState("");
+
+    const handleResendVerification = async () => {
+        setVerifySent(false);
+        setVerifyError("");
+
+        try {
+            const data = await resendVerification(user?.email || "");
+
+            if (data.success) {
+                setVerifySent(true);
+            } else {
+                setVerifyError(data.message || "Could not send the link.");
+            }
+        } catch (err) {
+            setVerifyError(
+                err.response?.data?.message || "Could not send the link."
+            );
+        }
+    };
 
     const handleProfileChange = (e) => {
         setProfileForm({ ...profileForm, [e.target.name]: e.target.value });
@@ -127,6 +148,38 @@ function Settings() {
                     <p className="mt-1 text-sm text-slate-500">
                         Signed in as {user?.email}.
                     </p>
+
+                    {!user?.email_verified && (
+                        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                            <p className="text-sm font-medium text-amber-800">
+                                Your email is not verified yet.
+                            </p>
+                            <p className="mt-1 text-xs text-amber-700">
+                                Verified emails keep your account safe and are
+                                required before requesting or offering services.
+                            </p>
+                            {!verifySent && (
+                                <Button
+                                    className="mt-3"
+                                    variant="outline"
+                                    onClick={handleResendVerification}
+                                >
+                                    Resend verification email
+                                </Button>
+                            )}
+                            {verifySent && (
+                                <p className="mt-2 text-sm text-emerald-700">
+                                    A new verification link was sent. Check your
+                                    inbox (and spam).
+                                </p>
+                            )}
+                            {verifyError && (
+                                <p className="mt-2 text-sm text-red-600">
+                                    {verifyError}
+                                </p>
+                            )}
+                        </div>
+                    )}
 
                     {profileMessage && (
                         <div className="mt-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">

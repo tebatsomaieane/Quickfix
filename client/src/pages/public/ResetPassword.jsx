@@ -3,6 +3,15 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { resetPassword } from "../../services/authService";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
+import Logo from "../../components/ui/Logo";
+import AuthShell from "../../components/auth/AuthShell";
+import resetImage from "../../assets/cleaner2.jpg";
+
+const HIGHLIGHTS = [
+    "Secure new password in two taps",
+    "Your requests, offers and jobs stay untouched",
+    "Log in straight after you're done"
+];
 
 function ResetPassword() {
     const navigate = useNavigate();
@@ -67,29 +76,36 @@ function ResetPassword() {
     };
 
     return (
-        <div className="bg-slate-50 py-16 sm:py-24">
-            <div className="mx-auto w-full max-w-md px-4">
-                <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-                    <h1 className="text-2xl font-bold text-slate-900">
-                        Set a new password
-                    </h1>
-                    <p className="mt-2 text-sm text-slate-600">
-                        Choose a new password for your account.
-                    </p>
+        <AuthShell
+            image={resetImage}
+            imageSeed="Focused provider getting back to work"
+            imageIcon="sparkles"
+            eyebrow="Almost there — set a new password."
+            highlights={HIGHLIGHTS}
+        >
+            <div>
+                <Logo size="lg" brand="Quick" accent="Fix" />
+                <h1 className="mt-6 text-3xl font-extrabold tracking-tight text-slate-900">
+                    Set a new password
+                </h1>
+                <p className="mt-2 text-sm text-slate-600">
+                    Choose a new password for your account.
+                </p>
 
+                <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
                     {message && (
-                        <div className="mt-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
+                        <div className="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
                             {message}
                         </div>
                     )}
 
                     {error && (
-                        <div className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+                        <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
                             {error}
                         </div>
                     )}
 
-                    <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+                    <form onSubmit={handleSubmit} className="space-y-4">
                         <Input
                             label="Email address"
                             id="email"
@@ -141,7 +157,7 @@ function ResetPassword() {
                     </p>
                 </div>
             </div>
-        </div>
+        </AuthShell>
     );
 }
 

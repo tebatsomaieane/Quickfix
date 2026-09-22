@@ -280,22 +280,32 @@ function ProviderProfile() {
                         {provider.reviews.map((review) => (
                             <Card key={review.id} className="p-5">
                                 <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-medium text-slate-900">
-                                            {review.first_name}{" "}
-                                            {review.last_name}
-                                        </span>
-                                        <RatingStars rating={review.rating} />
+                                    <div className="flex items-center gap-3">
+                                        <ProviderAvatar
+                                            name={`${review.first_name} ${review.last_name}`}
+                                            size="sm"
+                                        />
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-medium text-slate-900">
+                                                    {review.first_name}{" "}
+                                                    {review.last_name}
+                                                </span>
+                                                <RatingStars
+                                                    rating={review.rating}
+                                                />
+                                            </div>
+                                            <span className="text-xs text-slate-400">
+                                                {new Date(
+                                                    review.created_at
+                                                ).toLocaleDateString()}
+                                            </span>
+                                        </div>
                                     </div>
-                                    <span className="text-xs text-slate-400">
-                                        {new Date(
-                                            review.created_at
-                                        ).toLocaleDateString()}
-                                    </span>
                                 </div>
 
                                 {review.comment && (
-                                    <p className="mt-2 text-sm text-slate-600">
+                                    <p className="mt-3 text-sm text-slate-600">
                                         {review.comment}
                                     </p>
                                 )}

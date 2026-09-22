@@ -11,6 +11,7 @@ import {
     loginUser as apiLogin,
     logoutUser as apiLogout
 } from "../services/authService";
+import { closeStream } from "../services/realtimeService";
 
 const AuthContext = createContext(null);
 
@@ -56,6 +57,7 @@ export function AuthProvider({ children }) {
 
     const logout = async () => {
         await apiLogout();
+        closeStream();
         setUser(null);
     };
 

@@ -6,9 +6,9 @@ import {
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
-import Input from "../../components/ui/Input";
 import Textarea from "../../components/ui/Textarea";
 import Spinner from "../../components/ui/Spinner";
+import FileUpload from "../../components/ui/FileUpload";
 import { formatDate } from "../../lib/format";
 
 const STATUS_COLORS = {
@@ -238,15 +238,17 @@ function Verification() {
                                     />
                                 </div>
 
-                                <Input
-                                    label="Supporting document link"
-                                    id="document_url"
-                                    name="document_url"
-                                    type="url"
-                                    placeholder="https://example.com/certificate.pdf"
+                                <FileUpload
+                                    label="Supporting document"
+                                    kind="image"
                                     value={form.document_url}
-                                    onChange={handleChange}
-                                    required
+                                    onChange={(url) =>
+                                        setForm({
+                                            ...form,
+                                            document_url: url
+                                        })
+                                    }
+                                    hint="Upload a photo of your certificate, qualification or ID (required)."
                                 />
 
                                 <Button type="submit" loading={submitting}>

@@ -89,7 +89,10 @@ const getAll = async (req, res) => {
 
         // Strip PII from public listing
         const safeProviders = providers.map((p) => {
-            const { email, phone, ...rest } = p;
+            const rest = { ...p };
+            delete rest.email;
+            delete rest.phone;
+
             return rest;
         });
 

@@ -134,43 +134,79 @@ function Promotions() {
             ) : promotions.length === 0 ? (
                 <EmptyState title="No promotions yet" description="Create a promotion to offer a time-limited discount to customers." />
             ) : (
-                <Card className="overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm">
-                            <thead className="border-b bg-slate-50 text-xs font-semibold tracking-wide text-slate-500">
-                                <tr>
-                                    <th className="px-4 py-3">Title</th>
-                                    <th className="px-4 py-3">Discount</th>
-                                    <th className="px-4 py-3">Period</th>
-                                    <th className="px-4 py-3">Status</th>
-                                    <th className="px-4 py-3 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {promotions.map((promo) => (
-                                    <tr key={promo.id} className="hover:bg-slate-50">
-                                        <td className="px-4 py-3 font-medium text-slate-900">{promo.title}</td>
-                                        <td className="px-4 py-3 text-indigo-600 font-semibold">{promo.discount}%</td>
-                                        <td className="px-4 py-3 text-slate-500 text-xs">
-                                            {promo.start_date?.slice(0,10)} — {promo.end_date?.slice(0,10)}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <Badge color={promo.status === "ACTIVE" ? "green" : promo.status === "PENDING" ? "amber" : "gray"}>
-                                                {promo.status.toLowerCase()}
-                                            </Badge>
-                                        </td>
-                                        <td className="px-4 py-3 text-right">
-                                            <div className="flex justify-end gap-2">
-                                                <Button size="sm" variant="secondary" onClick={() => handleEdit(promo)}>Edit</Button>
-                                                <Button size="sm" variant="danger" loading={deleting === promo.id} onClick={() => handleDelete(promo.id)}>Delete</Button>
-                                            </div>
-                                        </td>
+                <>
+                    <Card className="hidden overflow-hidden md:block">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm">
+                                <thead className="border-b bg-slate-50 text-xs font-semibold tracking-wide text-slate-500">
+                                    <tr>
+                                        <th className="px-4 py-3">Title</th>
+                                        <th className="px-4 py-3">Discount</th>
+                                        <th className="px-4 py-3">Period</th>
+                                        <th className="px-4 py-3">Status</th>
+                                        <th className="px-4 py-3 text-right">Actions</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {promotions.map((promo) => (
+                                        <tr key={promo.id} className="hover:bg-slate-50">
+                                            <td className="px-4 py-3 font-medium text-slate-900">{promo.title}</td>
+                                            <td className="px-4 py-3 text-indigo-600 font-semibold">{promo.discount}%</td>
+                                            <td className="px-4 py-3 text-slate-500 text-xs">
+                                                {promo.start_date?.slice(0,10)} — {promo.end_date?.slice(0,10)}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <Badge color={promo.status === "ACTIVE" ? "green" : promo.status === "PENDING" ? "amber" : "gray"}>
+                                                    {promo.status.toLowerCase()}
+                                                </Badge>
+                                            </td>
+                                            <td className="px-4 py-3 text-right">
+                                                <div className="flex justify-end gap-2">
+                                                    <Button size="sm" variant="secondary" onClick={() => handleEdit(promo)}>Edit</Button>
+                                                    <Button size="sm" variant="danger" loading={deleting === promo.id} onClick={() => handleDelete(promo.id)}>Delete</Button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </Card>
+
+                    <div className="space-y-3 md:hidden">
+                        {promotions.map((promo) => (
+                            <Card key={promo.id} className="overflow-hidden">
+                                <div className="flex items-start justify-between gap-3 p-4">
+                                    <div className="min-w-0">
+                                        <h3 className="font-semibold leading-snug text-slate-900">
+                                            {promo.title}
+                                        </h3>
+                                        <p className="mt-0.5 text-xs text-slate-500">
+                                            {promo.start_date?.slice(0, 10)} — {promo.end_date?.slice(0, 10)}
+                                        </p>
+                                    </div>
+                                    <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-sm font-extrabold text-amber-700">
+                                        {promo.discount}%
+                                    </span>
+                                </div>
+                                {promo.description && (
+                                    <p className="line-clamp-2 px-4 text-sm text-slate-500">
+                                        {promo.description}
+                                    </p>
+                                )}
+                                <div className="flex items-center justify-between gap-3 border-t border-slate-100 p-3">
+                                    <Badge color={promo.status === "ACTIVE" ? "green" : promo.status === "PENDING" ? "amber" : "gray"}>
+                                        {promo.status.toLowerCase()}
+                                    </Badge>
+                                    <div className="flex gap-2">
+                                        <Button size="md" variant="secondary" onClick={() => handleEdit(promo)}>Edit</Button>
+                                        <Button size="md" variant="danger" loading={deleting === promo.id} onClick={() => handleDelete(promo.id)}>Delete</Button>
+                                    </div>
+                                </div>
+                            </Card>
+                        ))}
                     </div>
-                </Card>
+                </>
             )}
         </div>
     );

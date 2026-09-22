@@ -16,6 +16,54 @@ const api = axios.create({
     withCredentials: true
 });
 
+// Real-time streams (EventSource) need the same base URL. EventSource can't
+// set custom headers, so auth relies on the httpOnly session cookie - the
+// same cookie every other API call uses.
+export const getApiBaseUrl = () => baseURL;
+
+// ==========================================
+// CSRF protection
+// The API echoes a csrfToken cookie back on every state-changing request.
+// We fetch the token once at startup (CORS prevents attackers from doing
+// the same) and replay it as x-csrf-token on all non-GET requests.
+// ==========================================
+let csrfToken = null;
+let csrfPending = null;
+
+const fetchCsrfToken = () => {
+    if (csrfToken) return Promise.resolve(csrfToken);
+
+    if (!csrfPending) {
+        csrfPending = axios
+            .get(`${baseURL}/csrf`, { withCredentials: true })
+            .then((res) => {
+                csrfToken = res.data?.data?.token || null;
+
+                return csrfToken;
+            })
+            .catch(() => null)
+            .finally(() => {
+                csrfPending = null;
+            });
+    }
+
+    return csrfPending;
+};
+
+api.interceptors.request.use(async (config) => {
+    const method = (config.method || "get").toLowerCase();
+
+    if (method !== "get" && method !== "head" && method !== "options") {
+        const token = await fetchCsrfToken();
+
+        if (token) {
+            config.headers["x-csrf-token"] = token;
+        }
+    }
+
+    return config;
+});
+
 // Global 401 handling: an invalid/expired session means the request failed
 // for the whole app, so bounce the user to /login once.
 let redirectingToLogin = false;

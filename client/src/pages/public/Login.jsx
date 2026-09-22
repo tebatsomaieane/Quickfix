@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { resendVerification } from "../../services/authService";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
 import Logo from "../../components/ui/Logo";
 import AuthShell from "../../components/auth/AuthShell";
+import loginHeroImage from "../../assets/electrician.jpg";
 
 const ROLE_PATHS = {
     CUSTOMER: "/customer/dashboard",
@@ -30,6 +32,8 @@ function Login() {
 
     const [error, setError] = useState("");
     const [loggingIn, setLoggingIn] = useState(false);
+    const [verifyPendingEmail, setVerifyPendingEmail] = useState("");
+    const [resendMessage, setResendMessage] = useState("");
 
     if (!loading && user) {
         const target = ROLE_PATHS[user.role] || "/";
@@ -48,6 +52,7 @@ function Login() {
         e.preventDefault();
 
         setError("");
+        setResendMessage("");
         setLoggingIn(true);
 
         try {
@@ -57,19 +62,42 @@ function Login() {
                 navigate(ROLE_PATHS[data.user.role] || "/");
             }
         } catch (error) {
+            const serverError = error.response?.data;
+
             setError(
-                error.response?.data?.message ||
-                "Login failed. Please try again."
+                serverError?.message || "Login failed. Please try again."
             );
+
+            if (serverError?.code === "EMAIL_NOT_VERIFIED") {
+                setVerifyPendingEmail(formData.email.trim());
+            }
         } finally {
             setLoggingIn(false);
         }
     };
 
+    const handleResend = async () => {
+        setResendMessage("");
+
+        if (!verifyPendingEmail) {
+            return;
+        }
+
+        const data = await resendVerification(verifyPendingEmail);
+
+        setResendMessage(
+            data?.success
+                ? data.message || "A new verification link has been sent."
+                : data?.message || "Could not resend the link. Try again later."
+        );
+    };
+
     return (
         <AuthShell
-            imageSeed="login engineer"
+            image={loginHeroImage}
+            imageSeed="Verified electrician at work in Lesotho"
             imageIcon="wrench"
+            eyebrow="Verified professionals, close to home."
             highlights={HIGHLIGHTS}
         >
             <div>
@@ -85,6 +113,26 @@ function Login() {
                     {error && (
                         <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
                             {error}
+                        </div>
+                    )}
+
+                    {verifyPendingEmail && (
+                        <div className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3">
+                            <p className="text-sm text-indigo-800">
+                                Verify your email, then log in with the same
+                                link from your inbox (check spam too).
+                            </p>
+                            <Button
+                                className="mt-3"
+                                onClick={handleResend}
+                            >
+                                Resend verification email
+                            </Button>
+                            {resendMessage && (
+                                <p className="mt-2 text-sm text-indigo-700">
+                                    {resendMessage}
+                                </p>
+                            )}
                         </div>
                     )}
 

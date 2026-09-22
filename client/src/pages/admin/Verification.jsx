@@ -8,6 +8,7 @@ import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
 import Spinner from "../../components/ui/Spinner";
 import EmptyState from "../../components/ui/EmptyState";
+import SmartImage from "../../components/ui/SmartImage";
 import { formatDate } from "../../lib/format";
 
 const STATUS_COLORS = {
@@ -157,9 +158,16 @@ function AdminVerification() {
                                         href={request.document_url}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                                        className="group relative block h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-slate-200"
+                                        title="Open document"
                                     >
-                                        View document
+                                        <SmartImage
+                                            src={request.document_url}
+                                            alt="Verification document"
+                                            seed={`doc-${request.id}`}
+                                            icon="file"
+                                            className="h-full w-full object-cover transition group-hover:scale-105"
+                                        />
                                     </a>
                                 )}
                             </div>

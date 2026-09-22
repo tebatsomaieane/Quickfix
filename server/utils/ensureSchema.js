@@ -15,6 +15,19 @@ async function columnExists(connection, table, column) {
 }
 
 
+async function tableExists(connection, table) {
+    const [rows] = await connection.query(
+        `SELECT COUNT(*) AS n
+         FROM information_schema.TABLES
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = ?`,
+        [table]
+    );
+
+    return Number(rows[0].n) > 0;
+}
+
+
 async function ensureSchema() {
     const connection = await db.getConnection();
 
@@ -30,6 +43,23 @@ async function ensureSchema() {
             await connection.query(
                 `ALTER TABLE service_requests
                  ADD COLUMN preferred_provider_id INT NULL AFTER service_id`
+            );
+        }
+
+        if (!(await tableExists(connection, "email_verification_tokens"))) {
+            await connection.query(
+                `CREATE TABLE email_verification_tokens (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    user_id INT NOT NULL,
+                    token_hash VARCHAR(64) NOT NULL UNIQUE,
+                    expires_at DATETIME NOT NULL,
+                    used BOOLEAN NOT NULL DEFAULT FALSE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT fk_email_verification_user
+                        FOREIGN KEY (user_id)
+                        REFERENCES users(id)
+                        ON DELETE CASCADE
+                )`
             );
         }
     } finally {

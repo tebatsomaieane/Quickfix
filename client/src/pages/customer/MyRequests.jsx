@@ -114,6 +114,8 @@ function MyRequests() {
                 <EmptyState
                     title="No requests here"
                     description="Create a service request to start receiving offers."
+                    icon="briefcase"
+                    tone="indigo"
                     action={
                         <Link to="/customer/requests/new">
                             <Button>Create a request</Button>

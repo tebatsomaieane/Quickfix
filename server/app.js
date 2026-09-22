@@ -25,6 +25,9 @@ const businessRoutes = require("./routes/businessRoutes");
 const providerVerificationRoutes = require("./routes/providerVerificationRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
+const csrfRoutes = require("./routes/csrfRoutes");
+const eventsRoutes = require("./routes/eventsRoutes");
+const { csrfProtection } = require("./middleware/csrf");
 
 const app = express();
 
@@ -122,6 +125,9 @@ app.use(express.json({ limit: "100kb" }));
 app.use(express.urlencoded({ extended: true, limit: "100kb" }));
 app.use(cookieParser());
 
+// CSRF defence (mutating requests must echo the csrfToken cookie).
+app.use(csrfProtection);
+
 // User-uploaded media (photos/videos) stored on the API server's disk.
 const uploadsDir = path.join(__dirname, "uploads");
 app.use("/uploads", express.static(uploadsDir, {
@@ -158,6 +164,9 @@ if (process.env.NODE_ENV !== "production") {
 
 // Authentication routes
 app.use("/api/auth", authRoutes);
+
+// Security token endpoint (CSRF bootstrap)
+app.use("/api/csrf", csrfRoutes);
 
 // Service catalogue routes (public)
 app.use("/api/categories", categoryRoutes);
@@ -207,6 +216,9 @@ app.use("/api/admin", adminRoutes);
 
 // Media uploads
 app.use("/api/uploads", uploadRoutes);
+
+// Real-time events (SSE)
+app.use("/api/events", eventsRoutes);
 
 // Production single-process deployment: serve the built React client.
 if (process.env.NODE_ENV === "production") {

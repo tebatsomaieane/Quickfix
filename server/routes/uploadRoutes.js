@@ -5,6 +5,7 @@ const fs = require("fs");
 const crypto = require("crypto");
 
 const { protect } = require("../middleware/authMiddleware");
+const rateLimit = require("../middleware/rateLimit");
 
 const router = express.Router();
 
@@ -18,6 +19,9 @@ const DAILY_QUOTA_BYTES =
 
 // Authenticated users only - media is owned by real accounts.
 router.use(protect);
+
+// Cap how many uploads a single account can push through in a window.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 40 }));
 
 const storage = multer.diskStorage({
     destination: uploadsDir,
