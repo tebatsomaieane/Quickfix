@@ -15,7 +15,7 @@ import offerProviderImage from "../../assets/cleaner.jpg";
 import offerStoreImage from "../../assets/restaurant.jpg";
 import categoryHomeImage from "../../assets/cleaner2.jpg";
 import categoryAutomotiveImage from "../../assets/CarRepair.jpg";
-import categoryTechnologyImage from "../../assets/programmer.jpg";
+import categoryTechnologyImage from "../../assets/technology.jfif";
 import categoryBeautyImage from "../../assets/salon.jpg";
 import businessImage from "../../assets/business.jpg";
 
@@ -31,7 +31,11 @@ const DISTRICTS = [
     "Leribe",
     "Mafeteng",
     "Butha-Buthe",
-    "Mohale's Hoek"
+    "Mohale's Hoek",
+    "Quthing",
+    "Qacha's Nek",
+    "Thaba-Tseka",
+    "Mokhotlong"
 ];
 
 // A category without a real photo renders branded gradient + icon.
