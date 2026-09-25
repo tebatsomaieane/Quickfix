@@ -14,8 +14,10 @@
 -- Admin default password:  Admin@Lesotho2026
 --   CHANGE THIS after your first login.
 --
--- Safe to re-run: truncates everything first (admin + catalogue
--- are always re-seeded with stable ids).
+-- The seeded admin is pre-verified and has two-factor authentication
+-- disabled (two_factor_enabled = FALSE) so a fresh install can be
+-- administered even before SMTP is configured. Every account created
+-- through the app has 2FA enabled by default.
 -- =========================================================
 
 SET FOREIGN_KEY_CHECKS = 0;
@@ -49,8 +51,8 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- ADMIN ACCOUNT (single production administrator)
 -- =========================================================
 
-INSERT INTO users (id, first_name, last_name, email, phone, password, role, email_verified, is_active) VALUES
-(1, 'QuickFix', 'Admin', 'admin@quickfix.co.ls', '+266 5779 9537', '$2b$10$ODYolz8nkLIhbKXSBVCFt.lClQ6bPDfFsGDGjT9pdpC3eseDVuMsS', 'ADMIN', TRUE, TRUE);
+INSERT INTO users (id, first_name, last_name, email, phone, password, role, email_verified, is_active, two_factor_enabled) VALUES
+(1, 'QuickFix', 'Admin', 'admin@quickfix.co.ls', '+266 5779 9537', '$2b$10$ODYolz8nkLIhbKXSBVCFt.lClQ6bPDfFsGDGjT9pdpC3eseDVuMsS', 'ADMIN', TRUE, TRUE, FALSE);
 
 
 -- =========================================================

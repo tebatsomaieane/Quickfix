@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { resendVerification, verifyEmail } from "../../services/authService";
 import AuthShell from "../../components/auth/AuthShell";
@@ -7,56 +7,61 @@ import Input from "../../components/ui/Input";
 import Logo from "../../components/ui/Logo";
 import verifyImage from "../../assets/cleaner.jpg";
 
+const PIN_PATTERN = /^\d{6}$/;
+
 function VerifyEmail() {
     const [params] = useSearchParams();
-    const [status, setStatus] = useState("checking"); // checking | success | error | resent
-    const [message, setMessage] = useState("");
     const [email, setEmail] = useState(params.get("email") || "");
+    const [pin, setPin] = useState("");
+    const [status, setStatus] = useState("idle"); // idle | success | error
+    const [message, setMessage] = useState("");
+    const [loading, setLoading] = useState(false);
     const [resendLoading, setResendLoading] = useState(false);
     const [resendMessage, setResendMessage] = useState("");
-    const invokedRef = useRef(false);
 
-    useEffect(() => {
-        if (invokedRef.current) {
-            return;
-        }
+    const handleSubmit = async (e) => {
+        e.preventDefault();
 
-        const token = params.get("token");
-        const emailParam = params.get("email");
+        setMessage("");
+        setStatus("checking");
 
-        if (!token || !emailParam) {
+        if (!email.trim()) {
             setStatus("error");
-            setMessage("This link is incomplete. Use the link from your email.");
+            setMessage("Enter the email address you registered with.");
 
             return;
         }
 
-        invokedRef.current = true;
+        if (!PIN_PATTERN.test(pin)) {
+            setStatus("error");
+            setMessage("Your verification PIN is 6 digits.");
 
-        verifyEmail(emailParam, token)
-            .then((data) => {
-                if (data.success) {
-                    setStatus("success");
-                    setMessage(data.message);
-                } else {
-                    setStatus("error");
-                    setMessage(data.message || "Unable to verify your email.");
-                }
-            })
-            .catch((error) => {
-                setStatus("error");
-                setMessage(
-                    error.response?.data?.message ||
-                    "Unable to verify your email. Please try again."
-                );
-            });
-    }, [params]);
+            return;
+        }
+
+        setLoading(true);
+
+        try {
+            const data = await verifyEmail(email.trim(), pin);
+
+            setStatus(data.success ? "success" : "error");
+            setMessage(data.message || "Unable to verify your email.");
+        } catch (error) {
+            setStatus("error");
+            setMessage(
+                error.response?.data?.message ||
+                "Unable to verify your email. Please try again."
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleResend = async (e) => {
         e.preventDefault();
 
         if (!email.trim()) {
-            setResendMessage("Enter your email address to resend the link.");
+            setResendMessage("Enter your email address to resend the PIN.");
 
             return;
         }
@@ -64,35 +69,23 @@ function VerifyEmail() {
         setResendLoading(true);
         setResendMessage("");
 
-        const data = await resendVerification(email.trim());
+        try {
+            const data = await resendVerification(email.trim());
 
-        if (data.success) {
             setResendMessage(
-                data.message || "If the email is unverified, a new link has been sent."
+                data?.success
+                    ? data.message || "A new verification PIN has been sent."
+                    : data?.message || "Could not resend the PIN. Try again later."
             );
-        } else {
+        } catch (error) {
             setResendMessage(
-                data.message ||
-                "Could not resend the link. Please try again later."
+                error.response?.data?.message ||
+                "Could not resend the PIN. Try again later."
             );
+        } finally {
+            setResendLoading(false);
         }
-
-        setResendLoading(false);
     };
-
-    const iconColour =
-        status === "success"
-            ? "bg-emerald-50 text-emerald-600"
-            : status === "checking"
-                ? "bg-slate-100 text-slate-500"
-                : "bg-red-50 text-red-600";
-
-    const iconLabel =
-        status === "success"
-            ? "✓"
-            : status === "checking"
-                ? "…"
-                : "!";
 
     return (
         <AuthShell
@@ -105,46 +98,50 @@ function VerifyEmail() {
             <div>
                 <Logo size="lg" brand="Quick" accent="Fix" />
                 <h1 className="mt-6 text-3xl font-extrabold tracking-tight text-slate-900">
-                    Email verification
+                    {status === "success" ? "Email verified" : "Verify your email"}
                 </h1>
+                <p className="mt-2 text-sm text-slate-600">
+                    {status === "success"
+                        ? "Your QuickFix account is now active."
+                        : "Enter the 6-digit PIN we emailed you (check spam too). It expires in 10 minutes."}
+                </p>
 
                 <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-                    <div className="flex items-center gap-4">
-                        <span
-                            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-lg font-bold ${iconColour}`}
+                    {message && (
+                        <div
+                            className={`mb-4 rounded-lg px-4 py-3 text-sm ${
+                                status === "success"
+                                    ? "bg-green-50 text-green-700"
+                                    : "bg-red-50 text-red-700"
+                            }`}
                         >
-                            {iconLabel}
-                        </span>
-                        <div>
-                            <p className="font-medium text-slate-900">
-                                {status === "success"
-                                    ? "Email verified"
-                                    : status === "checking"
-                                        ? "Verifying…"
-                                        : "Something's off"}
-                            </p>
-                            <p className="mt-0.5 text-sm text-slate-600">
-                                {message ||
-                                    "Checking your verification link…"}
-                            </p>
+                            {message}
                         </div>
-                    </div>
+                    )}
 
-                    {status === "success" && (
-                        <div className="mt-6">
+                    {status === "success" ? (
+                        <>
+                            <div className="flex items-center gap-4">
+                                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-lg font-bold text-emerald-600">
+                                    ✓
+                                </span>
+                                <p className="text-sm text-slate-600">
+                                    You can now sign in with your email and
+                                    password. If two-factor authentication is
+                                    on, you'll enter one more code at login.
+                                </p>
+                            </div>
                             <Button
-                                className="w-full"
+                                className="mt-6 w-full"
                                 onClick={() =>
                                     (window.location.href = "/login")
                                 }
                             >
                                 Continue to login
                             </Button>
-                        </div>
-                    )}
-
-                    {status === "error" && (
-                        <form onSubmit={handleResend} className="mt-6 space-y-4">
+                        </>
+                    ) : (
+                        <form onSubmit={handleSubmit} className="space-y-4">
                             <Input
                                 label="Email address"
                                 type="email"
@@ -155,18 +152,51 @@ function VerifyEmail() {
                                 autoComplete="email"
                                 required
                             />
+
+                            <Input
+                                label="6-digit verification PIN"
+                                id="pin"
+                                name="pin"
+                                inputMode="numeric"
+                                autoComplete="one-time-code"
+                                placeholder="••••••"
+                                value={pin}
+                                onChange={(e) =>
+                                    setPin(e.target.value.replace(/\D/g, "").slice(0, 6))
+                                }
+                                hint="Sent to your email at registration."
+                                maxLength="6"
+                                required
+                            />
+
                             <Button
                                 type="submit"
                                 className="w-full"
-                                loading={resendLoading}
+                                loading={loading}
                             >
-                                Send a new verification link
+                                {loading ? "Verifying…" : "Verify email"}
                             </Button>
-                            {resendMessage && (
-                                <p className="rounded-lg bg-indigo-50 px-4 py-3 text-sm text-indigo-700">
-                                    {resendMessage}
+
+                            <div className="rounded-lg bg-indigo-50 px-4 py-3 text-center">
+                                <p className="text-sm text-indigo-700">
+                                    Didn't get a PIN? Try your spam folder, or
+                                    resend it.
                                 </p>
-                            )}
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    className="mt-2"
+                                    onClick={handleResend}
+                                    loading={resendLoading}
+                                >
+                                    Resend verification PIN
+                                </Button>
+                                {resendMessage && (
+                                    <p className="mt-2 text-sm text-indigo-700">
+                                        {resendMessage}
+                                    </p>
+                                )}
+                            </div>
                         </form>
                     )}
 

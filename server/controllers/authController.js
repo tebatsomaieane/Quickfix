@@ -4,16 +4,77 @@ const jwt = require("jsonwebtoken");
 const db = require("../config/db");
 const {
     sendPasswordResetEmail,
-    sendVerificationEmail,
-    isEmailConfigured
+    sendEmailVerificationPin,
+    sendLoginOtp
 } = require("../utils/email");
 
 const JWT_MAX_AGE = 60 * 60 * 24; // 1 day in seconds
 
 const BCRYPT_ROUNDS = 10;
 
-const REQUIRE_EMAIL_VERIFICATION =
-    String(process.env.REQUIRE_EMAIL_VERIFICATION || "").toLowerCase() === "true";
+// One-time PIN (registration email verification + login 2FA).
+const OTP_LENGTH = 6;
+const OTP_WINDOW_MINUTES = 10;
+const MAX_OTP_ATTEMPTS = 5;
+
+// Generate a cryptographically random N-digit PIN, zero-padded.
+const generateOtp = () =>
+    crypto
+        .randomInt(0, Math.pow(10, OTP_LENGTH))
+        .toString()
+        .padStart(OTP_LENGTH, "0");
+
+// PINs are stored as SHA-256 hashes, never plaintext.
+const hashOtp = (pin) =>
+    crypto.createHash("sha256").update(pin).digest("hex");
+
+// Constant-time comparison of two token hashes.
+const safeEqual = (a, b) => {
+    if (typeof a !== "string" || typeof b !== "string") {
+        return false;
+    }
+
+    const left = Buffer.from(a);
+    const right = Buffer.from(b);
+
+    return left.length === right.length
+        && crypto.timingSafeEqual(left, right);
+};
+
+const otpExpiry = () => new Date(Date.now() + OTP_WINDOW_MINUTES * 60 * 1000);
+
+const isValidOtp = (pin) => /^\d{6}$/.test(String(pin).trim());
+
+// Whether sign-in is blocked until the account's email is verified.
+const emailVerificationRequired = () =>
+    process.env.REQUIRE_EMAIL_VERIFICATION === "true";
+
+// Anti-spam: at most one OTP resend per email per window.
+const OTP_RESEND_WINDOW_MS = 60 * 1000;
+const otpResendCooldowns = new Map(); // email -> last attempt timestamp
+
+// Records an OTP resend attempt for `email` and returns the remaining
+// cooldown in ms (0 when the resend is allowed right now). Runs on the
+// raw email string BEFORE any account lookup so it behaves identically
+// for unknown and existing accounts - a 429 can never reveal whether an
+// email is registered. Attempts are recorded even when blocked, so an
+// attacker cannot reset the window by spamming.
+const consumeOtpResendCooldown = (email) => {
+    const now = Date.now();
+    const last = otpResendCooldowns.get(email) || 0;
+
+    otpResendCooldowns.set(email, now);
+
+    if (otpResendCooldowns.size > 5000) {
+        for (const [key, ts] of otpResendCooldowns) {
+            if (now - ts >= OTP_RESEND_WINDOW_MS) {
+                otpResendCooldowns.delete(key);
+            }
+        }
+    }
+
+    return Math.max(0, OTP_RESEND_WINDOW_MS - (now - last));
+};
 
 const COOKIE_OPTIONS = {
     httpOnly: true,
@@ -25,44 +86,6 @@ const COOKIE_OPTIONS = {
     secure: process.env.NODE_ENV === "production",
     maxAge: JWT_MAX_AGE * 1000,
     path: "/"
-};
-
-
-// Create a fresh verification token for a user and try to email it.
-// Returns "sent" | "skipped". Never throws - registration must succeed
-// even when SMTP is not configured yet (a resend endpoint is available).
-const issueVerificationEmail = async (dbTarget, userId, email) => {
-    const token = crypto.randomBytes(32).toString("hex");
-    const tokenHash = crypto
-        .createHash("sha256")
-        .update(token)
-        .digest("hex");
-
-    const target = dbTarget || db;
-
-    await target.query(
-        `DELETE FROM email_verification_tokens WHERE user_id = ?`,
-        [userId]
-    );
-
-    await target.query(
-        `INSERT INTO email_verification_tokens
-            (user_id, token_hash, expires_at)
-         VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 24 HOUR))`,
-        [userId, tokenHash]
-    );
-
-    if (!isEmailConfigured()) {
-        console.warn(
-            `[verify] SMTP not configured - verification link for ${email} not sent`
-        );
-
-        return "skipped";
-    }
-
-    await sendVerificationEmail(email, token);
-
-    return "sent";
 };
 
 const register = async (req, res) => {
@@ -204,16 +227,38 @@ const register = async (req, res) => {
 
             await connection.commit();
 
-            const verification = await issueVerificationEmail(
-                connection,
-                userId,
-                emailValue
+            // Account is created as UNVERIFIED. Generate a 6-digit PIN and
+            // email it. The account cannot be used until email_verified is
+            // set via /auth/verify-email. Registration does NOT log the user
+            // in - they verify first, then sign in.
+            const verificationPin = generateOtp();
+
+            await db.query(
+                `UPDATE users
+                 SET verification_code_hash = ?,
+                     verification_code_expires = ?,
+                     verification_attempts = 0
+                 WHERE id = ?`,
+                [hashOtp(verificationPin), otpExpiry(), userId]
             );
+
+            try {
+                await sendEmailVerificationPin(
+                    emailValue,
+                    firstName,
+                    verificationPin
+                );
+            } catch (error) {
+                console.error(
+                    "[auth] Failed to send verification PIN:",
+                    error
+                );
+            }
 
             res.status(201).json({
                 success: true,
-                message: "Registration successful",
-                verification,
+                message: "Registration successful. A 6-digit verification PIN has been sent to your email.",
+                verification: "sent",
                 user: {
                     id: userId,
                     first_name: firstName,
@@ -258,7 +303,8 @@ const login = async (req, res) => {
         // 2. Find user
         const [users] = await db.query(
             `SELECT id, first_name, last_name, email, phone,
-                    password, role, email_verified, is_active
+                    password, role, email_verified, is_active,
+                    two_factor_enabled
              FROM users
              WHERE LOWER(email) = ?`,
             [email.trim().toLowerCase()]
@@ -294,16 +340,44 @@ const login = async (req, res) => {
             });
         }
 
-        // 5. Enforce email verification when turned on (admin/user toggle).
-        if (REQUIRE_EMAIL_VERIFICATION && !user.email_verified) {
+        // 5. Email verification gate (when enabled).
+        if (emailVerificationRequired() && !user.email_verified) {
             return res.status(403).json({
                 success: false,
                 code: "EMAIL_NOT_VERIFIED",
-                message: "Please verify your email address before logging in. Check your inbox (and spam) for the verification link."
+                message: "Please verify your email address before logging in. Request a verification PIN and enter it on the email verification page."
             });
         }
 
-        // 6. Create JWT
+        // 6. Two-factor step: correct password is only the first factor.
+        // A fresh 6-digit code is emailed and the session is created only
+        // after /auth/verify-2fa confirms it.
+        if (user.two_factor_enabled) {
+            const loginOtp = generateOtp();
+
+            await db.query(
+                `UPDATE users
+                 SET login_otp_hash = ?,
+                     login_otp_expires = ?,
+                     login_otp_attempts = 0
+                 WHERE id = ?`,
+                [hashOtp(loginOtp), otpExpiry(), user.id]
+            );
+
+            try {
+                await sendLoginOtp(user.email, user.first_name, loginOtp);
+            } catch (error) {
+                console.error("[auth] Failed to send login OTP:", error);
+            }
+
+            return res.status(200).json({
+                success: false,
+                code: "OTP_REQUIRED",
+                message: "For your security, enter the 6-digit code that was sent to your email to finish signing in."
+            });
+        }
+
+        // 7. Create JWT
         const token = jwt.sign(
             {
                 id: user.id,
@@ -316,10 +390,10 @@ const login = async (req, res) => {
             }
         );
 
-        // 7. Set the session token as an httpOnly cookie
+        // 8. Set the session token as an httpOnly cookie
         res.cookie("token", token, COOKIE_OPTIONS);
 
-        // 8. Return user + token
+        // 9. Return user + token
         res.json({
             success: true,
             message: "Login successful",
@@ -341,6 +415,393 @@ const login = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Server error during login"
+        });
+    }
+};
+
+
+// Build the session JWT, set the httpOnly cookie and respond with the
+// authenticated user. Used after the password check (no 2FA) and after a
+// verified login code.
+const issueSession = (user, res) => {
+    const token = jwt.sign(
+        {
+            id: user.id,
+            email: user.email,
+            role: user.role
+        },
+        process.env.JWT_SECRET,
+        {
+            expiresIn: "1d"
+        }
+    );
+
+    res.cookie("token", token, COOKIE_OPTIONS);
+
+    return res.json({
+        success: true,
+        message: "Login successful",
+        token,
+        user: {
+            id: user.id,
+            first_name: user.first_name,
+            last_name: user.last_name,
+            email: user.email,
+            phone: user.phone,
+            role: user.role,
+            email_verified: user.email_verified
+        }
+    });
+};
+
+
+// VERIFY EMAIL WITH PIN  (public)
+// POST /api/auth/verify-email  { email, pin }
+const verifyEmail = async (req, res) => {
+    try {
+        const { email, pin } = req.body;
+
+        const emailValue = (email || "").trim().toLowerCase();
+
+        if (!emailValue || !pin) {
+            return res.status(400).json({
+                success: false,
+                message: "Email and verification PIN are required"
+            });
+        }
+
+        if (!isValidOtp(pin)) {
+            return res.status(400).json({
+                success: false,
+                message: "Verification PIN must be 6 digits"
+            });
+        }
+
+        const [rows] = await db.query(
+            `SELECT id, email_verified,
+                    verification_code_hash, verification_code_expires,
+                    verification_attempts
+             FROM users
+             WHERE LOWER(email) = ?`,
+            [emailValue]
+        );
+
+        if (rows.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid or expired verification PIN"
+            });
+        }
+
+        const user = rows[0];
+
+        if (user.email_verified) {
+            return res.json({
+                success: true,
+                message: "Your email is already verified. You can log in."
+            });
+        }
+
+        if (
+            !user.verification_code_hash ||
+            !user.verification_code_expires ||
+            new Date(user.verification_code_expires).getTime() < Date.now()
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "This verification PIN has expired. Please request a new one."
+            });
+        }
+
+        if (!safeEqual(user.verification_code_hash, hashOtp(pin))) {
+            const attempts = user.verification_attempts + 1;
+            const lockedOut = attempts >= MAX_OTP_ATTEMPTS;
+
+            await db.query(
+                `UPDATE users
+                 SET verification_attempts = ?,
+                     verification_code_hash = CASE WHEN ? THEN NULL ELSE verification_code_hash END,
+                     verification_code_expires = CASE WHEN ? THEN NULL ELSE verification_code_expires END
+                 WHERE id = ?`,
+                [attempts, lockedOut ? 1 : 0, lockedOut ? 1 : 0, user.id]
+            );
+
+            return res.status(400).json({
+                success: false,
+                message: lockedOut
+                    ? "Too many incorrect attempts. Request a new verification PIN."
+                    : "Incorrect verification PIN. Please try again."
+            });
+        }
+
+        await db.query(
+            `UPDATE users
+             SET email_verified = TRUE,
+                 verification_code_hash = NULL,
+                 verification_code_expires = NULL,
+                 verification_attempts = 0
+             WHERE id = ?`,
+            [user.id]
+        );
+
+        return res.json({
+            success: true,
+            message: "Email verified. You can now log in."
+        });
+    } catch (error) {
+        console.error("Email verification error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Server error while verifying email"
+        });
+    }
+};
+
+
+// RESEND VERIFICATION PIN  (public)
+// POST /api/auth/resend-verification  { email }
+const resendVerification = async (req, res) => {
+    try {
+        const emailValue = (req.body.email || "").trim().toLowerCase();
+
+        if (!emailValue) {
+            return res.status(400).json({
+                success: false,
+                message: "Email is required"
+            });
+        }
+
+        const waitVerificationMs = consumeOtpResendCooldown(emailValue);
+
+        if (waitVerificationMs > 0) {
+            return res.status(429).json({
+                success: false,
+                code: "RESEND_TOO_SOON",
+                message: `Please wait about ${Math.ceil(waitVerificationMs / 1000)}s before requesting another PIN.`
+            });
+        }
+
+        const [rows] = await db.query(
+            `SELECT id, first_name, email_verified
+             FROM users
+             WHERE LOWER(email) = ?`,
+            [emailValue]
+        );
+
+        // Never reveal whether an account exists.
+        if (rows.length === 0 || rows[0].email_verified) {
+            return res.json({
+                success: true,
+                message: "If that email exists, a new verification PIN has been sent."
+            });
+        }
+
+        const user = rows[0];
+        const verificationPin = generateOtp();
+
+        await db.query(
+            `UPDATE users
+             SET verification_code_hash = ?,
+                 verification_code_expires = ?,
+                 verification_attempts = 0
+             WHERE id = ?`,
+            [hashOtp(verificationPin), otpExpiry(), user.id]
+        );
+
+        try {
+            await sendEmailVerificationPin(user.email, user.first_name, verificationPin);
+        } catch (error) {
+            console.error("[auth] Failed to resend verification PIN:", error);
+        }
+
+        return res.json({
+            success: true,
+            message: "A new 6-digit verification PIN has been sent to your email."
+        });
+    } catch (error) {
+        console.error("Resend verification error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Server error while resending verification PIN"
+        });
+    }
+};
+
+
+// VERIFY LOGIN CODE (2FA)  (public, second factor)
+// POST /api/auth/verify-2fa  { email, pin }
+const verifyTwoFactor = async (req, res) => {
+    try {
+        const { email, pin } = req.body;
+
+        const emailValue = (email || "").trim().toLowerCase();
+
+        if (!emailValue || !pin) {
+            return res.status(400).json({
+                success: false,
+                message: "Email and verification code are required"
+            });
+        }
+
+        if (!isValidOtp(pin)) {
+            return res.status(400).json({
+                success: false,
+                message: "Verification code must be 6 digits"
+            });
+        }
+
+        const [rows] = await db.query(
+            `SELECT id, first_name, last_name, email, phone,
+                    role, email_verified, is_active,
+                    two_factor_enabled,
+                    login_otp_hash, login_otp_expires, login_otp_attempts
+             FROM users
+             WHERE LOWER(email) = ?`,
+            [emailValue]
+        );
+
+        if (rows.length === 0 || !rows[0].is_active) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid email or verification code"
+            });
+        }
+
+        const user = rows[0];
+
+        if (!user.two_factor_enabled) {
+            return res.status(400).json({
+                success: false,
+                message: "Two-factor authentication is not enabled for this account."
+            });
+        }
+
+        if (
+            !user.login_otp_hash ||
+            !user.login_otp_expires ||
+            new Date(user.login_otp_expires).getTime() < Date.now()
+        ) {
+            return res.status(400).json({
+                success: false,
+                code: "OTP_EXPIRED",
+                message: "This code has expired. Please sign in again to receive a new one."
+            });
+        }
+
+        if (!safeEqual(user.login_otp_hash, hashOtp(pin))) {
+            const attempts = user.login_otp_attempts + 1;
+            const lockedOut = attempts >= MAX_OTP_ATTEMPTS;
+
+            await db.query(
+                `UPDATE users
+                 SET login_otp_attempts = ?,
+                     login_otp_hash = CASE WHEN ? THEN NULL ELSE login_otp_hash END,
+                     login_otp_expires = CASE WHEN ? THEN NULL ELSE login_otp_expires END
+                 WHERE id = ?`,
+                [attempts, lockedOut ? 1 : 0, lockedOut ? 1 : 0, user.id]
+            );
+
+            return res.status(400).json({
+                success: false,
+                message: lockedOut
+                    ? "Too many incorrect attempts. Please sign in again to receive a new code."
+                    : "Incorrect verification code. Please try again."
+            });
+        }
+
+        // Code confirmed: clear the OTP, mark the email verified (entering a
+        // code sent to that address proves ownership) and create the session.
+        await db.query(
+            `UPDATE users
+             SET login_otp_hash = NULL,
+                 login_otp_expires = NULL,
+                 login_otp_attempts = 0,
+                 email_verified = TRUE
+             WHERE id = ?`,
+            [user.id]
+        );
+
+        return issueSession(user, res);
+    } catch (error) {
+        console.error("Two-factor verification error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Server error while verifying code"
+        });
+    }
+};
+
+
+// RESEND LOGIN CODE (2FA)  (public)
+// POST /api/auth/resend-otp  { email }
+const resendOtp = async (req, res) => {
+    try {
+        const emailValue = (req.body.email || "").trim().toLowerCase();
+
+        if (!emailValue) {
+            return res.status(400).json({
+                success: false,
+                message: "Email is required"
+            });
+        }
+
+        const waitOtpMs = consumeOtpResendCooldown(emailValue);
+
+        if (waitOtpMs > 0) {
+            return res.status(429).json({
+                success: false,
+                code: "RESEND_TOO_SOON",
+                message: `Please wait about ${Math.ceil(waitOtpMs / 1000)}s before requesting another code.`
+            });
+        }
+
+        const [rows] = await db.query(
+            `SELECT id, first_name, two_factor_enabled
+             FROM users
+             WHERE LOWER(email) = ? AND is_active = TRUE`,
+            [emailValue]
+        );
+
+        // Generic response - never reveal whether the account exists or
+        // whether 2FA is active.
+        if (rows.length === 0 || !rows[0].two_factor_enabled) {
+            return res.json({
+                success: true,
+                message: "If that account has two-factor authentication enabled, a new code has been sent."
+            });
+        }
+
+        const user = rows[0];
+        const loginOtp = generateOtp();
+
+        await db.query(
+            `UPDATE users
+             SET login_otp_hash = ?,
+                 login_otp_expires = ?,
+                 login_otp_attempts = 0
+             WHERE id = ?`,
+            [hashOtp(loginOtp), otpExpiry(), user.id]
+        );
+
+        try {
+            await sendLoginOtp(user.email, user.first_name, loginOtp);
+        } catch (error) {
+            console.error("[auth] Failed to resend login code:", error);
+        }
+
+        return res.json({
+            success: true,
+            message: "A new login code has been sent to your email."
+        });
+    } catch (error) {
+        console.error("Resend login code error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Server error while resending login code"
         });
     }
 };
@@ -779,155 +1240,18 @@ const resetPassword = async (req, res) => {
 };
 
 
-// GET /api/auth/verify-email?token=...&email=...  (public)
-// Validate a verification token and mark the account as verified.
-const verifyEmail = async (req, res) => {
-    try {
-        const token = req.query.token;
-        const email = req.query.email ? req.query.email.trim().toLowerCase() : "";
-
-        if (!token || !email) {
-            return res.status(400).json({
-                success: false,
-                message: "Verification token and email are required"
-            });
-        }
-
-        if (email.length > 255) {
-            return res.status(400).json({
-                success: false,
-                message: "Email must be 255 characters or fewer"
-            });
-        }
-
-        const tokenHash = crypto
-            .createHash("sha256")
-            .update(token)
-            .digest("hex");
-
-        const [rows] = await db.query(
-            `SELECT evt.id AS token_id, u.id AS user_id, u.email,
-                    u.email_verified
-             FROM email_verification_tokens evt
-             JOIN users u ON u.id = evt.user_id
-             WHERE evt.token_hash = ?
-               AND evt.used = FALSE
-               AND evt.expires_at > NOW()`,
-            [tokenHash]
-        );
-
-        if (rows.length === 0) {
-            return res.status(400).json({
-                success: false,
-                code: "INVALID_VERIFICATION_TOKEN",
-                message: "Verification link is invalid or has expired. Request a new one."
-            });
-        }
-
-        if (rows[0].email !== email) {
-            return res.status(400).json({
-                success: false,
-                code: "INVALID_VERIFICATION_TOKEN",
-                message: "Verification link is invalid or has expired. Request a new one."
-            });
-        }
-
-        if (!rows[0].email_verified) {
-            await db.query("UPDATE users SET email_verified = TRUE WHERE id = ?", [
-                rows[0].user_id
-            ]);
-        }
-
-        await db.query(
-            "UPDATE email_verification_tokens SET used = TRUE WHERE id = ?",
-            [rows[0].token_id]
-        );
-
-        return res.json({
-            success: true,
-            message: "Email verified successfully. You can now log in."
-        });
-    } catch (error) {
-        console.error("Email verification error:", error);
-
-        return res.status(500).json({
-            success: false,
-            message: "Server error while verifying email"
-        });
-    }
-};
-
-
-// POST /api/auth/resend-verification  (public, body { email })
-const resendVerification = async (req, res) => {
-    try {
-        const email = req.body && req.body.email
-            ? String(req.body.email).trim().toLowerCase()
-            : "";
-
-        if (!email) {
-            return res.status(400).json({
-                success: false,
-                message: "Email is required"
-            });
-        }
-
-        if (email.length > 255) {
-            return res.status(400).json({
-                success: false,
-                message: "Email must be 255 characters or fewer"
-            });
-        }
-
-        // Never reveal whether an account exists (prevents enumeration).
-        const [users] = await db.query(
-            `SELECT id, email, email_verified
-             FROM users
-             WHERE LOWER(email) = ? AND is_active = TRUE`,
-            [email]
-        );
-
-        if (users.length === 0 || users[0].email_verified) {
-            return res.json({
-                success: true,
-                message: "If that email exists and is unverified, a new verification link has been sent."
-            });
-        }
-
-        const result = await issueVerificationEmail(null, users[0].id, users[0].email);
-
-        if (result === "skipped") {
-            return res.status(503).json({
-                success: false,
-                message: "Verification emails are temporarily unavailable. Please try again later."
-            });
-        }
-
-        return res.json({
-            success: true,
-            message: "A new verification link has been sent to your email."
-        });
-    } catch (error) {
-        console.error("Resend verification error:", error);
-
-        return res.status(500).json({
-            success: false,
-            message: "Server error while resending verification link"
-        });
-    }
-};
-
-
 module.exports = {
     register,
     login,
+    verifyEmail,
+    resendVerification,
+    verifyTwoFactor,
+    resendOtp,
     me,
     session,
     updateProfile,
     logout,
     changePassword,
     requestPasswordReset,
-    resetPassword,
-    verifyEmail,
-    resendVerification
+    resetPassword
 };

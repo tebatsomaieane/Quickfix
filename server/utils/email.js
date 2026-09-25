@@ -53,49 +53,73 @@ const sendMail = async ({ to, subject, text, html }) => {
     });
 };
 
-const sendVerificationEmail = async (to, verificationToken) => {
-    const verifyUrl = `${APP_URL}/verify-email?token=${verificationToken}&email=${encodeURIComponent(to)}`;
-
+const sendOtpEmail = async ({ to, firstName, code, subject, heading, body, expiresInMinutes }) => {
+    // In development/test without SMTP, surface the code in the server
+    // console so the PIN/OTP flow can be exercised end-to-end without an
+    // email account or domain.
     if (!isEmailConfigured()) {
         console.warn(
-            "[mail] SMTP not configured - verification link for",
-            to,
-            "not sent. Link:",
-            verifyUrl
+            `[mail] SMTP not configured - OTP for ${to} not sent (dev: ${code}, expires in ${expiresInMinutes} min)`
         );
         return null;
     }
 
     const text = [
-        "Welcome to QuickFix!",
+        `Hi ${firstName},`,
         "",
-        "Confirm your email address to keep your account secure.",
-        "Click the link below to verify your email (valid for 24 hours):",
+        body,
         "",
-        verifyUrl,
+        `Your QuickFix code is: ${code}`,
         "",
-        "If you did not create a QuickFix account, you can safely ignore this email.",
+        `This code expires in ${expiresInMinutes} minutes.`,
+        "",
+        "If you did not request this, you can safely ignore this email.",
         "",
         "QuickFix - Maseru, Lesotho"
     ].join("\n");
 
     const html = [
         "<div style=\"font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto\">",
-        "<h2 style=\"color:#1e293b\">Confirm your email address</h2>",
-        "<p style=\"color:#475569\">Welcome to QuickFix! Click the button below to verify your email (valid for 24 hours):</p>",
-        `<p style=\"text-align:center;margin:24px 0\"><a href="${verifyUrl}" style=\"background:#4f46e5;color:#ffffff;padding:12px 20px;border-radius:8px;text-decoration:none\">Verify email</a></p>`,
-        "<p style=\"color:#64748b;font-size:13px\">If the button does not work, copy and paste this link into your browser:</p>",
-        `<p style=\"color:#4f46e5;font-size:13px;word-break:break-all\">${verifyUrl}</p>`,
-        "<p style=\"color:#64748b;font-size:13px\">If you did not create a QuickFix account, you can safely ignore this email.</p>",
+        `<h2 style=\"color:#1e293b\">${heading}</h2>`,
+        `<p style=\"color:#475569\">Hi ${firstName},</p>`,
+        `<p style=\"color:#475569\">${body}</p>`,
+        `<p style=\"text-align:center;margin:24px 0\"><span style=\"display:inline-block;background:#eef2ff;color:#4338ca;font-size:28px;font-weight:700;letter-spacing:8px;padding:14px 22px;border-radius:12px\">${code}</span></p>`,
+        `<p style=\"color:#64748b;font-size:13px\">This code expires in ${expiresInMinutes} minutes. If you did not request this, you can safely ignore this email.</p>`,
         "<p style=\"color:#94a3b8;font-size:12px\">QuickFix &middot; Maseru, Lesotho</p>",
         "</div>"
     ].join("\n");
 
     return sendMail({
         to,
-        subject: "Confirm your QuickFix email",
+        subject,
         text,
         html
+    });
+};
+
+// Registration email verification PIN.
+const sendEmailVerificationPin = async (to, firstName, code) => {
+    return sendOtpEmail({
+        to,
+        firstName,
+        code,
+        subject: "Verify your QuickFix account",
+        heading: "Verify your email address",
+        body: "Welcome to QuickFix! Enter the 6-digit PIN below to verify your email address.",
+        expiresInMinutes: 10
+    });
+};
+
+// Login two-factor authentication code.
+const sendLoginOtp = async (to, firstName, code) => {
+    return sendOtpEmail({
+        to,
+        firstName,
+        code,
+        subject: "Your QuickFix login code",
+        heading: "Confirm it's you",
+        body: "Enter the 6-digit code below to finish signing in to QuickFix.",
+        expiresInMinutes: 10
     });
 };
 
@@ -148,6 +172,7 @@ const sendPasswordResetEmail = async (to, resetToken) => {
 module.exports = {
     isEmailConfigured,
     sendMail,
-    sendVerificationEmail,
+    sendEmailVerificationPin,
+    sendLoginOtp,
     sendPasswordResetEmail
 };

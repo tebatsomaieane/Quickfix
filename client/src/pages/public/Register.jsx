@@ -102,10 +102,10 @@ function Register() {
             if (data.success) {
                 if (data.verification === "sent") {
                     setSuccess(
-                        "Registration successful! A verification link was sent to your email. Please verify your email, then log in."
+                        "Account created! Check your email for the 6-digit verification PIN (check spam too)."
                     );
                 } else {
-                    setSuccess("Registration successful! Redirecting to login...");
+                    setSuccess("Registration successful!");
                 }
 
                 setFormData({
@@ -117,9 +117,9 @@ function Register() {
                     role: "CUSTOMER"
                 });
 
-                setTimeout(() => {
-                    navigate("/login");
-                }, 3000);
+                await new Promise((resolve) => setTimeout(resolve, 1500));
+
+                navigate(`/verify-email?email=${encodeURIComponent(payload.email)}`);
             } else {
                 setError(
                     data.message || "Registration failed. Please try again."

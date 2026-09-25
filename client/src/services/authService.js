@@ -141,22 +141,51 @@ export const resetPassword = async (data) => {
 
 
 // ==========================================
-// VERIFY EMAIL (public, via emailed link)
+// VERIFY EMAIL WITH PIN (public)
 // ==========================================
-export const verifyEmail = async (email, token) => {
-    const response = await api.get("/auth/verify-email", {
-        params: { email, token }
-    });
+export const verifyEmail = async (email, pin) => {
+    const response = await api.post(
+        "/auth/verify-email",
+        { email, pin }
+    );
 
     return response.data;
 };
 
 
 // ==========================================
-// RESEND VERIFICATION EMAIL (public)
+// RESEND VERIFICATION PIN (public)
 // ==========================================
 export const resendVerification = async (email) => {
     const response = await api.post("/auth/resend-verification", { email });
+
+    return response.data;
+};
+
+
+// ==========================================
+// VERIFY LOGIN 2FA CODE (public, second factor)
+// Completes a login after the correct password was entered.
+// ==========================================
+export const verifyTwoFactor = async (email, pin) => {
+    const response = await api.post(
+        "/auth/verify-2fa",
+        { email, pin }
+    );
+
+    if (response.data.success) {
+        cacheUser(response.data.user);
+    }
+
+    return response.data;
+};
+
+
+// ==========================================
+// RESEND LOGIN 2FA CODE (public)
+// ==========================================
+export const resendOtp = async (email) => {
+    const response = await api.post("/auth/resend-otp", { email });
 
     return response.data;
 };

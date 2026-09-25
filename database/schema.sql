@@ -37,6 +37,18 @@ CREATE TABLE users (
     email_verified BOOLEAN NOT NULL DEFAULT FALSE,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
 
+    -- Email PIN (registration) + login 2FA OTP. PINs are stored hashed,
+    -- never in plaintext. NULL means no PIN is pending.
+    two_factor_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+
+    verification_code_hash VARCHAR(64),
+    verification_code_expires DATETIME,
+    verification_attempts INT NOT NULL DEFAULT 0,
+
+    login_otp_hash VARCHAR(64),
+    login_otp_expires DATETIME,
+    login_otp_attempts INT NOT NULL DEFAULT 0,
+
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ON UPDATE CURRENT_TIMESTAMP

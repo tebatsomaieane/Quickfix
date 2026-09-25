@@ -39,6 +39,27 @@ async function ensureSchema() {
             );
         }
 
+        // Email PIN (registration) + login 2FA OTP columns.
+        // Shipped hashed, never plaintext. Each ALTER is only run when the
+        // column is missing so existing databases migrate in place.
+        const otpColumns = [
+            ["two_factor_enabled", "BOOLEAN NOT NULL DEFAULT TRUE"],
+            ["verification_code_hash", "VARCHAR(64) NULL"],
+            ["verification_code_expires", "DATETIME NULL"],
+            ["verification_attempts", "INT NOT NULL DEFAULT 0"],
+            ["login_otp_hash", "VARCHAR(64) NULL"],
+            ["login_otp_expires", "DATETIME NULL"],
+            ["login_otp_attempts", "INT NOT NULL DEFAULT 0"]
+        ];
+
+        for (const [column, definition] of otpColumns) {
+            if (!(await columnExists(connection, "users", column))) {
+                await connection.query(
+                    `ALTER TABLE users ADD COLUMN ${column} ${definition}`
+                );
+            }
+        }
+
         if (!(await columnExists(connection, "service_requests", "preferred_provider_id"))) {
             await connection.query(
                 `ALTER TABLE service_requests
