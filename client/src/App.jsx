@@ -53,7 +53,6 @@ import ProtectedRoute from "./routes/ProtectedRoute";
 
 import Button from "./components/ui/Button";
 import Icon from "./components/ui/Icon";
-import Spinner from "./components/ui/Spinner";
 import ErrorBoundary from "./components/ui/ErrorBoundary";
 
 import {
@@ -65,8 +64,16 @@ import {
 
 function PageLoader() {
     return (
-        <div className="flex min-h-[50vh] items-center justify-center">
-            <Spinner />
+        <div className="flex min-h-[50vh] flex-col items-center justify-center gap-5">
+            <span className="animate-bounce-in relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-xl shadow-indigo-500/30">
+                <Icon name="bolt" className="h-7 w-7" />
+            </span>
+            <div className="h-1.5 w-44 overflow-hidden rounded-full bg-slate-200">
+                <div className="qf-loading-bar h-full w-1/2 rounded-full bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500" />
+            </div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                Loading QuickFix
+            </p>
         </div>
     );
 }

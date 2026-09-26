@@ -11,7 +11,7 @@ function GenericSidebar({ navItems, brand = "QuickFix", onNavigate }) {
 
     return (
         <div className="flex h-full w-64 flex-col border-r border-slate-200 bg-white">
-            <div className="flex h-16 items-center border-b border-slate-200 px-5">
+            <div className="flex h-16 items-center border-b border-slate-200/80 bg-gradient-to-b from-white to-indigo-50/40 px-5">
                 {isAdmin ? (
                     <Logo
                         brand={brand}
@@ -31,9 +31,9 @@ function GenericSidebar({ navItems, brand = "QuickFix", onNavigate }) {
                 className="mt-3"
             />
 
-            <div className="border-t border-slate-200 p-4">
-                <div className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-slate-600 to-slate-800 text-sm font-bold text-white shadow">
+            <div className="border-t border-slate-200 p-3">
+                <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-gradient-to-b from-slate-50/80 to-white p-2.5">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-slate-600 to-slate-800 text-sm font-bold text-white shadow-md shadow-slate-300">
                         {(user?.first_name || "?")[0]}
                     </span>
                     <div className="min-w-0">

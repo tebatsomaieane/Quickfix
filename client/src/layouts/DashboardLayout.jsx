@@ -13,6 +13,7 @@ import CustomerSidebar from "../components/sidebars/CustomerSidebar";
 import ProviderSidebar from "../components/sidebars/ProviderSidebar";
 import GenericSidebar from "../components/sidebars/GenericSidebar";
 import MobileTabBar from "../components/sidebars/MobileTabBar";
+import ScrollProgress from "../components/motion/ScrollProgress";
 import { useToast } from "../components/ui/ToastProvider";
 import { onEvent } from "../services/realtimeService";
 
@@ -166,7 +167,7 @@ function DashboardLayout({ navItems }) {
         >
             <Icon name="bell" className="h-5 w-5" />
             {unread > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 animate-badge-pop items-center justify-center rounded-full bg-gradient-to-br from-rose-500 to-pink-600 px-1 text-[10px] font-bold text-white shadow-sm ring-2 ring-white">
                     {unread}
                 </span>
             )}
@@ -174,7 +175,7 @@ function DashboardLayout({ navItems }) {
     ) : null;
 
     return (
-        <div className="flex min-h-screen bg-slate-50">
+        <div className="qf-page-glow flex min-h-screen">
             {/* Desktop sidebar */}
             <aside className="fixed inset-y-0 left-0 z-30 hidden md:block">
                 {role === "PROVIDER" ? (
@@ -192,11 +193,11 @@ function DashboardLayout({ navItems }) {
             {drawerOpen && (
                 <div className="fixed inset-0 z-50 md:hidden">
                     <div
-                        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+                        className="qf-fade-in-fast absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
                         onClick={() => setDrawerOpen(false)}
                         aria-hidden="true"
                     />
-                    <div className="absolute inset-y-0 left-0 shadow-2xl">
+                    <div className="qf-drawer-in absolute inset-y-0 left-0 shadow-2xl">
                         {role === "PROVIDER" ? (
                             <ProviderSidebar
                                 navItems={navItems}
@@ -213,7 +214,8 @@ function DashboardLayout({ navItems }) {
             {/* Main column */}
             <div className="flex min-w-0 flex-1 flex-col md:pl-64">
                 {/* Topbar */}
-                <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-slate-200 bg-white/90 px-4 backdrop-blur sm:px-6">
+                <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-slate-200 bg-white/80 px-4 backdrop-blur-xl sm:px-6">
+                    <ScrollProgress />
                     <div className="flex items-center gap-2">
                         <button
                             type="button"
@@ -267,8 +269,8 @@ function DashboardLayout({ navItems }) {
                 </header>
 
                 {/* Content */}
-                <main className="flex-1 p-4 pb-24 sm:p-6 lg:p-8 md:pb-6">
-                    <div className="mx-auto max-w-6xl">
+                <main className="flex-1 p-4 pb-28 sm:p-6 lg:p-8 md:pb-6">
+                    <div key={location.pathname} className="qf-fade-in mx-auto max-w-6xl">
                         <Outlet />
                     </div>
                 </main>

@@ -4,8 +4,8 @@ function Spinner({ className = "" }) {
             role="status"
             aria-label="Loading"
             className={[
-                "inline-block animate-spin rounded-full border-4 border-slate-300 border-t-indigo-600",
-                "h-8 w-8",
+                "inline-block h-8 w-8 animate-spin rounded-full border-[3px] border-slate-200",
+                "border-t-indigo-600 shadow-sm",
                 className
             ].join(" ")}
         />

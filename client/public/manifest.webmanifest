@@ -1,0 +1,18 @@
+{
+  "name": "QuickFix Lesotho",
+  "short_name": "QuickFix",
+  "description": "Request a service, compare offers from verified providers, and hire with confidence — all across Lesotho.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4f46e5",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

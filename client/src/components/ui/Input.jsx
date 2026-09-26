@@ -1,12 +1,21 @@
-function Input({
-    label,
-    id,
-    type = "text",
-    error,
-    hint,
-    className = "",
-    ...props
-}) {
+/* eslint-disable react-refresh/only-export-components -- shares fieldClasses helper with Select/Textarea */
+const FIELD_CLASSES = [
+    "w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm",
+    "placeholder:text-slate-400",
+    "transition focus:outline-none focus:ring-4",
+    "hover:border-slate-400"
+].join(" ");
+
+const FIELD_TONE = (error) =>
+    error
+        ? "border-red-400 focus:border-red-500 focus:ring-red-100/70"
+        : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-100";
+
+export function fieldClasses(error, extra = "") {
+    return [FIELD_CLASSES, FIELD_TONE(error), extra].join(" ");
+}
+
+function Input({ label, id, error, hint, className = "", ...props }) {
     return (
         <div className="w-full">
             {label && (
@@ -20,16 +29,7 @@ function Input({
 
             <input
                 id={id}
-                type={type}
-                className={[
-                    "w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-slate-900",
-                    "placeholder:text-slate-400",
-                    "focus:outline-none focus:ring-2",
-                    error
-                        ? "border-red-400 focus:border-red-500 focus:ring-red-100"
-                        : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-100",
-                    className
-                ].join(" ")}
+                className={fieldClasses(error, className)}
                 {...props}
             />
 

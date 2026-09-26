@@ -3,13 +3,44 @@
 
 @theme {
     --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+    --animate-fade-in-up: fade-in-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+    --animate-float-slow: float-slow 9s ease-in-out infinite;
+    --animate-shimmer: shimmer 2.4s linear infinite;
+    --animate-glow-pulse: glow-pulse 5s ease-in-out infinite;
+    --animate-ken-burns: ken-burns 28s ease-in-out infinite alternate;
+    --animate-marquee: qf-marquee 46s linear infinite;
+    --animate-badge-pop: badge-pop 2.4s ease-in-out infinite;
+    --animate-bounce-in: bounce-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    --animate-pulse-ring: pulse-ring 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+    @keyframes fade-in-up {
+        from { opacity: 0; transform: translateY(16px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes float-slow {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-14px); }
+    }
+
+    @keyframes shimmer {
+        from { background-position: 200% 0; }
+        to { background-position: -200% 0; }
+    }
+
+    @keyframes glow-pulse {
+        0%, 100% { opacity: 0.55; transform: scale(1); }
+        50% { opacity: 0.9; transform: scale(1.12); }
+    }
 }
 
+/* ---------- Base ---------- */
 html {
     scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;
     max-width: 100%;
     overflow-x: clip;
+    color-scheme: light;
 }
 
 body {
@@ -17,6 +48,34 @@ body {
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     -webkit-tap-highlight-color: transparent;
+    background-color: #f8fafc;
+    color: #0f172a;
+}
+
+/* Brand glow overlays used by layouts */
+.qf-page-glow {
+    background:
+        radial-gradient(46rem 26rem at 110% -12%, rgba(99, 102, 241, 0.13), transparent 60%),
+        radial-gradient(40rem 24rem at -15% 22%, rgba(168, 85, 247, 0.1), transparent 60%),
+        #f8fafc;
+}
+
+::selection {
+    background: rgba(99, 102, 241, 0.22);
+    color: #1e1b4b;
+}
+
+/* ---------- Focus & inputs ---------- */
+input,
+select,
+textarea {
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: none;
 }
 
 /* Prevent iOS auto-zoom on focus for form controls (font-size 16px+) */
@@ -28,30 +87,16 @@ body {
     }
 }
 
-/* Safe-area insets for iOS notched devices */
+/* ---------- Safe-area insets for iOS notched devices ---------- */
 @supports (padding: env(safe-area-inset-bottom)) {
-    .pb-safe {
-        padding-bottom: env(safe-area-inset-bottom);
-    }
-
-    .pt-safe {
-        padding-top: env(safe-area-inset-top);
-    }
-
-    .pl-safe {
-        padding-left: env(safe-area-inset-left);
-    }
-
-    .pr-safe {
-        padding-right: env(safe-area-inset-right);
-    }
-
-    .bottom-safe {
-        bottom: env(safe-area-inset-bottom);
-    }
+    .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+    .pt-safe { padding-top: env(safe-area-inset-top); }
+    .pl-safe { padding-left: env(safe-area-inset-left); }
+    .pr-safe { padding-right: env(safe-area-inset-right); }
+    .bottom-safe { bottom: env(safe-area-inset-bottom); }
 }
 
-/* Hide horizontal scrollbar on horizontal-swipe panels but keep them swipeable */
+/* ---------- Scrollbars ---------- */
 .scrollbar-none {
     scrollbar-width: none;
 }
@@ -61,8 +106,8 @@ body {
 }
 
 ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
 }
 
 ::-webkit-scrollbar-track {
@@ -70,10 +115,323 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: rgb(203 213 225);
+    background: linear-gradient(180deg, #c7d2fe, #a5b4fc);
+    border: 2px solid transparent;
+    background-clip: padding-box;
     border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: rgb(148 163 184);
+    background: linear-gradient(180deg, #a5b4fc, #818cf8);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+/* ---------- Glass surfaces ---------- */
+.qf-glass {
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+}
+
+.qf-glass-dark {
+    background: rgba(15, 23, 42, 0.72);
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+}
+
+/* ---------- Gradient text & shimmer ---------- */
+.qf-text-gradient {
+    background: linear-gradient(120deg, #6366f1, #8b5cf6 45%, #d946ef);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.qf-text-shimmer {
+    background: linear-gradient(110deg, #fff 20%, #c7d2fe 40%, #fff 60%);
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: shimmer 3.5s linear infinite;
+}
+
+/* ---------- Card hover elevation ---------- */
+.qf-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 1rem;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
+    transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.qf-card-hover:hover {
+    transform: translateY(-3px);
+    border-color: rgba(99, 102, 241, 0.35);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08), 0 16px 48px rgba(99, 102, 241, 0.12);
+}
+
+/* Soft dotted texture for dark panels */
+.qf-dots {
+    background-image: radial-gradient(rgba(255, 255, 255, 0.14) 1px, transparent 1px);
+    background-size: 22px 22px;
+}
+
+/* ---------- Motion primitives (used by Reveal / PageFade components) ---------- */
+.qf-reveal-pre {
+    opacity: 0;
+    transform: translate3d(var(--qf-rx, 0px), var(--qf-ry, 24px), 0)
+        scale(var(--qf-rs, 1));
+    will-change: opacity, transform;
+}
+
+.qf-reveal-in {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    transition:
+        opacity var(--qf-rd, 0.7s) cubic-bezier(0.22, 1, 0.36, 1)
+            var(--qf-rdelay, 0ms),
+        transform var(--qf-rd, 0.7s) cubic-bezier(0.22, 1, 0.36, 1)
+            var(--qf-rdelay, 0ms);
+}
+
+/* ---------- Button shine sweep ---------- */
+.qf-btn-shine {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+}
+
+.qf-btn-shine::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    z-index: -1;
+    pointer-events: none;
+    background: linear-gradient(
+        105deg,
+        transparent 32%,
+        rgba(255, 255, 255, 0.35) 46%,
+        rgba(255, 255, 255, 0.6) 50%,
+        rgba(255, 255, 255, 0.35) 54%,
+        transparent 68%
+    );
+    transform: translateX(-130%);
+    transition: transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.qf-btn-shine:hover::after {
+    transform: translateX(130%);
+}
+
+/* ---------- Card/image shine sweep (triggered by .group:hover) ---------- */
+.qf-shine {
+    position: relative;
+    overflow: hidden;
+}
+
+.qf-shine::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+    background: linear-gradient(
+        105deg,
+        transparent 34%,
+        rgba(255, 255, 255, 0.4) 46%,
+        rgba(255, 255, 255, 0.65) 50%,
+        rgba(255, 255, 255, 0.4) 54%,
+        transparent 66%
+    );
+    transform: translateX(-130%);
+    transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.group:hover .qf-shine::after {
+    transform: translateX(130%);
+}
+
+/* ---------- Marquee ---------- */
+.qf-marquee-track {
+    display: flex;
+    width: max-content;
+    animation: qf-marquee var(--qf-marquee-duration, 46s) linear infinite;
+}
+
+.qf-marquee:hover .qf-marquee-track {
+    animation-play-state: paused;
+}
+
+.qf-marquee-mask {
+    -webkit-mask-image: linear-gradient(
+        to right,
+        transparent,
+        #000 7%,
+        #000 93%,
+        transparent
+    );
+    mask-image: linear-gradient(
+        to right,
+        transparent,
+        #000 7%,
+        #000 93%,
+        transparent
+    );
+}
+
+/* ---------- Drawer & fast fades ---------- */
+.qf-drawer-in {
+    animation: drawer-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.qf-fade-in-fast {
+    animation: fade-in-fast 0.25s ease both;
+}
+
+/* ---------- Route loading bar ---------- */
+.qf-loading-bar {
+    animation: qf-slide-x 1.15s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes ken-burns {
+    from {
+        transform: scale(1) translate3d(0, 0, 0);
+    }
+    to {
+        transform: scale(1.12) translate3d(-1.5%, -1%, 0);
+    }
+}
+
+@keyframes qf-marquee {
+    from {
+        transform: translate3d(0, 0, 0);
+    }
+    to {
+        transform: translate3d(-50%, 0, 0);
+    }
+}
+
+@keyframes badge-pop {
+    0%,
+    100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.16);
+    }
+}
+
+@keyframes bounce-in {
+    from {
+        opacity: 0;
+        transform: translateY(16px) scale(0.94);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes pulse-ring {
+    0% {
+        box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.45);
+    }
+    70% {
+        box-shadow: 0 0 0 12px rgba(99, 102, 241, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
+    }
+}
+
+@keyframes drawer-in {
+    from {
+        transform: translateX(-100%);
+    }
+    to {
+        transform: translateX(0);
+    }
+}
+
+@keyframes fade-in-fast {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes qf-slide-x {
+    0% {
+        transform: translateX(-110%);
+    }
+    100% {
+        transform: translateX(240%);
+    }
+}
+
+/* Guarantee emission of theme keyframes referenced by .qf-* helpers and
+   tokens even when the matching Tailwind utility is not used. */
+@keyframes fade-in-up {
+    from {
+        opacity: 0;
+        transform: translateY(16px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes float-slow {
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-14px);
+    }
+}
+
+@keyframes shimmer {
+    from {
+        background-position: 200% 0;
+    }
+    to {
+        background-position: -200% 0;
+    }
+}
+
+@keyframes glow-pulse {
+    0%,
+    100% {
+        opacity: 0.55;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.9;
+        transform: scale(1.12);
+    }
+}
+
+/* ---------- Motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .qf-fade-in {
+        animation: fade-in-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
 }

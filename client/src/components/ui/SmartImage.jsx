@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Icon from "./Icon";
 import { gradientFor } from "../../lib/visuals";
 
@@ -11,9 +11,18 @@ function SmartImage({
     seed = "",
     eager = false,
     fetchPriority,
-    decoding
+    decoding,
+    style
 }) {
     const [failed, setFailed] = useState(false);
+    const [loaded, setLoaded] = useState(false);
+    const imgRef = useRef(null);
+
+    useEffect(() => {
+        if (imgRef.current?.complete) {
+            setLoaded(true);
+        }
+    }, []);
 
     if (!src || failed) {
         return (
@@ -27,14 +36,13 @@ function SmartImage({
                 role="img"
             >
                 {emoji ? (
-                    <span className="select-none text-4xl drop-shadow">
+                    <span className="flex h-16 w-16 select-none items-center justify-center rounded-2xl bg-white/15 text-3xl shadow-lg backdrop-blur-sm">
                         {emoji}
                     </span>
                 ) : (
-                    <Icon
-                        name={icon}
-                        className="h-10 w-10 text-white/80"
-                    />
+                    <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 shadow-lg backdrop-blur-sm">
+                        <Icon name={icon} className="h-7 w-7 text-white/90" />
+                    </span>
                 )}
             </span>
         );
@@ -42,12 +50,20 @@ function SmartImage({
 
     return (
         <img
+            ref={imgRef}
             src={src}
             alt={alt}
             loading={eager ? "eager" : "lazy"}
             decoding={decoding || (eager ? "sync" : "async")}
             fetchPriority={fetchPriority}
+            onLoad={() => setLoaded(true)}
             onError={() => setFailed(true)}
+            style={{
+                opacity: loaded ? 1 : 0,
+                background: loaded ? undefined : gradientFor(seed),
+                transition: "opacity 0.5s ease, transform 0.5s ease",
+                ...style
+            }}
             className={className}
         />
     );

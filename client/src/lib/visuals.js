@@ -1,13 +1,40 @@
+import homeCleaningImage from "../assets/cleaner2.jpg";
+import automotiveImage from "../assets/Automotive.jfif";
+import technologyImage from "../assets/technology.jfif";
+import beautyImage from "../assets/salon.jpg";
+import cleaningImage from "../assets/cleaner.jpg";
+import electricalImage from "../assets/electrician.jpg";
+import plumbingImage from "../assets/Plumbing.jfif";
+import gardeningImage from "../assets/Gardening.jfif";
+import paintingImage from "../assets/Painting.jfif";
+import carpentryImage from "../assets/Capentry.jfif";
+import applianceImage from "../assets/ApplianceRepair.jfif";
+import carRepairImage from "../assets/CarRepair1.jpg";
+import carWashImage from "../assets/CarWash.jfif";
+import towingImage from "../assets/Towing.jfif";
+import autoElectricImage from "../assets/AutoElectric.jfif";
+import computerRepairImage from "../assets/ComputerRepair.jfif";
+import networkingImage from "../assets/NetworkingLesotho.jfif";
+import softwareImage from "../assets/SoftwareIntallation.jfif";
+import itSupportImage from "../assets/ITSupport.jfif";
+import hairdressingImage from "../assets/HairDressing.jfif";
+import barberingImage from "../assets/Beberring.jpg";
+import makeupImage from "../assets/Makeup.jfif";
+import nailsImage from "../assets/Nails.jfif";
+
 // QuickFix media helpers.
 //
-// The platform is 100% real-user content: every photo, video and
-// portrait is uploaded by a Basotho user through the app. Nothing on
-// the site points to generic stock photography, and no user is ever
-// shown a stock person's picture.
+// People are only ever shown a photo they uploaded themselves (see
+// getProviderPortrait) — no user is ever shown a stock person's face.
 //
-// When a record has no uploaded media yet, these helpers return null
-// and the UI renders a branded gradient + icon placeholder (see
-// SmartImage) or initials for people (see ProviderAvatar).
+// Catalogue records (categories, services) resolve in this order:
+//   1. Media uploaded through the app, stored on the API server.
+//   2. A bundled first-party Lesotho photo for that specific service.
+//   3. null, which renders a branded gradient + icon placeholder (see
+//      SmartImage).
+//
+// The bundled photos in ../assets are first-party imagery shipped with
+// the app, not third-party stock photography.
 
 const slugify = (value) =>
     String(value || "")
@@ -37,9 +64,40 @@ export const gradientFor = (name = "", hueShift = 0) => {
     return `linear-gradient(135deg, hsl(${hue1} 72% 56%) 0%, hsl(${hue2} 78% 42%) 100%)`;
 };
 
-export const getServiceImage = (service) => service?.image || null;
+const LOCAL_SERVICE_IMAGES = {
+    plumbing: plumbingImage,
+    cleaning: cleaningImage,
+    gardening: gardeningImage,
+    electrical: electricalImage,
+    painting: paintingImage,
+    carpentry: carpentryImage,
+    "appliance repair": applianceImage,
+    "car repair": carRepairImage,
+    "car wash": carWashImage,
+    towing: towingImage,
+    "auto electrical": autoElectricImage,
+    "computer repair": computerRepairImage,
+    networking: networkingImage,
+    "software installation": softwareImage,
+    "it support": itSupportImage,
+    hairdressing: hairdressingImage,
+    barbering: barberingImage,
+    makeup: makeupImage,
+    "nail services": nailsImage
+};
 
-export const getCategoryImage = (category) => category?.image || null;
+const LOCAL_CATEGORY_IMAGES = {
+    "home services": homeCleaningImage,
+    automotive: automotiveImage,
+    technology: technologyImage,
+    "beauty and personal care": beautyImage
+};
+
+export const getServiceImage = (service) =>
+    service?.image || LOCAL_SERVICE_IMAGES[slugify(service?.name)] || null;
+
+export const getCategoryImage = (category) =>
+    category?.image || LOCAL_CATEGORY_IMAGES[slugify(category?.name)] || null;
 
 export const getProductImage = (product) => product?.image || null;
 

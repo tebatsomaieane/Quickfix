@@ -12,7 +12,7 @@ function CustomerSidebar({ navItems, onNavigate }) {
     return (
         <div className="flex h-full w-64 flex-col border-r border-slate-200 bg-white">
             {/* Logo */}
-            <div className="flex h-16 items-center border-b border-slate-200 px-5">
+            <div className="flex h-16 items-center border-b border-slate-200/80 bg-gradient-to-b from-white to-indigo-50/40 px-5">
                 <Logo brand="Quick" accent="Fix" />
             </div>
 
@@ -21,7 +21,7 @@ function CustomerSidebar({ navItems, onNavigate }) {
                 <Link
                     to="/customer/requests/new"
                     onClick={onNavigate}
-                    className="group flex items-center justify-between gap-2 rounded-xl bg-gradient-to-br from-indigo-600 via-violet-600 to-indigo-700 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-200 transition hover:shadow-lg"
+                    className="group flex items-center justify-between gap-2 rounded-xl bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-600 bg-[length:200%_100%] bg-left px-4 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-200 transition-all duration-300 hover:bg-right hover:shadow-lg hover:shadow-indigo-300/60"
                 >
                     <span className="flex items-center gap-2">
                         <Icon name="plus" className="h-4 w-4" />
@@ -42,9 +42,9 @@ function CustomerSidebar({ navItems, onNavigate }) {
             />
 
             {/* User footer */}
-            <div className="border-t border-slate-200 p-4">
-                <div className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-sm font-bold text-white shadow">
+            <div className="border-t border-slate-200 p-3">
+                <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-gradient-to-b from-slate-50/80 to-white p-2.5">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-sm font-bold text-white shadow-md shadow-indigo-200">
                         {(user?.first_name || "?")[0]}
                     </span>
                     <div className="min-w-0">

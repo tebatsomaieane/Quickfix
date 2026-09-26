@@ -72,14 +72,17 @@ export function ToastProvider({ children }) {
                     return (
                         <div
                             key={toast.id}
-                            className={`pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-xl border bg-white p-3 shadow-lg ${style.ring}`}
+                            className={[
+                                "qf-fade-in pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-2xl border bg-white/90 p-3.5 shadow-xl shadow-slate-900/10 backdrop-blur-xl",
+                                style.ring
+                            ].join(" ")}
                         >
                             <span
-                                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${style.icon}`}
+                                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${style.icon}`}
                             >
                                 <Icon name={style.name} className="h-4 w-4" />
                             </span>
-                            <p className="min-w-0 flex-1 text-sm text-slate-700">
+                            <p className="min-w-0 flex-1 self-center text-sm font-medium text-slate-700">
                                 {toast.message}
                             </p>
                             <button

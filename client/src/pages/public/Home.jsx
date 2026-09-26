@@ -4,6 +4,9 @@ import Button from "../../components/ui/Button";
 import Icon from "../../components/ui/Icon";
 import Spinner from "../../components/ui/Spinner";
 import SmartImage from "../../components/ui/SmartImage";
+import Reveal from "../../components/motion/Reveal";
+import AnimatedValue from "../../components/motion/AnimatedValue";
+import ServiceTicker from "../../components/motion/ServiceTicker";
 import { fetchCategories, fetchMarketOverview } from "../../services/catalogueService";
 import { getCategoryImage } from "../../lib/visuals";
 
@@ -14,7 +17,7 @@ import offerServiceImage from "../../assets/servicerequestperson.jpg";
 import offerProviderImage from "../../assets/cleaner.jpg";
 import offerStoreImage from "../../assets/restaurant.jpg";
 import categoryHomeImage from "../../assets/cleaner2.jpg";
-import categoryAutomotiveImage from "../../assets/CarRepair.jpg";
+import categoryAutomotiveImage from "../../assets/Automotive.jfif";
 import categoryTechnologyImage from "../../assets/technology.jfif";
 import categoryBeautyImage from "../../assets/salon.jpg";
 import businessImage from "../../assets/business.jpg";
@@ -202,23 +205,43 @@ function Home() {
                     loading="eager"
                     fetchpriority="high"
                     decoding="async"
-                    className="absolute inset-0 h-full w-full object-cover"
+                    className="animate-ken-burns absolute inset-0 h-full w-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-r from-slate-950/95 via-slate-950/80 to-indigo-950/40" />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-slate-950/40" />
                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(2,6,23,0.35)_100%)]" />
+                <div
+                    className="qf-dots absolute inset-0 opacity-30"
+                    aria-hidden="true"
+                />
+                <div
+                    className="animate-glow-pulse absolute -left-24 top-1/4 h-72 w-72 rounded-full bg-indigo-500/30 blur-3xl"
+                    aria-hidden="true"
+                />
+                <div
+                    className="animate-glow-pulse absolute -right-20 top-16 h-64 w-64 rounded-full bg-violet-600/25 blur-3xl"
+                    style={{ animationDelay: "1.6s" }}
+                    aria-hidden="true"
+                />
+                <div
+                    className="animate-glow-pulse absolute bottom-0 left-1/3 h-56 w-56 rounded-full bg-fuchsia-500/20 blur-3xl"
+                    style={{ animationDelay: "3s" }}
+                    aria-hidden="true"
+                />
 
                 <div className="relative mx-auto grid max-w-7xl gap-12 px-4 py-14 sm:px-6 lg:grid-cols-2 lg:items-center lg:gap-10 lg:px-8 lg:py-24">
                     {/* Copy */}
                     <div>
-                        <span className="qf-rise inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-indigo-100 shadow-sm backdrop-blur">
-                            <Icon name="sparkles" className="h-3.5 w-3.5" />
+                        <span className="qf-rise inline-flex items-center gap-2 rounded-full border border-white/20 bg-gradient-to-r from-indigo-500/20 to-violet-500/20 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-indigo-100 shadow-sm backdrop-blur">
+                            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-indigo-400/30">
+                                <Icon name="sparkles" className="h-3 w-3 text-indigo-100" />
+                            </span>
                             Lesotho's local service marketplace
                         </span>
 
                         <h1 className="qf-rise mt-6 text-4xl font-extrabold leading-tight tracking-tight text-white sm:text-5xl lg:text-[3.4rem]" style={{ animationDelay: "0.06s" }}>
                             Find a trusted provider for any job,{" "}
-                            <span className="bg-gradient-to-r from-indigo-300 via-violet-300 to-fuchsia-300 bg-clip-text text-transparent">
+                            <span className="qf-text-shimmer bg-gradient-to-r from-indigo-300 via-violet-300 to-fuchsia-300 bg-clip-text text-transparent">
                                 close to home.
                             </span>
                         </h1>
@@ -238,7 +261,7 @@ function Home() {
                                 className="w-full shadow-lg shadow-indigo-500/30 sm:w-auto"
                             >
                                 Get started — it's free
-                                <Icon name="arrowRight" className="h-4 w-4" />
+                                <Icon name="arrowRight" className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" />
                             </Button>
                             <Button
                                 size="lg"
@@ -258,7 +281,7 @@ function Home() {
                             {DISTRICTS.map((district) => (
                                 <span
                                     key={district}
-                                    className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-medium text-indigo-100 backdrop-blur"
+                                    className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-medium text-indigo-100 backdrop-blur transition hover:border-indigo-300/40 hover:bg-indigo-400/15 hover:text-white"
                                 >
                                     <Icon
                                         name="location"
@@ -275,10 +298,13 @@ function Home() {
                                 {stats.map((stat) => (
                                     <div
                                         key={stat.label}
-                                        className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur"
+                                        className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 shadow-lg shadow-black/10 backdrop-blur transition hover:border-white/25 hover:bg-white/15"
                                     >
-                                        <dt className="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
-                                            {stat.value}
+                                        <dt className="bg-gradient-to-b from-white to-indigo-100 bg-clip-text text-2xl font-extrabold tracking-tight text-transparent sm:text-3xl">
+                                            <AnimatedValue
+                                                value={stat.value}
+                                                duration={1500}
+                                            />
                                         </dt>
                                         <dd className="mt-0.5 text-xs font-medium uppercase tracking-wide text-indigo-100/80">
                                             {stat.label}
@@ -305,8 +331,8 @@ function Home() {
                             </div>
 
                             {/* Floating card: verified */}
-                            <div className="absolute -left-3 top-8 hidden gap-3 rounded-2xl border border-white/15 bg-slate-900/85 p-4 shadow-xl backdrop-blur sm:flex">
-                                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-300">
+                            <div className="animate-float-slow absolute -left-4 top-10 hidden gap-3 rounded-2xl border border-white/15 bg-slate-900/85 p-4 shadow-xl shadow-black/30 backdrop-blur sm:flex">
+                                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-400/20">
                                     <Icon
                                         name="checkBadge"
                                         className="h-6 w-6"
@@ -324,8 +350,8 @@ function Home() {
 
                             {/* Floating card: rating */}
                             {rating !== null && (
-                                <div className="absolute -bottom-5 right-4 flex items-center gap-3 rounded-2xl border border-white/15 bg-slate-900/85 p-4 shadow-xl backdrop-blur">
-                                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-500/20 text-amber-300">
+                                <div className="animate-float-slow absolute -bottom-6 right-5 flex items-center gap-3 rounded-2xl border border-white/15 bg-slate-900/85 p-4 shadow-xl shadow-black/30 backdrop-blur" style={{ animationDelay: "1.2s" }}>
+                                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-500/20 text-amber-300 ring-1 ring-amber-400/20">
                                         <Icon name="star" className="h-6 w-6" />
                                     </span>
                                     <div>
@@ -347,12 +373,14 @@ function Home() {
             {/* ============================== OFFERINGS ============================== */}
             <section className="mx-auto max-w-7xl px-4 pb-4 sm:px-6 lg:px-8 -mt-6 sm:-mt-10 md:-mt-14 relative z-10">
                 <div className="grid gap-6 lg:grid-cols-3">
-                    {OFFERINGS.map((offering) => (
-                        <div
+                    {OFFERINGS.map((offering, index) => (
+                        <Reveal
                             key={offering.title}
-                            className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg ring-1 ring-slate-900/5 transition hover:-translate-y-1 hover:shadow-xl"
+                            delay={index * 110}
+                            y={30}
+                            className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg shadow-slate-900/5 ring-1 ring-slate-900/5 transition hover:-translate-y-1 hover:shadow-xl hover:shadow-indigo-500/10"
                         >
-                            <div className="relative h-52 overflow-hidden">
+                            <div className="qf-shine relative h-52 overflow-hidden">
                                 <SmartImage
                                     src={offering.image}
                                     alt={offering.title}
@@ -361,7 +389,7 @@ function Home() {
                                     className={`h-full w-full object-cover transition duration-500 group-hover:scale-105 ${offering.obj ?? "object-center"}`}
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent" />
-                                <span className="absolute left-4 top-4 flex h-11 w-11 items-center justify-center rounded-xl bg-white/95 text-indigo-600 shadow-lg">
+                                <span className="absolute left-4 top-4 flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-500/30 ring-1 ring-white/20">
                                     <Icon name={offering.icon} className="h-6 w-6" />
                                 </span>
                             </div>
@@ -373,15 +401,18 @@ function Home() {
                                     {offering.description}
                                 </p>
                             </div>
-                        </div>
+                        </Reveal>
                     ))}
                 </div>
             </section>
 
+            {/* ============================== SERVICE TICKER ============================== */}
+            <ServiceTicker />
+
             {/* ============================== CATEGORIES ============================== */}
             <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
                 <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-end">
-                    <div>
+                    <Reveal y={18}>
                         <p className="text-xs font-bold uppercase tracking-widest text-indigo-600">
                             Marketplace
                         </p>
@@ -392,14 +423,19 @@ function Home() {
                             Providers advertise under the categories below. The
                             full catalogue is available after you log in.
                         </p>
-                    </div>
-                    <Button
-                        variant="outline"
-                        onClick={() => navigate("/login")}
-                    >
-                        Browse the marketplace
-                        <Icon name="arrowRight" className="h-4 w-4" />
-                    </Button>
+                    </Reveal>
+                    <Reveal y={18} delay={120}>
+                        <Button
+                            variant="outline"
+                            onClick={() => navigate("/login")}
+                        >
+                            Browse the marketplace
+                            <Icon
+                                name="arrowRight"
+                                className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5"
+                            />
+                        </Button>
+                    </Reveal>
                 </div>
 
                 {categories.length === 0 ? (
@@ -408,13 +444,15 @@ function Home() {
                     </div>
                 ) : (
                     <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                        {categories.map((category) => {
+                        {categories.map((category, index) => {
                             const visual = CATEGORY_VISUAL[category.name] || {};
                             const image = visual.src || getCategoryImage(category);
                             return (
-                                <div
+                                <Reveal
                                     key={category.id}
-                                    className="group relative h-44 overflow-hidden rounded-2xl shadow-sm transition hover:shadow-xl"
+                                    delay={(index % 4) * 90}
+                                    y={26}
+                                    className="qf-shine group relative h-44 overflow-hidden rounded-2xl shadow-sm ring-1 ring-slate-900/5 transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-indigo-500/20 hover:ring-indigo-200"
                                 >
                                     <SmartImage
                                         src={image}
@@ -423,9 +461,9 @@ function Home() {
                                         icon={visual.icon || "grid"}
                                         className={`h-full w-full object-cover transition duration-500 group-hover:scale-105 ${visual.obj ?? "object-center"}`}
                                     />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-900/20 to-transparent" />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-900/25 to-transparent transition group-hover:from-indigo-950/90" />
                                     <div className="absolute inset-x-0 bottom-0 p-4">
-                                        <h3 className="text-lg font-bold text-white">
+                                        <h3 className="bg-gradient-to-b from-white to-indigo-100 bg-clip-text text-lg font-bold text-transparent">
                                             {category.name}
                                         </h3>
                                         <p className="mt-0.5 text-xs text-slate-200 line-clamp-1">
@@ -437,7 +475,7 @@ function Home() {
                                             {category.services.length} services
                                         </span>
                                     )}
-                                </div>
+                                </Reveal>
                             );
                         })}
                     </div>
@@ -448,12 +486,14 @@ function Home() {
             <section id="how-it-works" className="bg-slate-50 py-16 sm:py-20">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                     <div className="text-center">
-                        <p className="text-xs font-bold uppercase tracking-widest text-indigo-600">
-                            For customers
-                        </p>
-                        <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
-                            How it works
-                        </h2>
+                        <Reveal y={16}>
+                            <p className="text-xs font-bold uppercase tracking-widest text-indigo-600">
+                                For customers
+                            </p>
+                            <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
+                                How it works
+                            </h2>
+                        </Reveal>
                     </div>
 
                     <div className="relative mt-10 grid gap-6 lg:grid-cols-3">
@@ -462,14 +502,16 @@ function Home() {
                             aria-hidden="true"
                         />
                         {CUSTOMER_STEPS.map((step, index) => (
-                            <div
+                            <Reveal
                                 key={step.title}
-                                className="relative rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm"
+                                delay={index * 120}
+                                y={30}
+                                className="group relative rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm transition duration-300 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-500/10"
                             >
-                                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-200">
+                                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-200 transition group-hover:scale-105 group-hover:shadow-indigo-300">
                                     <Icon name={step.icon} className="h-6 w-6" />
                                 </div>
-                                <span className="absolute -top-3 right-6 flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-sm font-bold text-white shadow">
+                                <span className="absolute -top-3 right-6 flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-slate-800 to-slate-950 text-sm font-bold text-white shadow ring-1 ring-white/20">
                                     {index + 1}
                                 </span>
                                 <h3 className="mt-4 text-lg font-bold text-slate-900">
@@ -478,7 +520,7 @@ function Home() {
                                 <p className="mt-2 text-sm leading-relaxed text-slate-600">
                                     {step.description}
                                 </p>
-                            </div>
+                            </Reveal>
                         ))}
                     </div>
                 </div>
@@ -486,14 +528,15 @@ function Home() {
 
             {/* ============================== FOR BUSINESSES ============================== */}
             <section id="for-businesses" className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 sm:py-20">
-                <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 lg:grid lg:grid-cols-2">
+                <Reveal y={32} className="overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 lg:grid lg:grid-cols-2">
                     <div className="relative max-h-96 lg:max-h-none">
                         <SmartImage
                             src={businessImage}
                             alt="A local store advertising the products they sell on QuickFix"
                             seed="storefront"
                             icon="building"
-                            className="h-56 w-full object-cover object-center lg:h-full"
+                            className="animate-ken-burns h-56 w-full object-cover object-center lg:h-full"
+                            style={{ animationDuration: "22s" }}
                         />
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent to-slate-900/40" />
                     </div>
@@ -547,17 +590,23 @@ function Home() {
                             </Button>
                         </div>
                     </div>
-                </div>
+                </Reveal>
             </section>
 
             {/* ============================== TRUST ============================== */}
             <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-                <h2 className="text-center text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
-                    Built on trust
-                </h2>
+                <Reveal y={18}>
+                    <h2 className="text-center text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
+                        Built on trust
+                    </h2>
+                </Reveal>
                 <div className="mx-auto mt-8 grid max-w-3xl gap-4 sm:grid-cols-3">
-                    <div className="flex flex-col items-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
-                        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+                    <Reveal
+                        delay={0}
+                        y={24}
+                        className="flex flex-col items-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-emerald-500/10"
+                    >
+                        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/15 to-teal-500/15 text-emerald-600 ring-1 ring-emerald-500/20">
                             <Icon name="shield" className="h-6 w-6" />
                         </span>
                         <h3 className="mt-3 font-bold text-slate-900">
@@ -566,9 +615,13 @@ function Home() {
                         <p className="mt-1 text-sm text-slate-500">
                             Providers are verified before they can offer services.
                         </p>
-                    </div>
-                    <div className="flex flex-col items-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
-                        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+                    </Reveal>
+                    <Reveal
+                        delay={110}
+                        y={24}
+                        className="flex flex-col items-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-amber-500/10"
+                    >
+                        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500/15 to-orange-500/15 text-amber-600 ring-1 ring-amber-500/20">
                             <Icon name="star" className="h-6 w-6" />
                         </span>
                         <h3 className="mt-3 font-bold text-slate-900">
@@ -577,9 +630,13 @@ function Home() {
                         <p className="mt-1 text-sm text-slate-500">
                             Workmanship is rated after every completed job.
                         </p>
-                    </div>
-                    <div className="flex flex-col items-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
-                        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
+                    </Reveal>
+                    <Reveal
+                        delay={220}
+                        y={24}
+                        className="flex flex-col items-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-indigo-500/10"
+                    >
+                        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500/15 to-violet-500/15 text-indigo-600 ring-1 ring-indigo-500/20">
                             <Icon name="file" className="h-6 w-6" />
                         </span>
                         <h3 className="mt-3 font-bold text-slate-900">
@@ -588,16 +645,17 @@ function Home() {
                         <p className="mt-1 text-sm text-slate-500">
                             Compare quotes, timelines and history before you hire.
                         </p>
-                    </div>
+                    </Reveal>
                 </div>
             </section>
 
             {/* ============================== CTA ============================== */}
             <section className="mx-auto max-w-7xl px-4 pb-20 sm:px-6 lg:px-8">
-                <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 px-6 py-14 text-center shadow-2xl shadow-indigo-300/40 sm:px-12">
-                    <div className="absolute -left-16 -top-16 h-56 w-56 rounded-full bg-white/10 blur-2xl" aria-hidden="true" />
-                    <div className="absolute -bottom-20 -right-10 h-64 w-64 rounded-full bg-white/10 blur-2xl" aria-hidden="true" />
-                    <h2 className="relative text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+                <Reveal y={28} className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 px-6 py-14 text-center shadow-2xl shadow-indigo-300/40 sm:px-12">
+                    <div className="qf-dots absolute inset-0 opacity-40" aria-hidden="true" />
+                    <div className="animate-glow-pulse absolute -left-16 -top-16 h-56 w-56 rounded-full bg-white/10 blur-2xl" aria-hidden="true" />
+                    <div className="animate-glow-pulse absolute -bottom-20 -right-10 h-64 w-64 rounded-full bg-white/10 blur-2xl" style={{ animationDelay: "2s" }} aria-hidden="true" />
+                    <h2 className="qf-text-shimmer relative bg-gradient-to-r from-white via-indigo-50 to-white bg-clip-text text-3xl font-extrabold tracking-tight text-transparent sm:text-4xl">
                         Ready to get your job done?
                     </h2>
                     <p className="relative mx-auto mt-3 max-w-xl text-indigo-100">
@@ -612,10 +670,10 @@ function Home() {
                             className="shadow-xl"
                         >
                             Create a free account
-                            <Icon name="arrowRight" className="h-4 w-4" />
+                            <Icon name="arrowRight" className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" />
                         </Button>
                     </div>
-                </div>
+                </Reveal>
             </section>
         </div>
     );

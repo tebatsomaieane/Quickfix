@@ -1,3 +1,5 @@
+import { fieldClasses } from "./Input";
+
 function Select({
     label,
     id,
@@ -19,34 +21,45 @@ function Select({
                 </label>
             )}
 
-            <select
-                id={id}
-                className={[
-                    "w-full appearance-none rounded-lg border bg-white px-3.5 py-2.5 text-sm text-slate-900",
-                    "focus:outline-none focus:ring-2",
-                    error
-                        ? "border-red-400 focus:border-red-500 focus:ring-red-100"
-                        : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-100",
-                    className
-                ].join(" ")}
-                {...props}
-            >
-                <option value="">{placeholder}</option>
-                {options.map((option) => {
-                    const value = typeof option === "object"
-                        ? option.value
-                        : option;
-                    const label = typeof option === "object"
-                        ? option.label
-                        : option;
+            <div className="relative">
+                <select
+                    id={id}
+                    className={[
+                        fieldClasses(error, className),
+                        "cursor-pointer appearance-none pr-10",
+                        props.value === "" || props.value == null
+                            ? "text-slate-400"
+                            : "text-slate-900"
+                    ].join(" ")}
+                    {...props}
+                >
+                    <option value="">{placeholder}</option>
+                    {options.map((option) => {
+                        const value =
+                            typeof option === "object" ? option.value : option;
+                        const label =
+                            typeof option === "object" ? option.label : option;
 
-                    return (
-                        <option key={value} value={value}>
-                            {label}
-                        </option>
-                    );
-                })}
-            </select>
+                        return (
+                            <option key={value} value={value}>
+                                {label}
+                            </option>
+                        );
+                    })}
+                </select>
+                <svg
+                    className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                >
+                    <path d="M6 9l6 6 6-6" />
+                </svg>
+            </div>
 
             {error ? (
                 <p className="mt-1 text-sm text-red-600">{error}</p>

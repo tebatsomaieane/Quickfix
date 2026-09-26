@@ -1,3 +1,5 @@
+import { fieldClasses } from "./Input";
+
 function Textarea({
     label,
     id,
@@ -21,15 +23,7 @@ function Textarea({
             <textarea
                 id={id}
                 rows={rows}
-                className={[
-                    "w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-slate-900",
-                    "placeholder:text-slate-400",
-                    "focus:outline-none focus:ring-2",
-                    error
-                        ? "border-red-400 focus:border-red-500 focus:ring-red-100"
-                        : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-100",
-                    className
-                ].join(" ")}
+                className={fieldClasses(error, className)}
                 {...props}
             />
 
