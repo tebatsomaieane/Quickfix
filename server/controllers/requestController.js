@@ -19,80 +19,18 @@ const create = async (req, res) => {
             budget_max
         } = req.body;
 
-        // 1. Required fields
-        if (!service_id || !title || !description || !location) {
-            return res.status(400).json({
-                success: false,
-                message: "Service, title, description and location are required"
-            });
-        }
-
-        if (!title.trim() || !description.trim() || !location.trim()) {
-            return res.status(400).json({
-                success: false,
-                message: "Title, description and location cannot be empty"
-            });
-        }
-
-        if (title.trim().length > 200) {
-            return res.status(400).json({
-                success: false,
-                message: "Title must be 200 characters or fewer"
-            });
-        }
-
-        if (description.trim().length > 5000) {
-            return res.status(400).json({
-                success: false,
-                message: "Description must be 5000 characters or fewer"
-            });
-        }
-
-        if (location.trim().length > 255) {
-            return res.status(400).json({
-                success: false,
-                message: "Location must be 255 characters or fewer"
-            });
-        }
-
-        // 2. Budget validation
+        // 1. Shape, lengths, the date, the clock time and the budget bounds are
+        //    all settled by the `content.createRequest` schema, which runs
+        //    before this handler -- so an invalid request never reaches a query.
+        //    What is left is the one check no schema can make: that the chosen
+        //    service is real and bookable.
         let bMin = budget_min;
         let bMax = budget_max;
 
-        if (bMin !== undefined && bMin !== null && bMin !== "") {
-            bMin = Number(bMin);
+        bMin = bMin === undefined || bMin === null || bMin === "" ? null : Number(bMin);
+        bMax = bMax === undefined || bMax === null || bMax === "" ? null : Number(bMax);
 
-            if (!Number.isFinite(bMin) || bMin < 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Minimum budget must be a positive number"
-                });
-            }
-        } else {
-            bMin = null;
-        }
-
-        if (bMax !== undefined && bMax !== null && bMax !== "") {
-            bMax = Number(bMax);
-
-            if (!Number.isFinite(bMax) || bMax < 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Maximum budget must be a positive number"
-                });
-            }
-        } else {
-            bMax = null;
-        }
-
-        if (bMin !== null && bMax !== null && bMin > bMax) {
-            return res.status(400).json({
-                success: false,
-                message: "Minimum budget cannot be greater than maximum budget"
-            });
-        }
-
-        // 3. Verify the service exists and is active
+        // 2. Verify the service exists and is active
         const [services] = await db.query(
             `SELECT id FROM services
              WHERE id = ? AND status = 'ACTIVE'`,
@@ -106,7 +44,7 @@ const create = async (req, res) => {
             });
         }
 
-        // 4. Map user to customer profile
+        // 3. Map user to customer profile
         const customerId = await getCustomerId(req.user.id);
 
         if (!customerId) {
@@ -116,7 +54,7 @@ const create = async (req, res) => {
             });
         }
 
-        // 5. Create the request (with optional photo/video attachments)
+        // 4. Create the request (with optional photo/video attachments)
         const attachments = Array.isArray(req.body.attachments)
             ? req.body.attachments
             : [];

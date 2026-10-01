@@ -24,30 +24,33 @@ const {
     authorize
 } = require("../middleware/authMiddleware");
 
+const { validate } = require("../validators");
+const { content } = require("../validators/schemas");
+
 const router = express.Router();
 
 router.use(protect, authorize("BUSINESS_OWNER"));
 
 // Profile
 router.get("/profile", getProfile);
-router.put("/profile", updateProfile);
+router.put("/profile", validate(content.businessProfile), updateProfile);
 
 // Products
 router.get("/products", getMyProducts);
-router.post("/products", createProduct);
-router.put("/products/:id", updateProduct);
+router.post("/products", validate(content.product), createProduct);
+router.put("/products/:id", validate(content.product), updateProduct);
 router.delete("/products/:id", deleteProduct);
 
 // Advertisements
 router.get("/advertisements", getMyAdvertisements);
-router.post("/advertisements", createAdvertisement);
-router.put("/advertisements/:id", updateAdvertisement);
+router.post("/advertisements", validate(content.advertisement), createAdvertisement);
+router.put("/advertisements/:id", validate(content.advertisement), updateAdvertisement);
 router.delete("/advertisements/:id", deleteAdvertisement);
 
 // Promotions
 router.get("/promotions", getMyPromotions);
-router.post("/promotions", createPromotion);
-router.put("/promotions/:id", updatePromotion);
+router.post("/promotions", validate(content.promotion), createPromotion);
+router.put("/promotions/:id", validate(content.promotion), updatePromotion);
 router.delete("/promotions/:id", deletePromotion);
 
 // Analytics

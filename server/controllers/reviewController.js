@@ -11,21 +11,9 @@ const create = async (req, res) => {
     try {
         const { job_id, rating, comment } = req.body;
 
-        if (!job_id || rating === undefined || rating === null) {
-            return res.status(400).json({
-                success: false,
-                message: "Job id and rating are required"
-            });
-        }
-
+        // `rating` being a whole number from 1 to 5 is settled by the
+        // `content.review` schema before this handler runs.
         const ratingNum = Number(rating);
-
-        if (!Number.isInteger(ratingNum) || ratingNum < 1 || ratingNum > 5) {
-            return res.status(400).json({
-                success: false,
-                message: "Rating must be a whole number between 1 and 5"
-            });
-        }
 
         const customerId = await getCustomerId(req.user.id);
 

@@ -11,33 +11,8 @@ const create = async (req, res) => {
     try {
         const { subject, description, job_id } = req.body;
 
-        if (!subject || !subject.trim()) {
-            return res.status(400).json({
-                success: false,
-                message: "Subject is required"
-            });
-        }
-
-        if (!description || !description.trim()) {
-            return res.status(400).json({
-                success: false,
-                message: "Description is required"
-            });
-        }
-
-        if (subject.trim().length > 200) {
-            return res.status(400).json({
-                success: false,
-                message: "Subject must be 200 characters or fewer"
-            });
-        }
-
-        if (description.length > 5000) {
-            return res.status(400).json({
-                success: false,
-                message: "Description must be 5000 characters or fewer"
-            });
-        }
+        // Presence and lengths are settled by the `content.complaint` schema
+        // before this handler runs.
 
         const customerId = await getCustomerId(req.user.id);
         const providerId = await getProviderId(req.user.id);

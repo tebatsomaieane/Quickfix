@@ -6,7 +6,9 @@ const windowEntries = new Map();
 const DEFAULT_OPTIONS = {
     windowMs: 15 * 60 * 1000,
     max: 20,
-    message: "Too many attempts. Please try again later.",
+    // Says what to do, not just what happened. The paired `Retry-After` header
+    // carries the exact number of seconds.
+    message: "Too many attempts. Please wait a moment and try again.",
     // Trusted loopback traffic (dev tooling, CI, health checks) is exempt.
     // In production behind a reverse proxy this should usually stay false
     // so that all clients are rate limited consistently.
@@ -37,10 +39,34 @@ const rateLimit = (options = {}) => {
         const entries = windowEntries.get(key) || [];
         const active = entries.filter((ts) => now - ts < config.windowMs);
 
+        // Standard rate-limit headers, so a client (or an operator reading a
+        // network trace) can see the budget rather than having to guess at it.
+        const oldest = active.length > 0 ? active[0] : now;
+        res.setHeader("RateLimit-Limit", String(config.max));
+        res.setHeader(
+            "RateLimit-Remaining",
+            String(Math.max(0, config.max - active.length))
+        );
+        res.setHeader(
+            "RateLimit-Reset",
+            String(Math.ceil((oldest + config.windowMs - now) / 1000))
+        );
+
         if (active.length >= config.max) {
+            // `Retry-After` is how the browser is meant to learn when it may try
+            // again, and it is the difference between a client that waits and
+            // one that hammers a limit it cannot see.
+            const retryAfterSeconds = Math.max(
+                1,
+                Math.ceil((oldest + config.windowMs - now) / 1000)
+            );
+
+            res.setHeader("Retry-After", String(retryAfterSeconds));
+
             return res.status(429).json({
                 success: false,
-                message: config.message
+                message: config.message,
+                retryAfter: retryAfterSeconds
             });
         }
 

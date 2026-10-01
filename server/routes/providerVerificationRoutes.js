@@ -10,11 +10,14 @@ const {
     authorize
 } = require("../middleware/authMiddleware");
 
+const { validate } = require("../validators");
+const { content } = require("../validators/schemas");
+
 const router = express.Router();
 
 router.use(protect, authorize("PROVIDER"));
 
 router.get("/", mine);
-router.post("/", request);
+router.post("/", validate(content.verificationRequest), request);
 
 module.exports = router;

@@ -295,19 +295,8 @@ const sendMessage = async (req, res) => {
             });
         }
 
-        if (!message || !message.trim()) {
-            return res.status(400).json({
-                success: false,
-                message: "Message cannot be empty"
-            });
-        }
-
-        if (message.length > 5000) {
-            return res.status(400).json({
-                success: false,
-                message: "Message must be 5000 characters or fewer"
-            });
-        }
+        // An empty or over-long message is settled by the `content.sendMessage`
+        // schema before this handler runs.
 
         const { error } = await ensureParticipant(req, res, id);
 

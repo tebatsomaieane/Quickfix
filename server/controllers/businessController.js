@@ -68,22 +68,6 @@ const updateProfile = async (req, res) => {
             operating_hours
         } = req.body;
 
-        if (name !== undefined) {
-            if (!name || !name.trim()) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Business name cannot be empty"
-                });
-            }
-
-            if (name.trim().length > 200) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Business name must be 200 characters or fewer"
-                });
-            }
-        }
-
         const fields = {};
         if (name !== undefined) fields.name = name.trim();
         if (description !== undefined) fields.description = (description || "").trim() || null;
@@ -185,36 +169,20 @@ const createProduct = async (req, res) => {
 
         const { name, description, price, category_id, image } = req.body;
 
-        if (!name || !name.trim()) {
-            return res.status(400).json({
-                success: false,
-                message: "Product name is required"
-            });
-        }
-
-        if (name.trim().length > 200) {
-            return res.status(400).json({
-                success: false,
-                message: "Product name must be 200 characters or fewer"
-            });
-        }
-
-        if (price === undefined || price === null || !Number.isFinite(Number(price)) || Number(price) < 0) {
-            return res.status(400).json({
-                success: false,
-                message: "A valid price is required"
-            });
-        }
-
+        // Name, price and description lengths are settled by the
+        // `content.product` schema before this handler runs. Left is the check
+        // only the database can answer: whether this business already sells
+        // something under that name.
         const [existing] = await db.query(
             "SELECT id FROM products WHERE business_id = ? AND name = ?",
-            [businessId, name.trim()]
+            [businessId, name]
         );
 
         if (existing.length > 0) {
             return res.status(409).json({
                 success: false,
-                message: "A product with this name already exists"
+                message: "You already have a product with this name",
+                errors: { name: "You already have a product with this name" }
             });
         }
 
@@ -278,26 +246,10 @@ const updateProduct = async (req, res) => {
 
         const { name, description, price, category_id, image, status } = req.body;
 
-        if (name !== undefined && (!name || !name.trim())) {
-            return res.status(400).json({
-                success: false,
-                message: "Product name cannot be empty"
-            });
-        }
-
-        if (price !== undefined && (!Number.isFinite(Number(price)) || Number(price) < 0)) {
-            return res.status(400).json({
-                success: false,
-                message: "Price cannot be negative"
-            });
-        }
-
-        if (status !== undefined && !["ACTIVE", "INACTIVE"].includes(status)) {
-            return res.status(400).json({
-                success: false,
-                message: "Status must be ACTIVE or INACTIVE"
-            });
-        }
+        // Name, price, status and lengths are settled by the
+        // `content.product` schema before this handler runs. The UNIQUE
+        // (business_id, name) constraint is checked by the database, and its
+        // duplicate-key error is turned into a field error by the controller.
 
         await db.query(
             `UPDATE products
@@ -422,40 +374,8 @@ const createAdvertisement = async (req, res) => {
 
         const { title, description, image, service_id, start_date, end_date } = req.body;
 
-        if (!title || !title.trim()) {
-            return res.status(400).json({
-                success: false,
-                message: "Advertisement title is required"
-            });
-        }
-
-        if (title.trim().length > 200) {
-            return res.status(400).json({
-                success: false,
-                message: "Title must be 200 characters or fewer"
-            });
-        }
-
-        if (!start_date) {
-            return res.status(400).json({
-                success: false,
-                message: "Start date is required"
-            });
-        }
-
-        if (!end_date) {
-            return res.status(400).json({
-                success: false,
-                message: "End date is required"
-            });
-        }
-
-        if (new Date(end_date) < new Date(start_date)) {
-            return res.status(400).json({
-                success: false,
-                message: "End date must be on or after the start date"
-            });
-        }
+        // Title, lengths and the date ordering are settled by the
+        // `content.advertisement` schema before this handler runs.
 
         const [result] = await db.query(
             `INSERT INTO advertisements
@@ -520,17 +440,17 @@ const updateAdvertisement = async (req, res) => {
 
         const { title, description, image, service_id, start_date, end_date, status } = req.body;
 
-        if (title !== undefined && (!title || !title.trim())) {
-            return res.status(400).json({
-                success: false,
-                message: "Title cannot be empty"
-            });
-        }
-
+        // Title, lengths and the date ordering are settled by the
+        // `content.advertisement` schema before this handler runs.
+        //
+        // The owner-side status restriction is a business rule rather than a
+        // data-shape one, so it stays here: an advertisement is approved by an
+        // admin, and letting the owner set ACTIVE would publish it unreviewed.
         if (status !== undefined && !["PENDING", "PAUSED"].includes(status)) {
-            return res.status(400).json({
+            return res.status(422).json({
                 success: false,
-                message: "Owners may only set status to PENDING or PAUSED"
+                message: "Owners may only set status to PENDING or PAUSED",
+                errors: { status: "You can only set this to PENDING or PAUSED" }
             });
         }
 
@@ -659,47 +579,8 @@ const createPromotion = async (req, res) => {
 
         const { title, description, discount, service_id, start_date, end_date } = req.body;
 
-        if (!title || !title.trim()) {
-            return res.status(400).json({
-                success: false,
-                message: "Promotion title is required"
-            });
-        }
-
-        if (title.trim().length > 200) {
-            return res.status(400).json({
-                success: false,
-                message: "Title must be 200 characters or fewer"
-            });
-        }
-
-        if (discount === undefined || discount === null || Number(discount) < 0 || Number(discount) > 100) {
-            return res.status(400).json({
-                success: false,
-                message: "Discount must be between 0 and 100"
-            });
-        }
-
-        if (!start_date) {
-            return res.status(400).json({
-                success: false,
-                message: "Start date is required"
-            });
-        }
-
-        if (!end_date) {
-            return res.status(400).json({
-                success: false,
-                message: "End date is required"
-            });
-        }
-
-        if (new Date(end_date) < new Date(start_date)) {
-            return res.status(400).json({
-                success: false,
-                message: "End date must be on or after the start date"
-            });
-        }
+        // Title, discount range, lengths and the date ordering are settled by
+        // the `content.promotion` schema before this handler runs.
 
         const [result] = await db.query(
             `INSERT INTO promotions
@@ -764,24 +645,11 @@ const updatePromotion = async (req, res) => {
 
         const { title, description, discount, service_id, start_date, end_date, status } = req.body;
 
-        if (title !== undefined && (!title || !title.trim())) {
-            return res.status(400).json({
-                success: false,
-                message: "Title cannot be empty"
-            });
-        }
-
-        if (discount !== undefined && (Number(discount) < 0 || Number(discount) > 100)) {
-            return res.status(400).json({
-                success: false,
-                message: "Discount must be between 0 and 100"
-            });
-        }
-
         if (status !== undefined && !["PENDING", "PAUSED"].includes(status)) {
-            return res.status(400).json({
+            return res.status(422).json({
                 success: false,
-                message: "Owners may only set status to PENDING or PAUSED"
+                message: "Owners may only set status to PENDING or PAUSED",
+                errors: { status: "You can only set this to PENDING or PAUSED" }
             });
         }
 

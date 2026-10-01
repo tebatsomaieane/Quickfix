@@ -3,6 +3,7 @@ const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const helmet = require("helmet");
 const morgan = require("morgan");
+const compression = require("compression");
 const crypto = require("crypto");
 const path = require("path");
 
@@ -38,23 +39,109 @@ app.set("trust proxy", 1);
 
 app.disable("x-powered-by");
 
-// Security headers (helmet replaces the manual headers below it)
-app.use(helmet({
-    crossOriginResourcePolicy: { policy: "cross-origin" },
-    contentSecurityPolicy: false
-}));
+// Origins the browser is allowed to load subresources from and talk to.
+// `API_ORIGIN` is the API's own public address (it serves user uploads from
+// /uploads, so media has to be allowed from it too). Both are env-driven so a
+// staging host does not silently fall back to production.
+const apiOrigin = (process.env.API_ORIGIN || "").replace(/\/+$/, "");
+const publicOrigin = (process.env.PUBLIC_ORIGIN || "").replace(/\/+$/, "");
 
-// Request logging (skip in test environments)
-if (process.env.NODE_ENV !== "test") {
-    app.use(morgan(process.env.LOG_FORMAT || "combined"));
+const mediaOrigins = [apiOrigin, publicOrigin].filter(Boolean);
+
+const cspDirectives = {
+    defaultSrc: ["'self'"],
+    baseUri: ["'self'"],
+    objectSrc: ["'none'"],
+    // The build ships no inline <script>, so this needs no escape hatch. This is
+    // the directive that actually stops an injected script from executing.
+    scriptSrc: ["'self'"],
+    // React writes `style="..."` for dynamic values (progress widths, carousel
+    // offsets), and index.html carries a small critical-CSS block, so inline
+    // styles have to be permitted. Scripts are what matter for XSS.
+    styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+    fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+    imgSrc: [
+        "'self'",
+        "data:",
+        "blob:",
+        "https://thumb.wikimedia.org",
+        ...mediaOrigins
+    ],
+    // User-uploaded photos and videos are served by the API.
+    mediaSrc: ["'self'", "blob:", ...mediaOrigins],
+    // API calls and SSE streams.
+    connectSrc: ["'self'", ...mediaOrigins],
+    manifestSrc: ["'self'"],
+    workerSrc: ["'self'", "blob:"],
+    formAction: ["'self'"],
+    // The app is never legitimately framed.
+    frameAncestors: ["'none'"]
+};
+
+// Plain HTTP is only upgraded in production; doing it in development would
+// break the local http://localhost setup.
+if (process.env.NODE_ENV === "production") {
+    cspDirectives.upgradeInsecureRequests = [];
 }
 
-// Attach a request id for correlating logs and error reports.
+// Security headers (helmet replaces the manual headers below it)
+app.use(
+    helmet({
+        crossOriginResourcePolicy: { policy: "cross-origin" },
+        contentSecurityPolicy: {
+            useDefaults: false,
+            directives: cspDirectives
+        }
+    })
+);
+
+// Attach a request id for correlating logs and error reports. This has to run
+// before the logger below so every line carries the same id the error responses
+// and the `X-Request-Id` header do -- which is the only way to trace one user's
+// reported problem back through the log.
 app.use((req, res, next) => {
     req.id = crypto.randomBytes(8).toString("hex");
     res.setHeader("X-Request-Id", req.id);
     next();
 });
+
+// Request logging (skip in test environments)
+if (process.env.NODE_ENV !== "test") {
+    app.use(
+        morgan(process.env.LOG_FORMAT || ":id :method :url :status :res[content-length] - :response-time ms")
+    );
+}
+
+// Response compression.
+//
+// Every JSON list this API returns is text and compresses to roughly a fifth of
+// its size, so this is the single biggest response-time win available for a
+// catalogue or messages list. It is placed after `helmet` and before the route
+// handlers so it can choose an encoding from the response's own `Content-Type`.
+//
+// `threshold` skips payloads too small to be worth compressing -- most single
+// object responses are under 1kB, and compressing those costs CPU and adds
+// latency for nothing. Images, video and already-compressed formats are left
+// alone by the default filter.
+app.use(
+    compression({
+        threshold: 1024,
+        // Client-side support is negotiated per request; gzip is the safe floor
+        // because every browser that can run this app offers it.
+        level: 6,
+        // Server-sent events must never be compressed. `text/event-stream` is
+        // technically "compressible", and compressing it buffers the whole
+        // response -- which would turn the live notification stream into one
+        // long delay followed by a burst, defeating the entire point of it.
+        filter(req, res) {
+            if (res.getHeader("Content-Type") === "text/event-stream") {
+                return false;
+            }
+
+            return compression.filter(req, res);
+        }
+    })
+);
 
 // Security headers
 app.use((req, res, next) => {

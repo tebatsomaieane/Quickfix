@@ -12,40 +12,9 @@ const request = async (req, res) => {
             document_url
         } = req.body;
 
-        if (!identity_information || !identity_information.trim()) {
-            return res.status(400).json({
-                success: false,
-                message: "Identity information is required"
-            });
-        }
-
-        if (!professional_information || !professional_information.trim()) {
-            return res.status(400).json({
-                success: false,
-                message: "Professional information is required"
-            });
-        }
-
-        if (!qualification_information || !qualification_information.trim()) {
-            return res.status(400).json({
-                success: false,
-                message: "Qualification information is required"
-            });
-        }
-
-        if (!document_url || !document_url.trim()) {
-            return res.status(400).json({
-                success: false,
-                message: "A supporting document link is required"
-            });
-        }
-
-        if (!document_url.trim().startsWith("http://") && !document_url.trim().startsWith("https://")) {
-            return res.status(400).json({
-                success: false,
-                message: "Document URL must be a valid HTTP/HTTPS link"
-            });
-        }
+        // Presence, lengths and the http(s)-only rule on the document link are
+        // all settled by the `content.verificationRequest` schema before this
+        // handler runs.
 
         const [profiles] = await db.query(
             "SELECT id, verification_status FROM provider_profiles WHERE user_id = ?",

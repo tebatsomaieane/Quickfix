@@ -308,16 +308,7 @@ const updateMe = async (req, res) => {
         if (description !== undefined) fields.description = String(description).trim();
         if (profile_image !== undefined) fields.profile_image = String(profile_image).trim() || null;
         if (experience_years !== undefined) {
-            const years = Number(experience_years);
-
-            if (!Number.isFinite(years) || years < 0 || !Number.isInteger(years)) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Experience years must be a non-negative whole number"
-                });
-            }
-
-            fields.experience_years = years;
+            fields.experience_years = Number(experience_years);
         }
         if (location !== undefined) fields.location = String(location).trim() || null;
         if (service_area !== undefined) fields.service_area = String(service_area).trim() || null;

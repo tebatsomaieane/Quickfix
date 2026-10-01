@@ -65,36 +65,10 @@ const create = async (req, res) => {
             valid_until
         } = req.body;
 
-        if (!request_id || price === undefined || price === null) {
-            return res.status(400).json({
-                success: false,
-                message: "Request id and price are required"
-            });
-        }
-
+        // Presence, price range, hours range and the expiry date are settled by
+        // the `content.createOffer` schema before this handler runs. What is
+        // left is everything the database has to be asked about.
         const priceNum = Number(price);
-
-        if (!Number.isFinite(priceNum) || priceNum <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: "Price must be a positive number"
-            });
-        }
-
-        if (
-            estimated_hours !== undefined &&
-            estimated_hours !== null &&
-            estimated_hours !== ""
-        ) {
-            const hours = Number(estimated_hours);
-
-            if (!Number.isFinite(hours) || hours <= 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Estimated time must be a positive number"
-                });
-            }
-        }
 
         // Request must be open to offers
         const [requests] = await db.query(

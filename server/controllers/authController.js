@@ -43,8 +43,6 @@ const safeEqual = (a, b) => {
 
 const otpExpiry = () => new Date(Date.now() + OTP_WINDOW_MINUTES * 60 * 1000);
 
-const isValidOtp = (pin) => /^\d{6}$/.test(String(pin).trim());
-
 // Whether sign-in is blocked until the account's email is verified.
 const emailVerificationRequired = () =>
     process.env.REQUIRE_EMAIL_VERIFICATION === "true";
@@ -99,84 +97,31 @@ const register = async (req, res) => {
             role
         } = req.body;
 
-        if (!first_name || !last_name || !email || !password || !role) {
-            return res.status(400).json({
-                success: false,
-                message: "Please provide all required fields"
-            });
-        }
-
-        const allowedRoles = [
-            "CUSTOMER",
-            "PROVIDER",
-            "BUSINESS_OWNER"
-        ];
-
-        if (!allowedRoles.includes(role)) {
-            return res.status(400).json({
-                success: false,
-                message: "Invalid role"
-            });
-        }
-
-        const firstName = first_name.trim();
-        const lastName = last_name.trim();
-        const emailValue = email.trim().toLowerCase();
-        const phoneValue = (phone || "").trim();
-
-        if (!firstName || !lastName || !phoneValue) {
-            return res.status(400).json({
-                success: false,
-                message: "First name, last name and phone number are required"
-            });
-        }
-
-        if (firstName.length > 100 || lastName.length > 100) {
-            return res.status(400).json({
-                success: false,
-                message: "Names must be 100 characters or fewer"
-            });
-        }
-
-        if (emailValue.length > 255) {
-            return res.status(400).json({
-                success: false,
-                message: "Email must be 255 characters or fewer"
-            });
-        }
-
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-        if (!emailRegex.test(emailValue)) {
-            return res.status(400).json({
-                success: false,
-                message: "Please provide a valid email address"
-            });
-        }
-
-        if (phoneValue.length > 30) {
-            return res.status(400).json({
-                success: false,
-                message: "Phone number must be 30 characters or fewer"
-            });
-        }
-
-        if (password.length < 6) {
-            return res.status(400).json({
-                success: false,
-                message: "Password must be at least 6 characters long"
-            });
-        }
+        // Shape and format are already settled by the `auth.register` schema in
+        // validators/schemas.js, which also lowercases and trims before the
+        // body reached this point. What is left is the one check a schema
+        // cannot make, because only the database knows: is this email taken?
+        const firstName = first_name;
+        const lastName = last_name;
+        const emailValue = email;
+        const phoneValue = phone;
 
         const [existingUsers] = await db.query(
-            "SELECT id FROM users WHERE LOWER(email) = ?",
+            // Plain equality, not `LOWER(email) = ?`. Wrapping the column in a
+            // function makes the predicate non-sargable, so MySQL full-scans
+            // `users` on every single sign-in. The column's collation is
+            // already case-insensitive, and the value is normalised to
+            // lowercase on the way in, so equality against the UNIQUE index is
+            // both correct and an index lookup.
+            "SELECT id FROM users WHERE email = ?",
             [emailValue]
         );
 
         if (existingUsers.length > 0) {
             return res.status(409).json({
                 success: false,
-                message: "Email is already registered"
+                message: "An account with that email address already exists",
+                errors: { email: "This email address is already registered" }
             });
         }
 
@@ -292,22 +237,19 @@ const login = async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        // 1. Validate input
-        if (!email || !password) {
-            return res.status(400).json({
-                success: false,
-                message: "Email and password are required"
-            });
-        }
-
-        // 2. Find user
+        // 1. Find user.
+        //
+        // Plain equality against the UNIQUE index rather than `LOWER(email) = ?`,
+        // which is non-sargable and full-scans the table on every sign-in. Safe
+        // because the `auth.login` schema lowercases the submitted address and
+        // registration stores it that way.
         const [users] = await db.query(
             `SELECT id, first_name, last_name, email, phone,
                     password, role, email_verified, is_active,
                     two_factor_enabled
              FROM users
-             WHERE LOWER(email) = ?`,
-            [email.trim().toLowerCase()]
+             WHERE email = ?`,
+            [email]
         );
 
         if (users.length === 0) {
@@ -319,7 +261,7 @@ const login = async (req, res) => {
 
         const user = users[0];
 
-        // 3. Check account status
+        // 2. Check account status
         if (!user.is_active) {
             return res.status(403).json({
                 success: false,
@@ -327,7 +269,7 @@ const login = async (req, res) => {
             });
         }
 
-        // 4. Compare password
+        // 3. Compare password
         const passwordMatch = await bcrypt.compare(
             password,
             user.password
@@ -340,7 +282,7 @@ const login = async (req, res) => {
             });
         }
 
-        // 5. Email verification gate (when enabled).
+        // 4. Email verification gate (when enabled).
         if (emailVerificationRequired() && !user.email_verified) {
             return res.status(403).json({
                 success: false,
@@ -349,7 +291,7 @@ const login = async (req, res) => {
             });
         }
 
-        // 6. Two-factor step: correct password is only the first factor.
+        // 5. Two-factor step: correct password is only the first factor.
         // A fresh 6-digit code is emailed and the session is created only
         // after /auth/verify-2fa confirms it.
         if (user.two_factor_enabled) {
@@ -377,7 +319,7 @@ const login = async (req, res) => {
             });
         }
 
-        // 7. Create JWT
+        // 6. Create JWT
         const token = jwt.sign(
             {
                 id: user.id,
@@ -390,10 +332,20 @@ const login = async (req, res) => {
             }
         );
 
-        // 8. Set the session token as an httpOnly cookie
+        // 7. Set the session token as an httpOnly cookie
         res.cookie("token", token, COOKIE_OPTIONS);
 
-        // 9. Return user + token
+        // 8. Return user + token
+        // The customer profile columns are joined in so a freshly logged-in
+        // customer lands on Settings with their photo and location already
+        // populated, rather than blank until a later refetch.
+        const [customerProfile] = await db.query(
+            `SELECT profile_image, location
+             FROM customer_profiles
+             WHERE user_id = ?`,
+            [user.id]
+        );
+
         res.json({
             success: true,
             message: "Login successful",
@@ -405,7 +357,9 @@ const login = async (req, res) => {
                 email: user.email,
                 phone: user.phone,
                 role: user.role,
-                email_verified: user.email_verified
+                email_verified: user.email_verified,
+                profile_image: customerProfile[0]?.profile_image || null,
+                location: customerProfile[0]?.location || null
             }
         });
 
@@ -461,28 +415,15 @@ const verifyEmail = async (req, res) => {
     try {
         const { email, pin } = req.body;
 
-        const emailValue = (email || "").trim().toLowerCase();
-
-        if (!emailValue || !pin) {
-            return res.status(400).json({
-                success: false,
-                message: "Email and verification PIN are required"
-            });
-        }
-
-        if (!isValidOtp(pin)) {
-            return res.status(400).json({
-                success: false,
-                message: "Verification PIN must be 6 digits"
-            });
-        }
+        // Already trimmed and lowercased by the `auth.verifyEmail` schema.
+        const emailValue = email;
 
         const [rows] = await db.query(
             `SELECT id, email_verified,
                     verification_code_hash, verification_code_expires,
                     verification_attempts
              FROM users
-             WHERE LOWER(email) = ?`,
+             WHERE email = ?`,
             [emailValue]
         );
 
@@ -563,14 +504,7 @@ const verifyEmail = async (req, res) => {
 // POST /api/auth/resend-verification  { email }
 const resendVerification = async (req, res) => {
     try {
-        const emailValue = (req.body.email || "").trim().toLowerCase();
-
-        if (!emailValue) {
-            return res.status(400).json({
-                success: false,
-                message: "Email is required"
-            });
-        }
+        const emailValue = req.body.email;
 
         const waitVerificationMs = consumeOtpResendCooldown(emailValue);
 
@@ -585,7 +519,7 @@ const resendVerification = async (req, res) => {
         const [rows] = await db.query(
             `SELECT id, first_name, email_verified
              FROM users
-             WHERE LOWER(email) = ?`,
+             WHERE email = ?`,
             [emailValue]
         );
 
@@ -636,21 +570,8 @@ const verifyTwoFactor = async (req, res) => {
     try {
         const { email, pin } = req.body;
 
-        const emailValue = (email || "").trim().toLowerCase();
-
-        if (!emailValue || !pin) {
-            return res.status(400).json({
-                success: false,
-                message: "Email and verification code are required"
-            });
-        }
-
-        if (!isValidOtp(pin)) {
-            return res.status(400).json({
-                success: false,
-                message: "Verification code must be 6 digits"
-            });
-        }
+        // Already trimmed and lowercased by the `auth.verifyTwoFactor` schema.
+        const emailValue = email;
 
         const [rows] = await db.query(
             `SELECT id, first_name, last_name, email, phone,
@@ -658,7 +579,7 @@ const verifyTwoFactor = async (req, res) => {
                     two_factor_enabled,
                     login_otp_hash, login_otp_expires, login_otp_attempts
              FROM users
-             WHERE LOWER(email) = ?`,
+             WHERE email = ?`,
             [emailValue]
         );
 
@@ -739,14 +660,7 @@ const verifyTwoFactor = async (req, res) => {
 // POST /api/auth/resend-otp  { email }
 const resendOtp = async (req, res) => {
     try {
-        const emailValue = (req.body.email || "").trim().toLowerCase();
-
-        if (!emailValue) {
-            return res.status(400).json({
-                success: false,
-                message: "Email is required"
-            });
-        }
+        const emailValue = req.body.email;
 
         const waitOtpMs = consumeOtpResendCooldown(emailValue);
 
@@ -761,7 +675,7 @@ const resendOtp = async (req, res) => {
         const [rows] = await db.query(
             `SELECT id, first_name, two_factor_enabled
              FROM users
-             WHERE LOWER(email) = ? AND is_active = TRUE`,
+             WHERE email = ? AND is_active = TRUE`,
             [emailValue]
         );
 
@@ -859,7 +773,24 @@ const session = async (req, res) => {
             return res.json({ success: false, user: null });
         }
 
-        res.json({ success: true, user: users[0] });
+        // Customer profile columns are not part of the `users` row, so the
+        // session has to read them separately. Without this the client had no
+        // way to show a customer's existing photo or location.
+        const [profiles] = await db.query(
+            `SELECT profile_image, location
+             FROM customer_profiles
+             WHERE user_id = ?`,
+            [decoded.id]
+        );
+
+        res.json({
+            success: true,
+            user: {
+                ...users[0],
+                profile_image: profiles[0]?.profile_image || null,
+                location: profiles[0]?.location || null
+            }
+        });
     } catch (error) {
         console.error("Error checking session:", error);
 
@@ -942,24 +873,9 @@ const updateProfile = async (req, res) => {
         }
 
         if (Object.keys(updates).length === 0 && profile_image === undefined && location === undefined) {
-            return res.status(400).json({
+            return res.status(422).json({
                 success: false,
-                message: "Nothing to update"
-            });
-        }
-
-        if (updates.first_name && updates.first_name.length > 100 ||
-            updates.last_name && updates.last_name.length > 100) {
-            return res.status(400).json({
-                success: false,
-                message: "Names must be 100 characters or fewer"
-            });
-        }
-
-        if (updates.phone && updates.phone.length > 30) {
-            return res.status(400).json({
-                success: false,
-                message: "Phone number must be 30 characters or fewer"
+                message: "Nothing to update. Please change at least one field."
             });
         }
 
@@ -989,12 +905,19 @@ const updateProfile = async (req, res) => {
 
         if (req.user.role === "CUSTOMER" &&
             (profile_image !== undefined || location !== undefined)) {
+            // Previously both columns used COALESCE(?, col), which meant an
+            // empty string resolved to NULL and the existing value was kept.
+            // That made it impossible for a customer to clear a photo or a
+            // location: the UI reported success and the change silently
+            // did nothing. A NULL here now means "clear this field".
             await db.query(
                 `UPDATE customer_profiles
-                 SET profile_image = COALESCE(?, profile_image),
-                     location = COALESCE(?, location)
+                 SET profile_image = ?,
+                     location = ?
                  WHERE user_id = ?`,
-                [profile_image?.trim() || null, location?.trim() || null, req.user.id]
+                [profile_image === undefined ? undefined : profile_image?.trim() || null,
+                 location === undefined ? undefined : location?.trim() || null,
+                 req.user.id]
             );
         }
 
@@ -1005,10 +928,24 @@ const updateProfile = async (req, res) => {
             [req.user.id]
         );
 
+        // The session and profile-update responses previously omitted the
+        // customer-only columns, so the Settings form always rendered blank
+        // photo/location inputs and silently discarded them on save.
+        const [profiles] = await db.query(
+            `SELECT profile_image, location
+             FROM customer_profiles
+             WHERE user_id = ?`,
+            [req.user.id]
+        );
+
         return res.json({
             success: true,
             message: "Profile updated successfully",
-            user: users[0]
+            user: {
+                ...users[0],
+                profile_image: profiles[0]?.profile_image || null,
+                location: profiles[0]?.location || null
+            }
         });
     } catch (error) {
         console.error("Profile update error:", error);
@@ -1037,27 +974,10 @@ const changePassword = async (req, res) => {
     try {
         const { current_password, new_password } = req.body;
 
-        if (!current_password || !new_password) {
-            return res.status(400).json({
-                success: false,
-                message: "Current and new password are required"
-            });
-        }
-
-        if (new_password.length < 6) {
-            return res.status(400).json({
-                success: false,
-                message: "New password must be at least 6 characters long"
-            });
-        }
-
-        if (current_password === new_password) {
-            return res.status(400).json({
-                success: false,
-                message: "New password must be different from the current one"
-            });
-        }
-
+        // Presence and strength are settled by the `auth.changePassword`
+        // schema. Left here are the two checks it cannot make: that the
+        // submitted current password is the real one, and that the new password
+        // is not simply the old one back again.
         const [users] = await db.query(
             "SELECT id, password FROM users WHERE id = ?",
             [req.user.id]
@@ -1109,18 +1029,13 @@ const requestPasswordReset = async (req, res) => {
     try {
         const { email } = req.body;
 
-        if (!email || !email.trim()) {
-            return res.status(400).json({
-                success: false,
-                message: "Email is required"
-            });
-        }
-
-        const normalizedEmail = email.trim().toLowerCase();
-
         const [users] = await db.query(
-            "SELECT id FROM users WHERE LOWER(email) = LOWER(?) AND is_active = TRUE",
-            [normalizedEmail]
+            // Index lookup rather than a `LOWER(email) = LOWER(?)` scan: the
+            // schema lowercases the submitted address and the column is stored
+            // that way, so equality against the UNIQUE index is both correct
+            // and fast.
+            "SELECT id, email FROM users WHERE email = ? AND is_active = TRUE",
+            [email]
         );
 
         // Never reveal whether the account exists.
@@ -1170,20 +1085,11 @@ const resetPassword = async (req, res) => {
     try {
         const { token, email, new_password } = req.body;
 
-        if (!token || !email || !new_password) {
-            return res.status(400).json({
-                success: false,
-                message: "Token, email and new password are required"
-            });
-        }
-
-        if (new_password.length < 6) {
-            return res.status(400).json({
-                success: false,
-                message: "New password must be at least 6 characters long"
-            });
-        }
-
+        // Presence, token shape, email format and password strength are all
+        // settled by the `auth.resetPassword` schema.
+        //
+        // The emailed token is the secret itself; only its digest is stored, so
+        // a leaked database row cannot be replayed as a reset link.
         const tokenHash = crypto
             .createHash("sha256")
             .update(token)
@@ -1202,14 +1108,17 @@ const resetPassword = async (req, res) => {
         if (rows.length === 0) {
             return res.status(400).json({
                 success: false,
-                message: "Invalid or expired reset token"
+                message: "This reset link is invalid or has expired. Please request a new one."
             });
         }
 
-        if (rows[0].email !== email.trim().toLowerCase()) {
+        // The token is the secret; the email is only there to stop a link
+        // forwarded to the wrong inbox from being usable. Both failures are
+        // reported identically so neither reveals whether the token existed.
+        if (rows[0].email !== email) {
             return res.status(400).json({
                 success: false,
-                message: "Invalid or expired reset token"
+                message: "This reset link is invalid or has expired. Please request a new one."
             });
         }
 
