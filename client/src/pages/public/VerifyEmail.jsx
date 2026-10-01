@@ -49,7 +49,15 @@ function VerifyEmail() {
     } = useActionFeedback({ schema: SCHEMA, initialValues });
 
     const [verified, setVerified] = useState(false);
-    const [resendNotice, setResendNotice] = useState("");
+
+    // Seeded from the URL so a user who registered while email was down is told
+    // up front why there is no PIN in their inbox, instead of concluding their
+    // address is wrong.
+    const [resendNotice, setResendNotice] = useState(() =>
+        params.get("delivery") === "unavailable"
+            ? "We could not email your PIN just now. Use 'Resend PIN' below in a few minutes."
+            : ""
+    );
 
     // Kept digits-only and capped at six, so the field cannot hold something the
     // server would only reject. `maxLength` would not stop a pasted "12 34 56".

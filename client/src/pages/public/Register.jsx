@@ -161,6 +161,26 @@ function Register() {
                         payload.email.trim()
                     )}`
                 );
+            } else if (
+                data.code === "EMAIL_DELIVERY_UNAVAILABLE" &&
+                data.user
+            ) {
+                // The account exists; only the PIN did not go out. Sent to the
+                // verification page rather than left here, because that is
+                // where Resend PIN lives. Registering again would fail on a
+                // duplicate email.
+                setSuccess(
+                    "Account created, but we could not email your PIN. Use 'Resend PIN' on the next page in a few minutes."
+                );
+                reset(INITIAL_VALUES);
+
+                await new Promise((resolve) => setTimeout(resolve, 1500));
+
+                navigate(
+                    `/verify-email?email=${encodeURIComponent(
+                        payload.email.trim()
+                    )}&delivery=unavailable`
+                );
             } else {
                 applyServerError({ data });
             }

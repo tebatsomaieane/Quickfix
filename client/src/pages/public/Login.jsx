@@ -105,10 +105,19 @@ function Login() {
         } catch (requestError) {
             const serverError = requestError.response?.data;
 
-            // A rejected address is worth flagging on the field itself; a
-            // rejected password stays a banner so we do not imply the user
-            // mistyped something they cannot see.
-            if (serverError?.message?.toLowerCase().includes("email")) {
+            // Delivery being down says nothing about the address the user
+            // typed, so it is never blamed on the email field. Checked first
+            // because the message does mention email, which would otherwise
+            // light up an input the user got exactly right.
+            if (serverError?.code === "EMAIL_DELIVERY_UNAVAILABLE") {
+                setError(
+                    serverError.message ||
+                        "We could not email you a login code. Please try again in a few minutes."
+                );
+            } else if (serverError?.message?.toLowerCase().includes("email")) {
+                // A rejected address is worth flagging on the field itself; a
+                // rejected password stays a banner so we do not imply the user
+                // mistyped something they cannot see.
                 applyServerError(requestError);
             } else {
                 setError(
