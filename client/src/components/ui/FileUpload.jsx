@@ -83,25 +83,36 @@ const compressImage = (file) =>
 //   kind     - "image" | "video"
 //   label    - optional field label
 //   hint     - optional helper text below the control
+//   error    - optional validation message, e.g. from a form schema
+//   name     - field name, used to make the control focusable by `focusField`
+//   required - marks the field required in the accessibility tree
 function FileUpload({
     value,
     onChange,
     kind = "image",
     label,
     hint,
+    error: externalError,
+    name,
+    required,
     className = ""
 }) {
     const inputRef = useRef(null);
     const [uploading, setUploading] = useState(false);
     const [progress, setProgress] = useState(0);
-    const [error, setError] = useState("");
+    const [uploadError, setUploadError] = useState("");
+
+    // Upload failures and schema validation are both problems with this field,
+    // so they share one slot. Schema errors take precedence because they are
+    // the ones the user can fix by editing the form.
+    const error = externalError || uploadError;
 
     const accept = kind === "video" ? "video/*" : "image/*";
 
     const handleFile = async (file) => {
         if (!file) return;
 
-        setError("");
+        setUploadError("");
         setProgress(0);
         setUploading(true);
 
@@ -112,7 +123,7 @@ function FileUpload({
             const record = await uploadMedia(payload, setProgress);
             onChange(record.url);
         } catch (err) {
-            setError(
+            setUploadError(
                 err.response?.data?.message ||
                     "Upload failed. Please try again."
             );
@@ -121,12 +132,28 @@ function FileUpload({
         }
     };
 
+    const openPicker = () => {
+        setUploadError("");
+        inputRef.current?.click();
+    };
+
     return (
         <div className={className}>
             {label && (
-                <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                <label
+                    htmlFor={name ? `${name}-upload` : undefined}
+                    className="mb-1.5 block text-sm font-medium text-slate-700"
+                >
                     {label}
-                </span>
+                    {required && (
+                        <span
+                            className="ml-0.5 text-rose-500"
+                            aria-hidden="true"
+                        >
+                            *
+                        </span>
+                    )}
+                </label>
             )}
 
             {uploading ? (
@@ -163,7 +190,7 @@ function FileUpload({
                         <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => inputRef.current?.click()}
+                            onClick={openPicker}
                             className="bg-white"
                         >
                             <Icon name="image" className="h-4 w-4" />
@@ -173,7 +200,7 @@ function FileUpload({
                             variant="danger"
                             size="sm"
                             onClick={() => {
-                                setError("");
+                                setUploadError("");
                                 onChange("");
                             }}
                         >
@@ -185,8 +212,12 @@ function FileUpload({
             ) : (
                 <button
                     type="button"
-                    onClick={() => inputRef.current?.click()}
-                    className="flex h-44 w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 text-slate-500 transition hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-600"
+                    onClick={openPicker}
+                    className={`flex h-44 w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed bg-slate-50 text-slate-500 transition focus:outline-none focus:ring-4 focus:ring-indigo-100 ${
+                        error
+                            ? "border-red-400 hover:border-red-500"
+                            : "border-slate-300 hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-600"
+                    }`}
                 >
                     <Icon
                         name={kind === "video" ? "monitor" : "image"}
@@ -207,6 +238,11 @@ function FileUpload({
 
             <input
                 ref={inputRef}
+                // The id is derived from the field name so a form's
+                // `focusField` helper can move focus to the picker, the same
+                // way it targets a text input.
+                id={name ? `${name}-upload` : undefined}
+                name={name}
                 type="file"
                 accept={accept}
                 className="hidden"
@@ -216,9 +252,17 @@ function FileUpload({
                 }}
             />
 
-            {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
-            {!error && hint && (
-                <p className="mt-1 text-sm text-slate-500">{hint}</p>
+            {error ? (
+                <p
+                    role="alert"
+                    className="mt-1 text-sm font-medium text-red-600"
+                >
+                    {error}
+                </p>
+            ) : (
+                hint && (
+                    <p className="mt-1 text-sm text-slate-500">{hint}</p>
+                )
             )}
         </div>
     );

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
     fetchMyAdvertisements,
     createAdvertisement,
@@ -13,37 +13,95 @@ import Textarea from "../../components/ui/Textarea";
 import Spinner from "../../components/ui/Spinner";
 import EmptyState from "../../components/ui/EmptyState";
 import SmartImage from "../../components/ui/SmartImage";
+import useActionFeedback from "../../hooks/useActionFeedback";
+import { rules } from "../../lib/validation";
 import { formatDate } from "../../lib/format";
+
+const EMPTY_FORM = {
+    title: "",
+    description: "",
+    start_date: "",
+    end_date: "",
+    image: ""
+};
+
+/**
+ * Mirrors `content.advertisement` on the server.
+ *
+ * The date range is the rule that matters: an advertisement whose end date
+ * precedes its start is stored happily by MySQL and then simply never runs.
+ * `afterOrEqual` compares the two as plain calendar strings, which is exact for
+ * `YYYY-MM-DD` and immune to timezone shifting a day.
+ */
+const SCHEMA = {
+    title: [
+        rules.required("Title"),
+        rules.minLength(3, "Title must be at least 3 characters"),
+        rules.maxLength(200, "Title must be 200 characters or fewer")
+    ],
+    description: [
+        rules.maxLength(5000, "Description must be 5000 characters or fewer")
+    ],
+    image: [rules.maxLength(500, "Image URL is too long")],
+    start_date: [rules.required("Start date")],
+    end_date: [
+        rules.required("End date"),
+        rules.afterOrEqual("start_date", "End date")
+    ]
+};
 
 function Advertisements() {
     const [ads, setAds] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [editId, setEditId] = useState(null);
-    const [form, setForm] = useState({ title: "", description: "", start_date: "", end_date: "", image: "" });
-    const [formError, setFormError] = useState("");
-    const [submitting, setSubmitting] = useState(false);
     const [deleting, setDeleting] = useState(null);
 
-    const load = () => {
+    const {
+        values: form,
+        fieldErrors,
+        formError,
+        announcement,
+        pending: submitting,
+        handleChange,
+        handleBlur,
+        validateAll,
+        reset,
+        run
+    } = useActionFeedback({ schema: SCHEMA, initialValues: EMPTY_FORM });
+
+    const { run: runDelete } = useActionFeedback();
+
+    const load = useCallback(() => {
         setLoading(true);
         fetchMyAdvertisements()
             .then((data) => setAds(data.data))
             .catch(() => {})
             .finally(() => setLoading(false));
-    };
+    }, []);
 
-    useEffect(() => { load(); }, []);
+    useEffect(() => { load(); }, [load]);
 
-    const resetForm = () => {
-        setForm({ title: "", description: "", start_date: "", end_date: "", image: "" });
+    const closeForm = () => {
+        reset(EMPTY_FORM);
         setEditId(null);
         setShowForm(false);
-        setFormError("");
+    };
+
+    const toggleForm = () => {
+        if (showForm) {
+            closeForm();
+
+            return;
+        }
+
+        reset(EMPTY_FORM);
+        setEditId(null);
+        setShowForm(true);
     };
 
     const handleEdit = (ad) => {
-        setForm({
+        reset({
             title: ad.title,
             description: ad.description || "",
             start_date: ad.start_date?.slice(0, 10) || "",
@@ -52,46 +110,55 @@ function Advertisements() {
         });
         setEditId(ad.id);
         setShowForm(true);
-        setFormError("");
     };
-
-    const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setFormError("");
 
-        if (!form.title.trim()) { setFormError("Title is required."); return; }
-        if (!form.start_date) { setFormError("Start date is required."); return; }
-        if (!form.end_date) { setFormError("End date is required."); return; }
+        if (!validateAll(form)) {
+            return;
+        }
 
-        setSubmitting(true);
-        try {
-            const payload = {
-                title: form.title.trim(),
-                description: form.description.trim() || null,
-                image: form.image.trim() || null,
-                start_date: form.start_date,
-                end_date: form.end_date
-            };
+        const payload = {
+            title: form.title.trim(),
+            description: form.description.trim() || null,
+            image: form.image.trim() || null,
+            start_date: form.start_date,
+            end_date: form.end_date
+        };
 
-            if (editId) {
-                await updateAdvertisement(editId, payload);
-            } else {
-                await createAdvertisement(payload);
+        const { ok } = await run(
+            () =>
+                editId
+                    ? updateAdvertisement(editId, payload)
+                    : createAdvertisement(payload),
+            {
+                success: editId
+                    ? "Advertisement updated."
+                    : "Advertisement created.",
+                retry: true
             }
-            resetForm();
+        );
+
+        if (ok) {
+            closeForm();
             load();
-        } catch (err) {
-            setFormError(err.response?.data?.message || "Action failed.");
-        } finally {
-            setSubmitting(false);
         }
     };
 
     const handleDelete = async (id) => {
         setDeleting(id);
-        try { await deleteAdvertisement(id); load(); } catch {} finally { setDeleting(null); }
+
+        const { ok } = await runDelete(() => deleteAdvertisement(id), {
+            success: "Advertisement deleted.",
+            retry: true
+        });
+
+        if (ok) {
+            load();
+        }
+
+        setDeleting(null);
     };
 
     return (
@@ -101,7 +168,7 @@ function Advertisements() {
                     <h1 className="text-2xl font-bold text-slate-900">Advertisements</h1>
                     <p className="mt-1 text-sm text-slate-500">Schedule advertisements to promote your business.</p>
                 </div>
-                <Button onClick={() => { resetForm(); setShowForm((v) => !v); }}>
+                <Button onClick={toggleForm}>
                     {showForm ? "Close" : "+ New advertisement"}
                 </Button>
             </div>
@@ -109,22 +176,82 @@ function Advertisements() {
             {showForm && (
                 <Card className="mb-6 max-w-2xl p-6">
                     <h2 className="font-semibold text-slate-900">{editId ? "Edit advertisement" : "New advertisement"}</h2>
-                    {formError && <div className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</div>}
-                    <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-                        <Input label="Title" id="title" name="title" value={form.title} onChange={handleChange} required />
-                        <div>
-                            <label htmlFor="description" className="mb-1.5 block text-sm font-medium text-slate-700">Description</label>
-                            <Textarea id="description" name="description" rows="3" value={form.description} onChange={handleChange} />
-                        </div>
-                        <Input label="Image URL (optional)" id="image" name="image" type="url" value={form.image} onChange={handleChange} placeholder="https://..." />
+                    {formError && <div role="alert" className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</div>}
+                    <form onSubmit={handleSubmit} noValidate className="mt-5 space-y-4">
+                        <Input
+                            label="Title"
+                            id="title"
+                            name="title"
+                            value={form.title}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            maxLength={200}
+                            error={fieldErrors.title}
+                            required
+                        />
+
+                        <Textarea
+                            label="Description"
+                            id="description"
+                            name="description"
+                            rows="3"
+                            value={form.description}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            maxLength={5000}
+                            error={fieldErrors.description}
+                        />
+
+                        <Input
+                            label="Image URL (optional)"
+                            id="image"
+                            name="image"
+                            type="url"
+                            value={form.image}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            maxLength={500}
+                            error={fieldErrors.image}
+                            placeholder="https://..."
+                        />
+
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <Input label="Start date" id="start_date" name="start_date" type="date" value={form.start_date} onChange={handleChange} required />
-                            <Input label="End date" id="end_date" name="end_date" type="date" value={form.end_date} onChange={handleChange} required />
+                            <Input
+                                label="Start date"
+                                id="start_date"
+                                name="start_date"
+                                type="date"
+                                value={form.start_date}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                error={fieldErrors.start_date}
+                                required
+                            />
+                            <Input
+                                label="End date"
+                                id="end_date"
+                                name="end_date"
+                                type="date"
+                                value={form.end_date}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                // A date picker only allows a past date once a
+                                // start has been chosen, so the range cannot be
+                                // built backwards by accident.
+                                min={form.start_date || undefined}
+                                error={fieldErrors.end_date}
+                                required
+                            />
                         </div>
+
                         <div className="flex gap-3">
                             <Button type="submit" loading={submitting}>{editId ? "Update" : "Create"}</Button>
-                            <Button variant="secondary" type="button" onClick={resetForm}>Cancel</Button>
+                            <Button variant="secondary" type="button" onClick={closeForm}>Cancel</Button>
                         </div>
+
+                        <p aria-live="polite" className="sr-only">
+                            {announcement}
+                        </p>
                     </form>
                 </Card>
             )}
@@ -136,7 +263,7 @@ function Advertisements() {
             ) : (
                 <>
                     <Card className="hidden overflow-hidden md:block">
-                        <div className="overflow-x-auto">
+                        <div className="qf-scroll-x overflow-x-auto">
                             <table className="w-full text-left text-sm">
                                 <thead className="border-b bg-slate-50 text-xs font-semibold tracking-wide text-slate-500">
                                     <tr>

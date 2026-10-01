@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { fetchMyNotifications } from "../services/notificationService";
@@ -14,6 +14,8 @@ import ProviderSidebar from "../components/sidebars/ProviderSidebar";
 import GenericSidebar from "../components/sidebars/GenericSidebar";
 import MobileTabBar from "../components/sidebars/MobileTabBar";
 import ScrollProgress from "../components/motion/ScrollProgress";
+import ScrollToTop from "../components/motion/ScrollToTop";
+import useScrollLock from "../hooks/useScrollLock";
 import { useToast } from "../components/ui/ToastProvider";
 import { onEvent } from "../services/realtimeService";
 
@@ -27,17 +29,16 @@ const SIDEBARS = {
 const ROLE_TAB_ORDER = {
     CUSTOMER: [
         "/customer/dashboard",
-        "/customer/requests/new",
         "/customer/requests",
+        "/customer/requests/new",
         "/customer/jobs",
-        "/customer/messages"
+        "/customer/services"
     ],
     PROVIDER: [
         "/provider/dashboard",
         "/provider/requests",
         "/provider/jobs",
-        "/provider/offers",
-        "/provider/messages"
+        "/provider/offers"
     ],
     BUSINESS_OWNER: [
         "/business/dashboard",
@@ -67,6 +68,9 @@ function DashboardLayout({ navItems }) {
     const [unread, setUnread] = useState(0);
     const [profile, setProfile] = useState(null);
     const [drawerOpen, setDrawerOpen] = useState(false);
+    const [condensed, setCondensed] = useState(false);
+
+    useScrollLock(drawerOpen);
 
     const matched = navItems.find(
         (item) =>
@@ -147,45 +151,87 @@ function DashboardLayout({ navItems }) {
 
     useEffect(() => {
         setDrawerOpen(false);
+        setCondensed(false);
     }, [location.pathname]);
+
+    // Elevates the app bar once content slides underneath it, so the bar reads
+    // as a distinct layer rather than bleeding into the page.
+    useEffect(() => {
+        const onScroll = () => setCondensed(window.scrollY > 6);
+
+        onScroll();
+        window.addEventListener("scroll", onScroll, { passive: true });
+
+        return () => window.removeEventListener("scroll", onScroll);
+    }, []);
+
+    useEffect(() => {
+        if (!drawerOpen) {
+            return undefined;
+        }
+
+        const onKeyDown = (event) => {
+            if (event.key === "Escape") {
+                setDrawerOpen(false);
+            }
+        };
+
+        document.addEventListener("keydown", onKeyDown);
+
+        return () => document.removeEventListener("keydown", onKeyDown);
+    }, [drawerOpen]);
+
+    const closeDrawer = useCallback(() => setDrawerOpen(false), []);
 
     const handleLogout = async () => {
         await logout();
         window.location.href = "/login";
     };
 
-    const sidebarProps = useMemo(
-        () => ({ navItems, onNavigate: () => setDrawerOpen(false) }),
-        [navItems]
+    // The sidebars render a close button whenever `onClose` is supplied, so the
+    // desktop instance must not receive it or a stray "X" shows on wide screens.
+    const desktopSidebar = useMemo(
+        () => ({ navItems, onNavigate: closeDrawer }),
+        [navItems, closeDrawer]
+    );
+
+    const drawerSidebar = useMemo(
+        () => ({ navItems, onNavigate: closeDrawer, onClose: closeDrawer }),
+        [navItems, closeDrawer]
+    );
+
+    const providerSidebar = (props) => (
+        <ProviderSidebar profile={profile} {...props} />
     );
 
     const notificationButton = notificationsPath ? (
         <Link
             to={notificationsPath}
-            className="relative flex items-center rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-indigo-600"
+            className="qf-tap-sm relative flex items-center rounded-xl p-2.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-indigo-600"
             title="Notifications"
+            aria-label={
+                unread > 0 ? `Notifications, ${unread} unread` : "Notifications"
+            }
         >
             <Icon name="bell" className="h-5 w-5" />
             {unread > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 animate-badge-pop items-center justify-center rounded-full bg-gradient-to-br from-rose-500 to-pink-600 px-1 text-[10px] font-bold text-white shadow-sm ring-2 ring-white">
-                    {unread}
+                <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 animate-badge-pop items-center justify-center rounded-full bg-gradient-to-br from-rose-500 to-pink-600 px-1 text-[10px] font-bold leading-none text-white shadow-sm ring-2 ring-white">
+                    {unread > 9 ? "9+" : unread}
                 </span>
             )}
         </Link>
     ) : null;
 
     return (
-        <div className="qf-page-glow flex min-h-screen">
+        <div className="qf-page-glow flex min-h-dvh">
+            <ScrollToTop />
+
             {/* Desktop sidebar */}
             <aside className="fixed inset-y-0 left-0 z-30 hidden md:block">
                 {role === "PROVIDER" ? (
-                    <ProviderSidebar
-                        navItems={navItems}
-                        profile={profile}
-                        onNavigate={() => setDrawerOpen(false)}
-                    />
+                    providerSidebar(desktopSidebar)
                 ) : (
-                    <Sidebar {...sidebarProps} />
+                    <Sidebar {...desktopSidebar} />
                 )}
             </aside>
 
@@ -193,19 +239,20 @@ function DashboardLayout({ navItems }) {
             {drawerOpen && (
                 <div className="fixed inset-0 z-50 md:hidden">
                     <div
-                        className="qf-fade-in-fast absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-                        onClick={() => setDrawerOpen(false)}
+                        className="qf-fade-in-fast qf-overlay-block absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+                        onClick={closeDrawer}
                         aria-hidden="true"
                     />
-                    <div className="qf-drawer-in absolute inset-y-0 left-0 shadow-2xl">
+                    <div
+                        className="qf-drawer-in absolute inset-y-0 left-0 h-[100dvh] max-h-[100dvh] w-64 max-w-[85vw] overflow-hidden shadow-2xl"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Navigation"
+                    >
                         {role === "PROVIDER" ? (
-                            <ProviderSidebar
-                                navItems={navItems}
-                                profile={profile}
-                                onNavigate={() => setDrawerOpen(false)}
-                            />
+                            providerSidebar(drawerSidebar)
                         ) : (
-                            <Sidebar {...sidebarProps} />
+                            <Sidebar {...drawerSidebar} />
                         )}
                     </div>
                 </div>
@@ -213,64 +260,88 @@ function DashboardLayout({ navItems }) {
 
             {/* Main column */}
             <div className="flex min-w-0 flex-1 flex-col md:pl-64">
-                {/* Topbar */}
-                <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-slate-200 bg-white/80 px-4 backdrop-blur-xl sm:px-6">
-                    <ScrollProgress />
-                    <div className="flex items-center gap-2">
+                {/* App bar */}
+                <header
+                    className={[
+                        "sticky top-0 z-20 border-b bg-white/85 backdrop-blur-xl",
+                        "transition-[box-shadow,border-color] duration-300",
+                        condensed
+                            ? "border-slate-200 shadow-[0_4px_20px_rgba(15,23,42,0.07)]"
+                            : "border-transparent"
+                    ].join(" ")}
+                >
+                    <div
+                        className="flex min-h-[var(--qf-appbar-h)] items-center gap-1.5 px-2.5 pt-safe sm:px-6"
+                    >
                         <button
                             type="button"
                             onClick={() => setDrawerOpen(true)}
-                            className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 md:hidden"
+                            className="qf-tap-sm -ml-1 shrink-0 rounded-xl p-2.5 text-slate-600 transition-colors hover:bg-slate-100 md:hidden"
                             aria-label="Open menu"
                         >
-                            <Icon name="menu" className="h-5 w-5" />
+                            <Icon name="menu" className="h-[22px] w-[22px]" />
                         </button>
 
-                        <div className="hidden items-center text-sm text-slate-500 md:flex">
+                        {/* Mobile: current screen, so the user is never lost */}
+                        <h1 className="qf-title-in min-w-0 flex-1 truncate text-[17px] font-bold tracking-tight text-slate-900 md:hidden">
+                            {currentLabel || ROLE_LABEL[role]}
+                        </h1>
+
+                        {/* Desktop breadcrumb */}
+                        <div className="hidden min-w-0 items-center text-sm text-slate-500 md:flex">
                             <Link
                                 to={dashboardPath}
-                                className="inline-flex items-center gap-1.5 font-medium text-slate-500 transition hover:text-indigo-600"
+                                className="inline-flex shrink-0 items-center gap-1.5 font-medium text-slate-500 transition hover:text-indigo-600"
                             >
                                 <Icon name="home" className="h-4 w-4" />
                                 {ROLE_LABEL[role]} home
                             </Link>
                             <Icon
                                 name="chevronRight"
-                                className="mx-2 h-4 w-4 text-slate-300"
+                                className="mx-2 h-4 w-4 shrink-0 text-slate-300"
                             />
-                            <span className="font-semibold text-slate-800">
+                            <span className="truncate font-semibold text-slate-800">
                                 {currentLabel}
                             </span>
                         </div>
+
+                        <div className="ml-auto flex shrink-0 items-center gap-0.5">
+                            {notificationButton}
+
+                            <button
+                                type="button"
+                                onClick={handleLogout}
+                                className="qf-tap-sm hidden items-center rounded-xl p-2.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-rose-600 md:inline-flex"
+                                title="Log out"
+                                aria-label="Log out"
+                            >
+                                <Icon name="logout" className="h-5 w-5" />
+                            </button>
+
+                            <Link
+                                to={dashboardPath}
+                                aria-label="Go to dashboard"
+                                className="qf-tap-smooth flex items-center gap-2 rounded-full border border-slate-200 py-1 pl-1 pr-3 transition-colors hover:border-indigo-300 hover:bg-indigo-50 md:hidden"
+                            >
+                                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-xs font-bold text-white">
+                                    {(user?.first_name || "?")[0]}
+                                </span>
+                                <span className="max-w-[7rem] truncate text-xs font-semibold text-slate-700">
+                                    {user?.first_name}
+                                </span>
+                            </Link>
+                        </div>
                     </div>
 
-                    <div className="flex items-center gap-1">
-                        {notificationButton}
-                        <button
-                            type="button"
-                            onClick={handleLogout}
-                            className="hidden rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-rose-600 md:inline-flex"
-                            title="Log out"
-                        >
-                            <Icon name="logout" className="h-5 w-5" />
-                        </button>
-                        <Link
-                            to={dashboardPath}
-                            className="flex items-center gap-2 rounded-full border border-slate-200 py-1 pl-1 pr-3 transition hover:border-indigo-300 hover:bg-indigo-50 md:hidden"
-                        >
-                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-xs font-bold text-white">
-                                {(user?.first_name || "?")[0]}
-                            </span>
-                            <span className="text-xs font-medium text-slate-700">
-                                {user?.first_name}
-                            </span>
-                        </Link>
-                    </div>
+                    <ScrollProgress />
                 </header>
 
                 {/* Content */}
-                <main className="flex-1 p-4 pb-28 sm:p-6 lg:p-8 md:pb-6">
-                    <div key={location.pathname} className="qf-fade-in mx-auto max-w-6xl">
+                <main className="qf-tabbar-space flex-1 px-3.5 pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pt-8">
+                    <div
+                        key={location.pathname}
+                        className="qf-fade-in mx-auto w-full max-w-6xl"
+                    >
                         <Outlet />
                     </div>
                 </main>

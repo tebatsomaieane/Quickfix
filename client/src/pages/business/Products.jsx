@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
     fetchMyProducts,
     createProduct,
@@ -14,90 +14,163 @@ import Spinner from "../../components/ui/Spinner";
 import EmptyState from "../../components/ui/EmptyState";
 import SmartImage from "../../components/ui/SmartImage";
 import FileUpload from "../../components/ui/FileUpload";
+import useActionFeedback from "../../hooks/useActionFeedback";
+import { rules } from "../../lib/validation";
 import { formatCurrency, formatDate } from "../../lib/format";
 import { getProductImage } from "../../lib/visuals";
+
+const EMPTY_FORM = {
+    name: "",
+    description: "",
+    price: "",
+    category_id: "",
+    image: ""
+};
+
+/**
+ * Mirrors `content.product` on the server.
+ *
+ * Price accepts zero deliberately: a "free" or "enquire" listing is a real
+ * choice, and the server permits it. What is rejected is a blank or
+ * non-numeric price, which would otherwise reach a DECIMAL column as NaN.
+ */
+const SCHEMA = {
+    name: [
+        rules.required("Product name"),
+        rules.minLength(2, "Product name must be at least 2 characters"),
+        rules.maxLength(200, "Product name must be 200 characters or fewer")
+    ],
+    description: [
+        rules.maxLength(5000, "Description must be 5000 characters or fewer")
+    ],
+    price: [
+        rules.required("Price"),
+        rules.number({ label: "Price", min: 0, max: 10000000 })
+    ],
+    category_id: [rules.number({ label: "Category", integer: true, min: 1 })],
+    image: [rules.maxLength(500, "Image reference is too long")]
+};
 
 function Products() {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [editId, setEditId] = useState(null);
-    const [form, setForm] = useState({ name: "", description: "", price: "", category_id: "", image: "" });
-    const [formError, setFormError] = useState("");
-    const [submitting, setSubmitting] = useState(false);
     const [deleting, setDeleting] = useState(null);
 
-    const load = () => {
+    const {
+        values: form,
+        fieldErrors,
+        formError,
+        announcement,
+        pending: submitting,
+        setValue,
+        handleChange,
+        handleBlur,
+        validateAll,
+        reset,
+        run
+    } = useActionFeedback({ schema: SCHEMA, initialValues: EMPTY_FORM });
+
+    // Deleting is a separate action with its own button, so it gets its own
+    // pending state rather than one shared flag that would grey out the form
+    // while a row was being removed.
+    const { run: runDelete } = useActionFeedback();
+
+    const load = useCallback(() => {
         setLoading(true);
         fetchMyProducts()
             .then((data) => setProducts(data.data))
             .catch(() => {})
             .finally(() => setLoading(false));
-    };
+    }, []);
 
-    useEffect(() => { load(); }, []);
+    useEffect(() => { load(); }, [load]);
 
-    const resetForm = () => {
-        setForm({ name: "", description: "", price: "", category_id: "", image: "" });
+    const closeForm = () => {
+        reset(EMPTY_FORM);
         setEditId(null);
         setShowForm(false);
-        setFormError("");
+    };
+
+    const toggleForm = () => {
+        if (showForm) {
+            closeForm();
+
+            return;
+        }
+
+        // Opening a blank form must not inherit the last edited product.
+        reset(EMPTY_FORM);
+        setEditId(null);
+        setShowForm(true);
     };
 
     const handleEdit = (product) => {
-        setForm({
+        reset({
             name: product.name,
             description: product.description || "",
             price: String(product.price),
-            category_id: product.category_id ? String(product.category_id) : "",
+            category_id: product.category_id
+                ? String(product.category_id)
+                : "",
             image: product.image || ""
         });
         setEditId(product.id);
         setShowForm(true);
-        setFormError("");
     };
-
-    const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setFormError("");
 
-        if (!form.name.trim()) { setFormError("Product name is required."); return; }
-        if (!form.price || Number(form.price) < 0) { setFormError("A valid price is required."); return; }
+        if (!validateAll(form)) {
+            return;
+        }
 
-        setSubmitting(true);
-        try {
-            const payload = {
-                name: form.name.trim(),
-                description: form.description.trim() || null,
-                price: Number(form.price),
-                category_id: form.category_id ? Number(form.category_id) : null,
-                image: form.image.trim() || null
-            };
+        const payload = {
+            name: form.name.trim(),
+            description: form.description.trim() || null,
+            price: Number(form.price),
+            category_id: form.category_id
+                ? Number(form.category_id)
+                : null,
+            image: form.image.trim() || null
+        };
 
-            if (editId) {
-                await updateProduct(editId, payload);
-            } else {
-                await createProduct(payload);
+        const { ok } = await run(
+            () =>
+                editId
+                    ? updateProduct(editId, payload)
+                    : createProduct(payload),
+            {
+                success: editId
+                    ? "Product updated."
+                    : "Product created.",
+                retry: true
             }
-            resetForm();
+        );
+
+        if (ok) {
+            closeForm();
             load();
-        } catch (err) {
-            setFormError(err.response?.data?.message || "Action failed.");
-        } finally {
-            setSubmitting(false);
         }
     };
 
+    // The toast is the right home for a delete failure: it happened in the
+// table, not in the form, so a banner above the form would be misleading.
     const handleDelete = async (id) => {
         setDeleting(id);
-        try {
-            await deleteProduct(id);
+
+        const { ok } = await runDelete(() => deleteProduct(id), {
+            success: "Product deleted.",
+            retry: true
+        });
+
+        if (ok) {
             load();
-        } catch {} finally {
-            setDeleting(null);
         }
+
+        setDeleting(null);
     };
 
     return (
@@ -107,7 +180,7 @@ function Products() {
                     <h1 className="text-2xl font-bold text-slate-900">Products</h1>
                     <p className="mt-1 text-sm text-slate-500">Manage products you advertise on the marketplace.</p>
                 </div>
-                <Button onClick={() => { resetForm(); setShowForm((v) => !v); }}>
+                <Button onClick={toggleForm}>
                     {showForm ? "Close" : "+ New product"}
                 </Button>
             </div>
@@ -115,24 +188,64 @@ function Products() {
             {showForm && (
                 <Card className="mb-6 max-w-2xl p-6">
                     <h2 className="font-semibold text-slate-900">{editId ? "Edit product" : "New product"}</h2>
-                    {formError && <div className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</div>}
-                    <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-                        <Input label="Product name" id="name" name="name" value={form.name} onChange={handleChange} required />
-                        <div>
-                            <label htmlFor="description" className="mb-1.5 block text-sm font-medium text-slate-700">Description</label>
-                            <Textarea id="description" name="description" rows="3" value={form.description} onChange={handleChange} />
-                        </div>
-                        <Input label="Price" id="price" name="price" type="number" min="0" step="0.01" value={form.price} onChange={handleChange} required />
+                    {formError && <div role="alert" className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</div>}
+                    <form onSubmit={handleSubmit} noValidate className="mt-5 space-y-4">
+                        <Input
+                            label="Product name"
+                            id="name"
+                            name="name"
+                            value={form.name}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            maxLength={200}
+                            error={fieldErrors.name}
+                            required
+                        />
+
+                        <Textarea
+                            label="Description"
+                            id="description"
+                            name="description"
+                            rows="3"
+                            value={form.description}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            maxLength={5000}
+                            error={fieldErrors.description}
+                        />
+
+                        <Input
+                            label="Price (M)"
+                            id="price"
+                            name="price"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={form.price}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            error={fieldErrors.price}
+                            hint="Enter 0 if customers should enquire about the price."
+                            required
+                        />
+
                         <FileUpload
                             label="Product photo"
+                            name="image"
                             kind="image"
                             value={form.image}
-                            onChange={(url) => setForm({ ...form, image: url })}
+                            onChange={(url) => setValue("image", url)}
+                            error={fieldErrors.image}
                         />
+
                         <div className="flex gap-3">
                             <Button type="submit" loading={submitting}>{editId ? "Update" : "Create"}</Button>
-                            <Button variant="secondary" type="button" onClick={resetForm}>Cancel</Button>
+                            <Button variant="secondary" type="button" onClick={closeForm}>Cancel</Button>
                         </div>
+
+                        <p aria-live="polite" className="sr-only">
+                            {announcement}
+                        </p>
                     </form>
                 </Card>
             )}
@@ -144,7 +257,7 @@ function Products() {
             ) : (
                 <>
                     <Card className="hidden overflow-hidden md:block">
-                        <div className="overflow-x-auto">
+                        <div className="qf-scroll-x overflow-x-auto">
                             <table className="w-full text-left text-sm">
                                 <thead className="border-b bg-slate-50 text-xs font-semibold tracking-wide text-slate-500">
                                     <tr>

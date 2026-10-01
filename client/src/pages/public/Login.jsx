@@ -8,8 +8,11 @@ import {
 } from "../../services/authService";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
+import PasswordInput from "../../components/ui/PasswordInput";
 import Logo from "../../components/ui/Logo";
 import AuthShell from "../../components/auth/AuthShell";
+import useFormValidation from "../../hooks/useFormValidation";
+import { rules } from "../../lib/validation";
 import loginHeroImage from "../../assets/electrician.jpg";
 
 const ROLE_PATHS = {
@@ -27,16 +30,39 @@ const HIGHLIGHTS = [
 
 const PIN_PATTERN = /^\d{6}$/;
 
+const INITIAL_CREDENTIALS = { email: "", password: "" };
+
+/**
+ * Login validates format only. The password rule is deliberately absent: the
+ * account's real requirements belong to whoever set it, and rejecting a
+ * shorter-but-valid password here would lock a legitimate user out of their
+ * own account. Strength is enforced at registration instead.
+ */
+const CREDENTIAL_SCHEMA = {
+    email: [rules.required("Email address"), rules.email()],
+    password: [rules.required("Password")]
+};
+
 function Login() {
     const navigate = useNavigate();
     const { user, loading, login, setUser } = useAuth();
 
     const [step, setStep] = useState("credentials"); // credentials | otp
-    const [formData, setFormData] = useState({
-        email: "",
-        password: ""
+    const {
+        values: formData,
+        errors,
+        formError,
+        announcement,
+        handleChange,
+        handleBlur,
+        validateAll,
+        applyServerError
+    } = useFormValidation({
+        schema: CREDENTIAL_SCHEMA,
+        initialValues: INITIAL_CREDENTIALS
     });
     const [pin, setPin] = useState("");
+    const [pinError, setPinError] = useState("");
     const [error, setError] = useState("");
     const [loggingIn, setLoggingIn] = useState(false);
     const [verifyPendingEmail, setVerifyPendingEmail] = useState("");
@@ -48,22 +74,23 @@ function Login() {
         return <Navigate to={target} replace />;
     }
 
-    const handleChange = (e) => {
-        setFormData({
-            ...formData,
-            [e.target.name]: e.target.value
-        });
-    };
-
     const handleSubmit = async (e) => {
         e.preventDefault();
 
         setError("");
         setResendMessage("");
+
+        if (!validateAll(formData)) {
+            return;
+        }
+
         setLoggingIn(true);
 
         try {
-            const data = await login(formData);
+            const data = await login({
+                email: formData.email.trim(),
+                password: formData.password
+            });
 
             if (data.success) {
                 navigate(ROLE_PATHS[data.user.role] || "/");
@@ -71,15 +98,23 @@ function Login() {
                 // Correct password. Second factor required.
                 setStep("otp");
                 setPin("");
+                setPinError("");
             } else {
                 setError(data.message || "Login failed. Please try again.");
             }
-        } catch (error) {
-            const serverError = error.response?.data;
+        } catch (requestError) {
+            const serverError = requestError.response?.data;
 
-            setError(
-                serverError?.message || "Login failed. Please try again."
-            );
+            // A rejected address is worth flagging on the field itself; a
+            // rejected password stays a banner so we do not imply the user
+            // mistyped something they cannot see.
+            if (serverError?.message?.toLowerCase().includes("email")) {
+                applyServerError(requestError);
+            } else {
+                setError(
+                    serverError?.message || "Login failed. Please try again."
+                );
+            }
 
             if (serverError?.code === "EMAIL_NOT_VERIFIED") {
                 setVerifyPendingEmail(formData.email.trim());
@@ -94,9 +129,10 @@ function Login() {
 
         setError("");
         setResendMessage("");
+        setPinError("");
 
         if (!PIN_PATTERN.test(pin)) {
-            setError("Your login code is 6 digits.");
+            setPinError("Your login code is 6 digits.");
 
             return;
         }
@@ -192,14 +228,14 @@ function Login() {
                 </p>
 
                 <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-                    {error && (
-                        <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-                            {error}
+                    {(error || formError) && (
+                        <div role="alert" className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+                            {error || formError}
                         </div>
                     )}
 
                     {step === "otp" ? (
-                        <form onSubmit={handleOtpSubmit} className="space-y-4">
+                        <form onSubmit={handleOtpSubmit} noValidate className="space-y-4">
                             <Input
                                 label="6-digit login code"
                                 id="pin"
@@ -208,9 +244,15 @@ function Login() {
                                 autoComplete="one-time-code"
                                 placeholder="••••••"
                                 value={pin}
-                                onChange={(e) =>
-                                    setPin(e.target.value.replace(/\D/g, "").slice(0, 6))
-                                }
+                                onChange={(e) => {
+                                    setPin(
+                                        e.target.value
+                                            .replace(/\D/g, "")
+                                            .slice(0, 6)
+                                    );
+                                    setPinError("");
+                                }}
+                                error={pinError}
                                 hint="Sent to your email. Expires in 10 minutes."
                                 maxLength="6"
                                 required
@@ -241,7 +283,7 @@ function Login() {
                             </div>
 
                             {resendMessage && (
-                                <p className="rounded-lg bg-indigo-50 px-4 py-3 text-sm text-indigo-700">
+                                <p role="status" className="rounded-lg bg-indigo-50 px-4 py-3 text-sm text-indigo-700">
                                     {resendMessage}
                                 </p>
                             )}
@@ -289,7 +331,7 @@ function Login() {
                                 </div>
                             )}
 
-                            <form onSubmit={handleSubmit} className="space-y-4">
+                            <form onSubmit={handleSubmit} noValidate className="space-y-4">
                                 <Input
                                     label="Email"
                                     id="email"
@@ -298,19 +340,24 @@ function Login() {
                                     placeholder="example@email.com"
                                     value={formData.email}
                                     onChange={handleChange}
+                                    onBlur={handleBlur}
                                     autoComplete="email"
+                                    autoCapitalize="none"
+                                    spellCheck="false"
+                                    error={errors.email}
                                     required
                                 />
 
-                                <Input
+                                <PasswordInput
                                     label="Password"
                                     id="password"
-                                    type="password"
                                     name="password"
                                     placeholder="Enter your password"
                                     value={formData.password}
                                     onChange={handleChange}
+                                    onBlur={handleBlur}
                                     autoComplete="current-password"
+                                    error={errors.password}
                                     required
                                 />
 
@@ -321,6 +368,10 @@ function Login() {
                                 >
                                     {loggingIn ? "Checking…" : "Log in"}
                                 </Button>
+
+                                <p aria-live="polite" className="sr-only">
+                                    {announcement}
+                                </p>
                             </form>
                         </>
                     )}

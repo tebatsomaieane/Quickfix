@@ -255,6 +255,26 @@ const ICON_PATHS = {
             <path d="M21 15l-5-5-9 9" />
         </>
     ),
+    more: (
+        <>
+            <circle cx="5" cy="12" r="1.6" />
+            <circle cx="12" cy="12" r="1.6" />
+            <circle cx="19" cy="12" r="1.6" />
+        </>
+    ),
+    chevronDown: <path d="M6 9l6 6 6-6" />,
+    trendDown: (
+        <>
+            <path d="M3 7l6 6 4-4 8 8" />
+            <path d="M15 17h6v-6" />
+        </>
+    ),
+    walletCredit: (
+        <>
+            <path d="M3 7a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2v1" />
+            <path d="M3 7v10a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-6H5a2 2 0 0 1 0-4h17" />
+        </>
+    ),
 };
 
 const STROKE_ICONS = new Set([
@@ -265,7 +285,7 @@ const STROKE_ICONS = new Set([
     "search", "inbox", "briefcase", "shield", "megaphone", "building", "eye",
     "heart", "sparkles", "phone", "send", "trendUp", "wallet", "checkBadge",
     "layers", "plug", "filter", "arrowLeft", "thumbsUp", "trash", "image",
-    "alert", "x"
+    "alert", "x", "more", "chevronDown", "trendDown", "walletCredit"
 ]);
 
 function Icon({ name, className = "h-5 w-5" }) {

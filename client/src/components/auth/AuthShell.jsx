@@ -87,7 +87,10 @@ function AuthShell({
 
     return (
         <div className="bg-slate-50">
-            <div className="mx-auto min-h-[calc(100vh-4rem)] max-w-7xl px-4 pb-12 pt-6 sm:px-6 lg:grid lg:grid-cols-2 lg:items-center lg:gap-12 lg:px-8 lg:py-12">
+            {/* `100dvh` (not `100vh`) so the form does not overflow behind the
+                mobile browser chrome, and the extra bottom padding keeps the
+                submit button clear of the on-screen keyboard. */}
+            <div className="mx-auto flex min-h-[100dvh] max-w-7xl flex-col justify-center px-4 pb-[max(env(safe-area-inset-bottom),3rem)] pt-6 sm:px-6 lg:grid lg:grid-cols-2 lg:items-center lg:gap-12 lg:px-8 lg:py-12">
                 {/* Mobile image banner */}
                 <div className="relative mb-8 overflow-hidden rounded-3xl shadow-xl shadow-slate-200/60 ring-1 ring-slate-900/5 lg:hidden">
                     <SmartImage

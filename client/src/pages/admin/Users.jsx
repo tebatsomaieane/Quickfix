@@ -110,7 +110,7 @@ function AdminUsers() {
             ) : (
                 <>
                     <Card className="hidden overflow-hidden md:block">
-                        <div className="overflow-x-auto">
+                        <div className="qf-scroll-x overflow-x-auto">
                             <table className="w-full text-left text-sm">
                                 <thead className="border-b bg-slate-50 text-xs font-semibold tracking-wide text-slate-500">
                                     <tr>

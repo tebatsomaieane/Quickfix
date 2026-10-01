@@ -6,8 +6,8 @@ import { fetchMyOffers } from "../../services/offerService";
 import { fetchAvailableRequests } from "../../services/requestService";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
-import Spinner from "../../components/ui/Spinner";
 import StatCard from "../../components/ui/StatCard";
+import DashboardSkeleton from "../../components/ui/DashboardSkeleton";
 import ProviderAvatar from "../../components/ui/ProviderAvatar";
 import VerificationBadge from "../../components/ui/VerificationBadge";
 import Icon from "../../components/ui/Icon";
@@ -141,9 +141,7 @@ function ProviderDashboard() {
     return (
         <div>
             {loading ? (
-                <div className="flex justify-center py-16">
-                    <Spinner />
-                </div>
+                <DashboardSkeleton />
             ) : profile ? (
                 <>
                     {/* Workbench banner */}
@@ -383,7 +381,7 @@ function ProviderDashboard() {
                         Your services & pricing
                     </h2>
                     <Card className="overflow-hidden">
-                        <div className="overflow-x-auto">
+                        <div className="qf-scroll-x overflow-x-auto">
                             <table className="min-w-full text-sm">
                                 <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
                                     <tr>

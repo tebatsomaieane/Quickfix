@@ -10,8 +10,49 @@ import Textarea from "../../components/ui/Textarea";
 import Select from "../../components/ui/Select";
 import Spinner from "../../components/ui/Spinner";
 import Icon from "../../components/ui/Icon";
+import useFormValidation from "../../hooks/useFormValidation";
+import { rules, todayAsString } from "../../lib/validation";
 
 const MAX_ATTACHMENTS = 6;
+
+/**
+ * Mirrors requestController's create-request contract: a service, a title and
+ * a description are required, and the text fields are capped so a user is told
+ * the limit while typing rather than after a rejected round-trip.
+ */
+const SCHEMA = {
+    service_id: [rules.required("Service")],
+    title: [
+        rules.required("Title"),
+        rules.minLength(5, "Give your request a short, clear title"),
+        rules.maxLength(200, "Title must be 200 characters or fewer")
+    ],
+    description: [
+        rules.required("Description"),
+        rules.minLength(10, "Add a little more detail so providers can help"),
+        rules.maxLength(5000, "Description must be 5000 characters or fewer")
+    ],
+    location: [
+        rules.required("Location"),
+        rules.maxLength(255, "Location must be 255 characters or fewer")
+    ],
+    budget_min: [rules.number({ min: 0, label: "Minimum budget" })],
+    budget_max: [
+        rules.number({ min: 0, label: "Maximum budget" }),
+        // Compared as numbers rather than strings, because "100" sorts before
+        // "9" alphabetically.
+        (value, values) => {
+            if (!value || !values?.budget_min) {
+                return null;
+            }
+
+            return Number(values.budget_min) <= Number(value)
+                ? null
+                : "Maximum budget cannot be lower than the minimum";
+        }
+    ],
+    preferred_date: [rules.notPast("Preferred date")]
+};
 
 function CreateRequest() {
     const navigate = useNavigate();
@@ -19,18 +60,29 @@ function CreateRequest() {
     const [services, setServices] = useState([]);
     const [loadingServices, setLoadingServices] = useState(true);
 
-    const [formData, setFormData] = useState({
-        service_id: "",
-        title: "",
-        description: "",
-        location: "",
-        preferred_date: "",
-        preferred_time: "",
-        budget_min: "",
-        budget_max: ""
+    const {
+        values: formData,
+        errors,
+        formError,
+        announcement,
+        setFormError,
+        handleChange,
+        handleBlur,
+        validateAll
+    } = useFormValidation({
+        schema: SCHEMA,
+        initialValues: {
+            service_id: "",
+            title: "",
+            description: "",
+            location: "",
+            preferred_date: "",
+            preferred_time: "",
+            budget_min: "",
+            budget_max: ""
+        }
     });
 
-    const [error, setError] = useState("");
     const [submitting, setSubmitting] = useState(false);
 
     const [attachments, setAttachments] = useState([]);
@@ -44,11 +96,11 @@ function CreateRequest() {
         );
 
         if (selected.length === 0) {
-            setError("You can attach up to 6 photos or videos.");
+            setFormError("You can attach up to 6 photos or videos.");
             return;
         }
 
-        setError("");
+        setFormError("");
         setUploadingMedia(true);
 
         try {
@@ -64,7 +116,7 @@ function CreateRequest() {
 
             setAttachments((previous) => [...previous, ...uploaded]);
         } catch (err) {
-            setError(
+            setFormError(
                 err.response?.data?.message ||
                     "One or more files failed to upload."
             );
@@ -85,7 +137,7 @@ function CreateRequest() {
                 }
             } catch {
                 if (!cancelled) {
-                    setError("Unable to load services. Please refresh.");
+                    setFormError("Unable to load services. Please refresh.");
                 }
             } finally {
                 if (!cancelled) {
@@ -99,26 +151,10 @@ function CreateRequest() {
         return () => {
             cancelled = true;
         };
-    }, []);
-
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-
-        setFormData((previous) => ({
-            ...previous,
-            [name]: value
-        }));
-    };
+    }, [setFormError]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-
-        setError("");
-
-        if (!formData.service_id) {
-            setError("Please choose a service.");
-            return;
-        }
 
         const budgetMin = formData.budget_min
             ? Number(formData.budget_min)
@@ -127,19 +163,7 @@ function CreateRequest() {
             ? Number(formData.budget_max)
             : null;
 
-        if (
-            budgetMin !== null &&
-            budgetMax !== null &&
-            budgetMin > budgetMax
-        ) {
-            setError(
-                "Minimum budget cannot be greater than maximum budget."
-            );
-            return;
-        }
-
-        if (formData.preferred_date && formData.preferred_date < new Date().toISOString().slice(0, 10)) {
-            setError("Preferred date cannot be in the past.");
+        if (!validateAll(formData)) {
             return;
         }
 
@@ -166,7 +190,7 @@ function CreateRequest() {
                 navigate(`/customer/requests/${data.data.id}`);
             }
         } catch (err) {
-            setError(
+            setFormError(
                 err.response?.data?.message ||
                 "Failed to create request. Please try again."
             );
@@ -199,22 +223,24 @@ function CreateRequest() {
                 </p>
             </div>
 
-            {error && (
-                <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {error}
+            {formError && (
+                <div role="alert" className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {formError}
                 </div>
             )}
 
             <Card className="max-w-2xl p-6">
-                <form onSubmit={handleSubmit} className="space-y-5">
+                <form onSubmit={handleSubmit} noValidate className="space-y-5">
                     <Select
                         label="Service"
                         id="service_id"
                         name="service_id"
                         value={formData.service_id}
                         onChange={handleChange}
+                        onBlur={handleBlur}
                         options={serviceOptions}
                         placeholder="Select a service"
+                        error={errors.service_id}
                         required
                     />
 
@@ -225,8 +251,10 @@ function CreateRequest() {
                         placeholder="e.g. Leaking kitchen pipe"
                         value={formData.title}
                         onChange={handleChange}
-                        hint="Short summary of the job (max 200 characters)."
-                        maxLength="200"
+                        onBlur={handleBlur}
+                        hint="Short summary of the job."
+                        maxLength={200}
+                        error={errors.title}
                         required
                     />
 
@@ -238,6 +266,10 @@ function CreateRequest() {
                         placeholder="Describe the problem in detail so providers can give you accurate offers."
                         value={formData.description}
                         onChange={handleChange}
+                        onBlur={handleBlur}
+                        maxLength={5000}
+                        hint={`${formData.description.length}/5000 characters`}
+                        error={errors.description}
                         required
                     />
 
@@ -248,6 +280,9 @@ function CreateRequest() {
                         placeholder="e.g. Maseru"
                         value={formData.location}
                         onChange={handleChange}
+                        onBlur={handleBlur}
+                        maxLength={255}
+                        error={errors.location}
                         required
                     />
 
@@ -257,8 +292,13 @@ function CreateRequest() {
                             id="preferred_date"
                             type="date"
                             name="preferred_date"
+                            // The browser's date picker will not offer a past
+                            // date, and the schema catches a typed one.
+                            min={todayAsString()}
                             value={formData.preferred_date}
                             onChange={handleChange}
+                            onBlur={handleBlur}
+                            error={errors.preferred_date}
                         />
                         <Input
                             label="Preferred time"
@@ -281,6 +321,8 @@ function CreateRequest() {
                             placeholder="e.g. 500"
                             value={formData.budget_min}
                             onChange={handleChange}
+                            onBlur={handleBlur}
+                            error={errors.budget_min}
                         />
                         <Input
                             label="Budget maximum (M)"
@@ -292,6 +334,8 @@ function CreateRequest() {
                             placeholder="e.g. 1000"
                             value={formData.budget_max}
                             onChange={handleChange}
+                            onBlur={handleBlur}
+                            error={errors.budget_max}
                         />
                     </div>
 
@@ -387,6 +431,10 @@ function CreateRequest() {
                             {submitting ? "Posting..." : "Post request"}
                         </Button>
                     </div>
+
+                    <p aria-live="polite" className="sr-only">
+                        {announcement}
+                    </p>
                 </form>
             </Card>
         </div>

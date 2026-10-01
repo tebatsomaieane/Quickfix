@@ -1,89 +1,101 @@
-import { useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { resendVerification, verifyEmail } from "../../services/authService";
 import AuthShell from "../../components/auth/AuthShell";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
 import Logo from "../../components/ui/Logo";
+import useActionFeedback from "../../hooks/useActionFeedback";
+import { rules } from "../../lib/validation";
 import verifyImage from "../../assets/cleaner.jpg";
 
-const PIN_PATTERN = /^\d{6}$/;
+/**
+ * Mirrors `auth.verifyEmail` on the server: an address plus a PIN of exactly
+ * six digits. The PIN box only ever holds digits (see `handlePinChange`), so the
+ * rule here is really catching the two things a user can still get wrong --
+ * leaving it empty, or typing fewer than six.
+ */
+const SCHEMA = {
+    email: [rules.required("Email address"), rules.email()],
+    pin: [
+        rules.required("Verification PIN"),
+        rules.digits(6, "Your PIN is 6 digits")
+    ]
+};
 
 function VerifyEmail() {
     const [params] = useSearchParams();
-    const [email, setEmail] = useState(params.get("email") || "");
-    const [pin, setPin] = useState("");
-    const [status, setStatus] = useState("idle"); // idle | success | error
-    const [message, setMessage] = useState("");
-    const [loading, setLoading] = useState(false);
-    const [resendLoading, setResendLoading] = useState(false);
-    const [resendMessage, setResendMessage] = useState("");
+    const navigate = useNavigate();
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    // The address arrives in the query string from registration, so it is
+    // prefilled. Memoised because the hook takes its initial values as the
+    // reset target, and a fresh object each render would rebuild it needlessly.
+    const initialValues = useMemo(
+        () => ({ email: params.get("email") || "", pin: "" }),
+        [params]
+    );
 
-        setMessage("");
-        setStatus("checking");
+    const {
+        values,
+        fieldErrors,
+        formError,
+        announcement,
+        pending,
+        setValue,
+        handleChange,
+        handleBlur,
+        validateAll,
+        run
+    } = useActionFeedback({ schema: SCHEMA, initialValues });
 
-        if (!email.trim()) {
-            setStatus("error");
-            setMessage("Enter the email address you registered with.");
+    const [verified, setVerified] = useState(false);
+    const [resendNotice, setResendNotice] = useState("");
 
+    // Kept digits-only and capped at six, so the field cannot hold something the
+    // server would only reject. `maxLength` would not stop a pasted "12 34 56".
+    const handlePinChange = (event) => {
+        setValue("pin", event.target.value.replace(/\D/g, "").slice(0, 6));
+    };
+
+    const handleSubmit = async (event) => {
+        event.preventDefault();
+
+        setResendNotice("");
+
+        if (!validateAll(values)) {
             return;
         }
 
-        if (!PIN_PATTERN.test(pin)) {
-            setStatus("error");
-            setMessage("Your verification PIN is 6 digits.");
+        const email = values.email.trim();
 
-            return;
-        }
+        const { ok } = await run(() => verifyEmail(email, values.pin.trim()));
 
-        setLoading(true);
-
-        try {
-            const data = await verifyEmail(email.trim(), pin);
-
-            setStatus(data.success ? "success" : "error");
-            setMessage(data.message || "Unable to verify your email.");
-        } catch (error) {
-            setStatus("error");
-            setMessage(
-                error.response?.data?.message ||
-                "Unable to verify your email. Please try again."
-            );
-        } finally {
-            setLoading(false);
+        if (ok) {
+            setVerified(true);
         }
     };
 
-    const handleResend = async (e) => {
-        e.preventDefault();
+    const handleResend = async () => {
+        const email = values.email.trim();
 
-        if (!email.trim()) {
-            setResendMessage("Enter your email address to resend the PIN.");
+        // A resend with no address has nowhere to go, so say so on the field
+        // rather than sending a request that cannot succeed.
+        if (!email) {
+            setValue("email", "");
+            setResendNotice("Enter your email address to resend the PIN.");
 
             return;
         }
 
-        setResendLoading(true);
-        setResendMessage("");
+        setResendNotice("");
 
-        try {
-            const data = await resendVerification(email.trim());
+        const { ok } = await run(() => resendVerification(email), {
+            success: "A new verification PIN is on its way",
+            retry: true
+        });
 
-            setResendMessage(
-                data?.success
-                    ? data.message || "A new verification PIN has been sent."
-                    : data?.message || "Could not resend the PIN. Try again later."
-            );
-        } catch (error) {
-            setResendMessage(
-                error.response?.data?.message ||
-                "Could not resend the PIN. Try again later."
-            );
-        } finally {
-            setResendLoading(false);
+        if (ok) {
+            setResendNotice("Check your inbox and spam folder for the new PIN.");
         }
     };
 
@@ -98,29 +110,17 @@ function VerifyEmail() {
             <div>
                 <Logo size="lg" brand="Quick" accent="Fix" />
                 <h1 className="mt-6 text-3xl font-extrabold tracking-tight text-slate-900">
-                    {status === "success" ? "Email verified" : "Verify your email"}
+                    {verified ? "Email verified" : "Verify your email"}
                 </h1>
                 <p className="mt-2 text-sm text-slate-600">
-                    {status === "success"
+                    {verified
                         ? "Your QuickFix account is now active."
                         : "Enter the 6-digit PIN we emailed you (check spam too). It expires in 10 minutes."}
                 </p>
 
                 <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-                    {message && (
-                        <div
-                            className={`mb-4 rounded-lg px-4 py-3 text-sm ${
-                                status === "success"
-                                    ? "bg-green-50 text-green-700"
-                                    : "bg-red-50 text-red-700"
-                            }`}
-                        >
-                            {message}
-                        </div>
-                    )}
-
-                    {status === "success" ? (
-                        <>
+                    {verified ? (
+                        <div role="status">
                             <div className="flex items-center gap-4">
                                 <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-lg font-bold text-emerald-600">
                                     ✓
@@ -133,23 +133,35 @@ function VerifyEmail() {
                             </div>
                             <Button
                                 className="mt-6 w-full"
-                                onClick={() =>
-                                    (window.location.href = "/login")
-                                }
+                                onClick={() => navigate("/login")}
                             >
                                 Continue to login
                             </Button>
-                        </>
+                        </div>
                     ) : (
-                        <form onSubmit={handleSubmit} className="space-y-4">
+                        <form onSubmit={handleSubmit} noValidate className="space-y-4">
+                            {formError && (
+                                <div
+                                    role="alert"
+                                    className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700"
+                                >
+                                    {formError}
+                                </div>
+                            )}
+
                             <Input
                                 label="Email address"
+                                id="email"
                                 type="email"
                                 name="email"
                                 placeholder="example@email.com"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                value={values.email}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
                                 autoComplete="email"
+                                autoCapitalize="none"
+                                spellCheck="false"
+                                error={fieldErrors.email}
                                 required
                             />
 
@@ -159,22 +171,18 @@ function VerifyEmail() {
                                 name="pin"
                                 inputMode="numeric"
                                 autoComplete="one-time-code"
-                                placeholder="••••••"
-                                value={pin}
-                                onChange={(e) =>
-                                    setPin(e.target.value.replace(/\D/g, "").slice(0, 6))
-                                }
+                                placeholder="000000"
+                                value={values.pin}
+                                onChange={handlePinChange}
+                                onBlur={handleBlur}
                                 hint="Sent to your email at registration."
-                                maxLength="6"
+                                maxLength={6}
+                                error={fieldErrors.pin}
                                 required
                             />
 
-                            <Button
-                                type="submit"
-                                className="w-full"
-                                loading={loading}
-                            >
-                                {loading ? "Verifying…" : "Verify email"}
+                            <Button type="submit" className="w-full" loading={pending}>
+                                {pending ? "Verifying…" : "Verify email"}
                             </Button>
 
                             <div className="rounded-lg bg-indigo-50 px-4 py-3 text-center">
@@ -187,16 +195,26 @@ function VerifyEmail() {
                                     variant="ghost"
                                     className="mt-2"
                                     onClick={handleResend}
-                                    loading={resendLoading}
+                                    loading={pending}
                                 >
                                     Resend verification PIN
                                 </Button>
-                                {resendMessage && (
-                                    <p className="mt-2 text-sm text-indigo-700">
-                                        {resendMessage}
+                                {resendNotice && (
+                                    <p
+                                        role="status"
+                                        className="mt-2 text-sm text-indigo-700"
+                                    >
+                                        {resendNotice}
                                     </p>
                                 )}
                             </div>
+
+                            {/* Announces validation outcomes that are not tied to
+                                a single field, so the count is not purely
+                                visual. */}
+                            <p aria-live="polite" className="sr-only">
+                                {announcement}
+                            </p>
                         </form>
                     )}
 

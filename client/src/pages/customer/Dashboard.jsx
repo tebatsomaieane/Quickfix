@@ -11,10 +11,11 @@ import {
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
-import Spinner from "../../components/ui/Spinner";
+import DashboardSkeleton from "../../components/ui/DashboardSkeleton";
 import StatCard from "../../components/ui/StatCard";
 import EmptyState from "../../components/ui/EmptyState";
 import Icon from "../../components/ui/Icon";
+import MediaRail from "../../components/ui/MediaRail";
 import SmartImage from "../../components/ui/SmartImage";
 import {
     formatCurrency,
@@ -23,6 +24,79 @@ import {
     statusLabel
 } from "../../lib/format";
 import { getCategoryImage, getBusinessImage } from "../../lib/visuals";
+
+function StoreCard({ ad, wide = false }) {
+    return (
+        <Link
+            to="/customer/products"
+            className={`group block ${wide ? "w-[15rem] shrink-0" : "h-full"}`}
+        >
+            <Card
+                hover
+                className="h-full overflow-hidden p-0"
+            >
+                <div className="relative h-32">
+                    <SmartImage
+                        src={getBusinessImage(ad)}
+                        alt={ad.title}
+                        seed={ad.title}
+                        icon="building"
+                        className="qf-img-zoom h-full w-full object-cover"
+                    />
+                    {ad.business_verified === "APPROVED" && (
+                        <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-0.5 text-[11px] font-bold text-emerald-600 shadow">
+                            <Icon
+                                name="checkBadge"
+                                className="h-3.5 w-3.5"
+                            />
+                            Verified
+                        </span>
+                    )}
+                </div>
+                <div className="p-4">
+                    <h4 className="font-semibold text-slate-900 line-clamp-1">
+                        {ad.title}
+                    </h4>
+                    <p className="mt-1 text-xs text-slate-500 line-clamp-2">
+                        {ad.business_name}
+                        {ad.business_location
+                            ? ` · ${ad.business_location}`
+                            : ""}
+                    </p>
+                </div>
+            </Card>
+        </Link>
+    );
+}
+
+function PromotionCard({ promo, wide = false }) {
+    return (
+        <Card
+            className={`flex flex-col p-4 ${wide ? "w-[15rem] shrink-0" : "h-full"}`}
+        >
+            <div className="flex items-start justify-between gap-2">
+                <h4 className="font-semibold text-slate-900">
+                    {promo.title}
+                </h4>
+                <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-sm font-extrabold text-amber-700">
+                    {promo.discount}%
+                </span>
+            </div>
+            {promo.description && (
+                <p className="mt-1 flex-1 text-sm text-slate-600 line-clamp-2">
+                    {promo.description}
+                </p>
+            )}
+            <p className="mt-2 text-xs text-slate-500">
+                {promo.business_name}
+                {promo.business_location
+                    ? ` · ${promo.business_location}`
+                    : ""}
+                {" · "}ends {formatDate(promo.end_date)}
+            </p>
+        </Card>
+    );
+}
 
 function CustomerDashboard() {
     const { user } = useAuth();
@@ -99,11 +173,7 @@ function CustomerDashboard() {
     const recentRequests = requests.slice(0, 5);
 
     if (loading) {
-        return (
-            <div className="flex justify-center py-24">
-                <Spinner />
-            </div>
-        );
+        return <DashboardSkeleton />;
     }
 
     if (error) {
@@ -122,8 +192,8 @@ function CustomerDashboard() {
                 <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/10 blur-2xl" aria-hidden="true" />
                 <div className="absolute -bottom-24 right-24 h-64 w-64 rounded-full bg-white/10 blur-2xl" aria-hidden="true" />
                 <div className="grid gap-0 lg:grid-cols-2">
-                    <div className="p-6 sm:p-8">
-                        <p className="text-xs font-bold uppercase tracking-widest text-indigo-200">
+                    <div className="p-5 sm:p-8">
+                        <p className="text-[11px] font-bold uppercase tracking-widest text-indigo-200">
                             {new Date().toLocaleDateString("en-GB", {
                                 weekday: "long",
                                 day: "numeric",
@@ -138,15 +208,21 @@ function CustomerDashboard() {
                             verified local providers compete for your job — or
                             browse the marketplace for ideas.
                         </p>
-                        <div className="mt-6 flex flex-wrap gap-3">
-                            <Link to="/customer/requests/new">
-                                <Button className="bg-white text-indigo-700 shadow-lg hover:bg-indigo-50">
+                        <div className="mt-6 flex flex-wrap gap-2.5">
+                            <Link to="/customer/requests/new" className="min-w-0">
+                                <Button className="w-full bg-white text-indigo-700 shadow-lg hover:bg-indigo-50 sm:w-auto">
                                     <Icon name="plus" className="h-4 w-4" />
                                     Post a request
                                 </Button>
                             </Link>
-                            <Link to="/customer/services">
-                                <Button variant="ghost" className="text-white hover:bg-white/10">
+                            <Link
+                                to="/customer/services"
+                                className="min-w-0"
+                            >
+                                <Button
+                                    variant="ghost"
+                                    className="w-full text-white hover:bg-white/10 sm:w-auto"
+                                >
                                     Browse services
                                 </Button>
                             </Link>
@@ -165,7 +241,7 @@ function CustomerDashboard() {
             </section>
 
             {/* Personal stats */}
-            <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:mt-6 sm:gap-4 lg:grid-cols-4">
                 <StatCard
                     icon="file"
                     label="Total requests"
@@ -197,9 +273,9 @@ function CustomerDashboard() {
             </div>
 
             {/* Marketplace overview */}
-            <section className="mt-8">
+            <section className="mt-7 sm:mt-8">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
+                    <div className="min-w-0">
                         <h2 className="text-lg font-bold text-slate-900">
                             Marketplace overview
                         </h2>
@@ -207,21 +283,28 @@ function CustomerDashboard() {
                             What's live on QuickFix right now
                         </p>
                     </div>
-                    <div className="flex gap-2">
-                        <Link to="/customer/services">
-                            <Button variant="outline" size="sm">Services</Button>
+                    {/* Scrolls rather than squashing on narrow phones */}
+                    <div className="qf-scroll-x -mx-3.5 flex w-full gap-2 overflow-x-auto px-3.5 pb-1 sm:mx-0 sm:w-auto sm:px-0 sm:pb-0">
+                        <Link to="/customer/services" className="shrink-0">
+                            <Button variant="outline" size="sm">
+                                Services
+                            </Button>
                         </Link>
-                        <Link to="/customer/products">
-                            <Button variant="outline" size="sm">Products</Button>
+                        <Link to="/customer/products" className="shrink-0">
+                            <Button variant="outline" size="sm">
+                                Products
+                            </Button>
                         </Link>
-                        <Link to="/customer/providers">
-                            <Button variant="outline" size="sm">Providers</Button>
+                        <Link to="/customer/providers" className="shrink-0">
+                            <Button variant="outline" size="sm">
+                                Providers
+                            </Button>
                         </Link>
                     </div>
                 </div>
 
                 {summary && (
-                    <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+                    <div className="mt-4 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
                         <StatCard icon="wrench" label="Services advertised" value={summary.services} tone="indigo" />
                         <StatCard icon="inbox" label="Products advertised" value={summary.products} tone="amber" />
                         <StatCard icon="users" label="Registered providers" value={summary.providers} tone="emerald" />
@@ -232,23 +315,54 @@ function CustomerDashboard() {
 
             {/* Category tiles */}
             {categories.length > 0 && (
-                <section className="mt-8">
+                <section className="mt-7 sm:mt-8">
                     <h2 className="mb-3 text-lg font-bold text-slate-900">
                         Browse by category
                     </h2>
-                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+
+                    {/* Phones get a rail that drifts left so more than one
+                        category is discoverable without a long scroll. */}
+                    <div className="lg:hidden">
+                        <MediaRail
+                            label="Service categories"
+                            speed={24}
+                            railClassName="qf-rail-fade"
+                        >
+                            {categories.map((category) => (
+                                <Link
+                                    key={category.id}
+                                    to={`/customer/services/${category.id}`}
+                                    className="qf-lift group relative h-24 w-[9.5rem] shrink-0 overflow-hidden rounded-2xl shadow-sm sm:h-28 sm:w-40"
+                                >
+                                    <SmartImage
+                                        src={getCategoryImage(category)}
+                                        alt={category.name}
+                                        seed={category.name}
+                                        icon="grid"
+                                        className="qf-img-zoom h-full w-full object-cover"
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-900/10 to-transparent" />
+                                    <p className="absolute inset-x-0 bottom-0 p-2.5 text-sm font-bold text-white">
+                                        {category.name}
+                                    </p>
+                                </Link>
+                            ))}
+                        </MediaRail>
+                    </div>
+
+                    <div className="hidden grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 lg:grid">
                         {categories.map((category) => (
                             <Link
                                 key={category.id}
                                 to={`/customer/services/${category.id}`}
-                                className="group relative h-28 overflow-hidden rounded-2xl shadow-sm transition hover:shadow-lg"
+                                className="qf-lift group relative h-24 overflow-hidden rounded-2xl shadow-sm sm:h-28"
                             >
                                 <SmartImage
                                     src={getCategoryImage(category)}
                                     alt={category.name}
                                     seed={category.name}
                                     icon="grid"
-                                    className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                                    className="qf-img-zoom h-full w-full object-cover"
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-900/10 to-transparent" />
                                 <p className="absolute inset-x-0 bottom-0 p-2.5 text-sm font-bold text-white">
@@ -268,42 +382,26 @@ function CustomerDashboard() {
                             <h3 className="mb-3 text-lg font-bold text-slate-900">
                                 Featured stores & cafés
                             </h3>
-                            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+
+                            <div className="lg:hidden">
+                                <MediaRail
+                                    label="Featured stores and cafés"
+                                    speed={26}
+                                    railClassName="qf-rail-fade"
+                                >
+                                    {advertisements.map((ad) => (
+                                        <StoreCard
+                                            key={ad.id}
+                                            ad={ad}
+                                            wide
+                                        />
+                                    ))}
+                                </MediaRail>
+                            </div>
+
+                            <div className="hidden gap-4 sm:grid-cols-2 lg:grid lg:grid-cols-3">
                                 {advertisements.map((ad) => (
-                                    <Link
-                                        key={ad.id}
-                                        to="/customer/products"
-                                        className="group"
-                                    >
-                                        <Card className="h-full overflow-hidden p-0 transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-lg">
-                                            <div className="relative h-32">
-                                                <SmartImage
-                                                    src={getBusinessImage(ad)}
-                                                    alt={ad.title}
-                                                    seed={ad.title}
-                                                    icon="building"
-                                                    className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                                                />
-                                                {ad.business_verified === "APPROVED" && (
-                                                    <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-0.5 text-[11px] font-bold text-emerald-600 shadow">
-                                                        <Icon name="checkBadge" className="h-3.5 w-3.5" />
-                                                        Verified
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="p-4">
-                                                <h4 className="font-semibold text-slate-900 line-clamp-1">
-                                                    {ad.title}
-                                                </h4>
-                                                <p className="mt-1 text-xs text-slate-500 line-clamp-2">
-                                                    {ad.business_name}
-                                                    {ad.business_location
-                                                        ? ` · ${ad.business_location}`
-                                                        : ""}
-                                                </p>
-                                            </div>
-                                        </Card>
-                                    </Link>
+                                    <StoreCard key={ad.id} ad={ad} />
                                 ))}
                             </div>
                         </div>
@@ -314,30 +412,29 @@ function CustomerDashboard() {
                             <h3 className="mb-3 text-lg font-bold text-slate-900">
                                 Current promotions
                             </h3>
-                            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+
+                            <div className="lg:hidden">
+                                <MediaRail
+                                    label="Current promotions"
+                                    speed={26}
+                                    railClassName="qf-rail-fade"
+                                >
+                                    {promotions.map((promo) => (
+                                        <PromotionCard
+                                            key={promo.id}
+                                            promo={promo}
+                                            wide
+                                        />
+                                    ))}
+                                </MediaRail>
+                            </div>
+
+                            <div className="hidden gap-4 sm:grid-cols-2 lg:grid lg:grid-cols-3">
                                 {promotions.map((promo) => (
-                                    <Card key={promo.id} className="flex flex-col p-4">
-                                        <div className="flex items-start justify-between gap-2">
-                                            <h4 className="font-semibold text-slate-900">
-                                                {promo.title}
-                                            </h4>
-                                            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-sm font-extrabold text-amber-700">
-                                                {promo.discount}%
-                                            </span>
-                                        </div>
-                                        {promo.description && (
-                                            <p className="mt-1 flex-1 text-sm text-slate-600 line-clamp-2">
-                                                {promo.description}
-                                            </p>
-                                        )}
-                                        <p className="mt-2 text-xs text-slate-500">
-                                            {promo.business_name}
-                                            {promo.business_location
-                                                ? ` · ${promo.business_location}`
-                                                : ""}
-                                            {" · "}ends {formatDate(promo.end_date)}
-                                        </p>
-                                    </Card>
+                                    <PromotionCard
+                                        key={promo.id}
+                                        promo={promo}
+                                    />
                                 ))}
                             </div>
                         </div>
@@ -383,8 +480,12 @@ function CustomerDashboard() {
                                 <Link
                                     key={request.id}
                                     to={`/customer/requests/${request.id}`}
+                                    className="qf-press-dim block rounded-2xl"
                                 >
-                                    <Card className="flex flex-col gap-3 p-4 transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md sm:flex-row sm:items-center sm:justify-between sm:flex-wrap">
+                                    <Card
+                                        pressable
+                                        className="flex flex-col gap-3 p-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
+                                    >
                                         <div className="min-w-0">
                                             <h3 className="font-semibold text-slate-900 line-clamp-1">
                                                 {request.title}

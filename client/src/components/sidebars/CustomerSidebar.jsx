@@ -5,15 +5,25 @@ import SidebarNav from "./SidebarNav";
 import Icon from "../ui/Icon";
 import Logo from "../ui/Logo";
 
-function CustomerSidebar({ navItems, onNavigate }) {
+function CustomerSidebar({ navItems, onNavigate, onClose }) {
     const { user, logout } = useAuth();
     const groups = groupNavItems(navItems);
 
     return (
         <div className="flex h-full w-64 flex-col border-r border-slate-200 bg-white">
             {/* Logo */}
-            <div className="flex h-16 items-center border-b border-slate-200/80 bg-gradient-to-b from-white to-indigo-50/40 px-5">
+            <div className="flex min-h-16 items-center gap-2 border-b border-slate-200/80 bg-gradient-to-b from-white to-indigo-50/40 py-3 pl-5 pr-4 pt-safe">
                 <Logo brand="Quick" accent="Fix" />
+                {onClose && (
+                    <button
+                        type="button"
+                        aria-label="Close menu"
+                        onClick={onClose}
+                        className="qf-tap-sm ml-auto rounded-xl p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                    >
+                        <Icon name="x" className="h-5 w-5" />
+                    </button>
+                )}
             </div>
 
             {/* CTA */}
@@ -21,7 +31,7 @@ function CustomerSidebar({ navItems, onNavigate }) {
                 <Link
                     to="/customer/requests/new"
                     onClick={onNavigate}
-                    className="group flex items-center justify-between gap-2 rounded-xl bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-600 bg-[length:200%_100%] bg-left px-4 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-200 transition-all duration-300 hover:bg-right hover:shadow-lg hover:shadow-indigo-300/60"
+                    className="qf-press-scale group flex items-center justify-between gap-2 rounded-xl bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-600 bg-[length:200%_100%] bg-left px-4 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-200 transition-all duration-300 hover:bg-right hover:shadow-lg hover:shadow-indigo-300/60"
                 >
                     <span className="flex items-center gap-2">
                         <Icon name="plus" className="h-4 w-4" />
@@ -59,7 +69,7 @@ function CustomerSidebar({ navItems, onNavigate }) {
                         type="button"
                         aria-label="Log out"
                         onClick={logout}
-                        className="ml-auto rounded-lg p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+                        className="qf-tap-sm ml-auto rounded-lg p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
                     >
                         <Icon name="logout" className="h-5 w-5" />
                     </button>

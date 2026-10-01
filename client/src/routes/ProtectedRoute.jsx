@@ -17,7 +17,7 @@ function ProtectedRoute({ allowedRoles }) {
     // Waiting for the session cookie to be verified
     if (loading) {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-slate-50">
+            <div className="flex min-h-dvh items-center justify-center bg-slate-50">
                 <Spinner />
             </div>
         );

@@ -8,7 +8,7 @@ import {
     fetchBusinesses
 } from "../../services/adminService";
 import Card from "../../components/ui/Card";
-import Spinner from "../../components/ui/Spinner";
+import DashboardSkeleton from "../../components/ui/DashboardSkeleton";
 import StatCard from "../../components/ui/StatCard";
 import Icon from "../../components/ui/Icon";
 
@@ -107,10 +107,14 @@ function AdminDashboard() {
 
     const hasActions = actionItems.some((item) => item.value > 0);
 
+    if (loading) {
+        return <DashboardSkeleton />;
+    }
+
     return (
         <div>
-            <div className="mb-6">
-                <h1 className="text-2xl font-bold text-slate-900">
+            <div className="mb-5 sm:mb-6">
+                <h1 className="text-[22px] font-extrabold leading-tight tracking-tight text-slate-900 sm:text-2xl">
                     Administration
                 </h1>
                 <p className="mt-1 text-sm text-slate-500">
@@ -119,12 +123,8 @@ function AdminDashboard() {
                 </p>
             </div>
 
-            {loading ? (
-                <div className="flex justify-center py-16">
-                    <Spinner />
-                </div>
-            ) : stats ? (
-                <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {stats ? (
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
                     <StatCard
                         icon="users"
                         label="Total users"
@@ -181,28 +181,24 @@ function AdminDashboard() {
                 </Card>
             )}
 
-            {loading ? (
-                <div className="flex justify-center py-16">
-                    <Spinner />
-                </div>
-            ) : hasActions ? (
-                <div className="mt-10">
-                    <h2 className="text-xl font-bold text-slate-900">
+            {hasActions ? (
+                <div className="mt-8 sm:mt-10">
+                    <h2 className="text-lg font-bold text-slate-900 sm:text-xl">
                         Action center
                     </h2>
                     <p className="mt-1 text-sm text-slate-500">
                         Items that need your attention.
                     </p>
 
-                    <div className="mt-4 grid gap-4 md:grid-cols-3">
+                    <div className="mt-4 grid gap-3 sm:gap-4 md:grid-cols-3">
                         {actionItems.map((item) => (
                             item.value === 0 ? null : (
                                 <Link key={item.label} to={item.to}>
-                                    <Card className="flex items-center gap-4 p-5 transition hover:border-indigo-300 hover:shadow">
-                                        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                                    <Card pressable className="flex h-full items-center gap-3 p-4 sm:gap-4 sm:p-5">
+                                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 sm:h-12 sm:w-12">
                                             <Icon name={item.icon} className="h-6 w-6" />
                                         </div>
-                                        <div>
+                                        <div className="min-w-0">
                                             <p className="text-2xl font-bold text-slate-900">
                                                 {item.value}
                                             </p>
@@ -216,7 +212,7 @@ function AdminDashboard() {
                         ))}
                     </div>
                 </div>
-            ) : stats ? (
+            ) : (
                 <div className="mt-10 rounded-2xl border border-slate-200 bg-white p-8 text-center">
                     <Icon
                         name="checkCircle"
@@ -230,7 +226,7 @@ function AdminDashboard() {
                         attention.
                     </p>
                 </div>
-            ) : null}
+            )}
         </div>
     );
 }

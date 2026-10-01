@@ -18,9 +18,11 @@ import {
     statusColor,
     statusLabel
 } from "../../lib/format";
+import { useActionFeedback } from "../../hooks/useActionFeedback";
 
 function ProviderJobs() {
     const { user } = useAuth();
+    const { run } = useActionFeedback();
     const [jobs, setJobs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -68,21 +70,20 @@ function ProviderJobs() {
     const handleAction = async (jobId, action) => {
         setBusyId(jobId);
 
-        try {
-            if (action === "start") {
-                await startJob(jobId);
-            } else {
-                await completeJob(jobId);
-            }
+        const isStart = action === "start";
 
+        const { ok } = await run(
+            () => (isStart ? startJob(jobId) : completeJob(jobId)),
+            {
+                success: isStart ? "Job started." : "Job completed.",
+                retry: true
+            }
+        );
+
+        setBusyId(null);
+
+        if (ok) {
             refresh();
-        } catch (err) {
-            setError(
-                err.response?.data?.message ||
-                    "Action could not be completed."
-            );
-        } finally {
-            setBusyId(null);
         }
     };
 

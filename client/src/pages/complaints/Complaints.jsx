@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     createComplaint,
     fetchMyComplaints
@@ -8,9 +8,12 @@ import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
 import Input from "../../components/ui/Input";
+import Select from "../../components/ui/Select";
 import Textarea from "../../components/ui/Textarea";
 import Spinner from "../../components/ui/Spinner";
 import EmptyState from "../../components/ui/EmptyState";
+import useActionFeedback from "../../hooks/useActionFeedback";
+import { rules } from "../../lib/validation";
 import { formatDate } from "../../lib/format";
 
 const STATUS_COLORS = {
@@ -20,6 +23,31 @@ const STATUS_COLORS = {
     REJECTED: "red"
 };
 
+const INITIAL_VALUES = {
+    job_id: "",
+    subject: "",
+    description: ""
+};
+
+/**
+ * Mirrors `content.complaint` on the server. The minimum lengths exist because
+ * an admin cannot act on "no show" or "bad service" -- they need a date, a place
+ * and what was agreed, and those two fields are the only place to put it.
+ */
+const SCHEMA = {
+    job_id: [rules.number({ label: "Related job", integer: true, min: 1 })],
+    subject: [
+        rules.required("Subject"),
+        rules.minLength(4, "Give the subject a little more detail"),
+        rules.maxLength(200, "Subject must be 200 characters or fewer")
+    ],
+    description: [
+        rules.required("Details"),
+        rules.minLength(10, "Please describe what happened in a bit more detail"),
+        rules.maxLength(5000, "Details must be 5000 characters or fewer")
+    ]
+};
+
 function Complaints() {
     const [complaints, setComplaints] = useState([]);
     const [jobs, setJobs] = useState([]);
@@ -27,15 +55,21 @@ function Complaints() {
     const [error, setError] = useState("");
 
     const [showForm, setShowForm] = useState(false);
-    const [form, setForm] = useState({
-        job_id: "",
-        subject: "",
-        description: ""
-    });
-    const [submitting, setSubmitting] = useState(false);
-    const [formError, setFormError] = useState("");
 
-    const load = () => {
+    const {
+        values,
+        fieldErrors,
+        formError,
+        announcement,
+        pending,
+        handleChange,
+        handleBlur,
+        validateAll,
+        reset,
+        run
+    } = useActionFeedback({ schema: SCHEMA, initialValues: INITIAL_VALUES });
+
+    const load = useCallback(() => {
         setLoading(true);
         setError("");
 
@@ -48,40 +82,61 @@ function Complaints() {
                 setError("Unable to load complaints. Please try again.")
             )
             .finally(() => setLoading(false));
-    };
+    }, []);
 
     useEffect(() => {
         load();
-    }, []);
+    }, [load]);
 
-    const handleChange = (e) => {
-        setForm({ ...form, [e.target.name]: e.target.value });
+    // Opening the form always starts from a clean slate, so a half-written
+    // complaint abandoned earlier is not silently resubmitted with new text.
+    const toggleForm = () => {
+        setShowForm((visible) => {
+            if (!visible) {
+                reset(INITIAL_VALUES);
+            }
+
+            return !visible;
+        });
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setFormError("");
-        setSubmitting(true);
+    const handleSubmit = async (event) => {
+        event.preventDefault();
 
-        try {
-            await createComplaint({
-                job_id: form.job_id || undefined,
-                subject: form.subject,
-                description: form.description
-            });
+        if (!validateAll(values)) {
+            return;
+        }
 
-            setForm({ job_id: "", subject: "", description: "" });
+        const { ok } = await run(
+            () =>
+                createComplaint({
+                    job_id: values.job_id || undefined,
+                    subject: values.subject.trim(),
+                    description: values.description.trim()
+                }),
+            {
+                success: "Complaint submitted. Our team will review it shortly.",
+                retry: true
+            }
+        );
+
+        if (ok) {
+            reset(INITIAL_VALUES);
             setShowForm(false);
             load();
-        } catch (err) {
-            setFormError(
-                err.response?.data?.message ||
-                    "Complaint could not be submitted."
-            );
-        } finally {
-            setSubmitting(false);
         }
     };
+
+    // The job list is empty until it arrives, and an empty `Select` with nothing
+    // but its placeholder reads as broken, so say what it means.
+    const jobOptions = useMemo(
+        () =>
+            jobs.map((job) => ({
+                value: job.id,
+                label: `Job #${job.id} — ${job.title}`
+            })),
+        [jobs]
+    );
 
     return (
         <div>
@@ -95,7 +150,7 @@ function Complaints() {
                         review it.
                     </p>
                 </div>
-                <Button onClick={() => setShowForm((v) => !v)}>
+                <Button onClick={toggleForm}>
                     {showForm ? "Close form" : "New complaint"}
                 </Button>
             </div>
@@ -107,66 +162,62 @@ function Complaints() {
                     </h2>
 
                     {formError && (
-                        <p className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+                        <div
+                            role="alert"
+                            className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700"
+                        >
                             {formError}
-                        </p>
+                        </div>
                     )}
 
-                    <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-                        <div>
-                            <label
-                                htmlFor="complaint-job"
-                                className="mb-1.5 block text-sm font-medium text-slate-700"
-                            >
-                                Related job (optional)
-                            </label>
-                            <select
-                                id="complaint-job"
-                                name="job_id"
-                                className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                                value={form.job_id}
-                                onChange={handleChange}
-                            >
-                                <option value="">Not related to a job</option>
-                                {jobs.map((job) => (
-                                    <option key={job.id} value={job.id}>
-                                        Job #{job.id} — {job.title}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
+                    <form onSubmit={handleSubmit} noValidate className="mt-5 space-y-4">
+                        <Select
+                            label="Related job (optional)"
+                            id="job_id"
+                            name="job_id"
+                            placeholder="Not related to a job"
+                            options={jobOptions}
+                            value={values.job_id}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            error={fieldErrors.job_id}
+                        />
 
                         <Input
                             label="Subject"
                             id="subject"
                             name="subject"
                             placeholder="e.g. Provider did not show up"
-                            value={form.subject}
+                            value={values.subject}
                             onChange={handleChange}
+                            onBlur={handleBlur}
+                            maxLength={200}
+                            error={fieldErrors.subject}
                             required
                         />
 
-                        <div>
-                            <label
-                                htmlFor="description"
-                                className="mb-1.5 block text-sm font-medium text-slate-700"
-                            >
-                                Details
-                            </label>
-                            <Textarea
-                                id="description"
-                                name="description"
-                                rows="4"
-                                placeholder="Describe what went wrong..."
-                                value={form.description}
-                                onChange={handleChange}
-                                required
-                            />
-                        </div>
+                        <Textarea
+                            label="Details"
+                            id="description"
+                            name="description"
+                            rows="4"
+                            placeholder="Describe what went wrong, including when it happened and what was agreed."
+                            value={values.description}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            maxLength={5000}
+                            error={fieldErrors.description}
+                            hint="Include dates and amounts where you can — it speeds up the review."
+                            required
+                        />
 
-                        <Button type="submit" loading={submitting}>
+                        <Button type="submit" loading={pending}>
                             Submit complaint
                         </Button>
+
+                        <p aria-live="polite" className="sr-only">
+                            {announcement}
+                        </p>
                     </form>
                 </Card>
             )}

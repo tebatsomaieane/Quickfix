@@ -35,7 +35,9 @@ function SidebarNav({
               };
 
     return (
-        <nav className={`flex-1 overflow-y-auto px-3 py-4 ${className}`}>
+        <nav
+            className={`qf-scroll-x flex-1 overflow-y-auto overscroll-contain px-3 py-4 ${className}`}
+        >
             {groups.map((group) => (
                 <div key={group.label} className="mb-5">
                     <p
@@ -55,8 +57,11 @@ function SidebarNav({
                                     <Link
                                         to={item.to}
                                         onClick={onNavigate}
+                                        aria-current={
+                                            active ? "page" : undefined
+                                        }
                                         className={[
-                                            "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200",
+                                            "qf-tap group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors duration-200",
                                             active
                                                 ? styles.itemActive
                                                 : styles.itemIdle

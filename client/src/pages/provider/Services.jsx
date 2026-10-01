@@ -1,27 +1,57 @@
 import { useEffect, useState } from "react";
-import { fetchCategories, fetchServices } from "../../services/catalogueService";
+import {
+    fetchCategories,
+    fetchMyProviderProfile,
+    fetchServices
+} from "../../services/catalogueService";
 import { updateProviderServices } from "../../services/providerService";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import Spinner from "../../components/ui/Spinner";
 import EmptyState from "../../components/ui/EmptyState";
+import { useActionFeedback } from "../../hooks/useActionFeedback";
 
 function ProviderServices() {
     const [categories, setCategories] = useState([]);
     const [services, setServices] = useState([]);
     const [selected, setSelected] = useState({});
     const [loading, setLoading] = useState(true);
-    const [message, setMessage] = useState("");
-    const [error, setError] = useState("");
-    const [saving, setSaving] = useState(false);
+    const [loadError, setLoadError] = useState("");
+    const { run, pending: saving } = useActionFeedback();
 
     useEffect(() => {
-        Promise.all([fetchCategories(), fetchServices()])
-            .then(([cats, serv]) => {
+        Promise.all([
+            fetchCategories(),
+            fetchServices(),
+            // Fetched to pre-tick the boxes. Saving replaces the provider's
+            // entire service list, so an editor that started empty would
+            // silently delete every existing selection the first time it was
+            // saved without being touched.
+            fetchMyProviderProfile()
+        ])
+            .then(([cats, serv, profile]) => {
                 setCategories(cats.data);
                 setServices(serv.data);
+
+                const current = profile?.data?.services || [];
+
+                setSelected(
+                    current.reduce((accumulator, service) => {
+                        accumulator[service.id] = {
+                            service_id: service.id,
+                            // The API stores price as null when unset.
+                            price: service.price ?? ""
+                        };
+
+                        return accumulator;
+                    }, {})
+                );
             })
-            .catch(() => {})
+            .catch(() => {
+                setLoadError(
+                    "We couldn't load your services. Please refresh and try again."
+                );
+            })
             .finally(() => setLoading(false));
     }, []);
 
@@ -48,29 +78,29 @@ function ProviderServices() {
     };
 
     const handleSave = async () => {
-        setMessage("");
-        setError("");
-        setSaving(true);
-        try {
-            const payload = Object.values(selected).map((entry) => ({
-                service_id: entry.service_id,
-                price: entry.price ? Number(entry.price) : null
-            }));
+        await run(
+            () => {
+                const payload = Object.values(selected).map((entry) => ({
+                    service_id: entry.service_id,
+                    price: entry.price ? Number(entry.price) : null
+                }));
 
-            const data = await updateProviderServices(payload);
-            if (data.success) {
-                setMessage("Services saved. Customers can now find you for these services.");
+                return updateProviderServices(payload);
+            },
+            {
+                success: "Services saved. Customers can now find you for these services.",
+                retry: true
             }
-        } catch (err) {
-            setError(err.response?.data?.message || "Failed to save services.");
-        } finally {
-            setSaving(false);
-        }
+        );
     };
 
     if (loading) {
         return <div className="flex justify-center py-20"><Spinner /></div>;
     }
+
+    // Saving is blocked rather than allowed to send an empty list, which the
+    // API would interpret as "remove all of this provider's services".
+    const selectedCount = Object.keys(selected).length;
 
     return (
         <div>
@@ -81,20 +111,25 @@ function ProviderServices() {
                         Choose the services you offer and set your prices.
                     </p>
                 </div>
-                <Button onClick={handleSave} loading={saving}>
+                <Button
+                    onClick={handleSave}
+                    loading={saving}
+                    disabled={selectedCount === 0}
+                >
                     Save services
                 </Button>
             </div>
 
-            {message && (
-                <div className="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
-                    {message}
+            {loadError && (
+                <div role="alert" className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {loadError}
                 </div>
             )}
 
-            {error && (
-                <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {error}
+            {selectedCount === 0 && !loadError && (
+                <div className="mb-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    Select at least one service before saving. Saving with
+                    nothing selected would remove all your current services.
                 </div>
             )}
 

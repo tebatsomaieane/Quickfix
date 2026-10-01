@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
@@ -13,6 +13,7 @@ import Button from "../../components/ui/Button";
 import Spinner from "../../components/ui/Spinner";
 import Icon from "../../components/ui/Icon";
 import { onEvent } from "../../services/realtimeService";
+import useActionFeedback from "../../hooks/useActionFeedback";
 
 function Messages() {
     const { user } = useAuth();
@@ -24,7 +25,12 @@ function Messages() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [draft, setDraft] = useState("");
-    const [sending, setSending] = useState(false);
+
+    // Sending goes through the shared feedback path so a dropped connection
+    // offers a "Try again" that re-sends the same text, instead of a banner
+    // telling the user nothing about what happened to their message.
+    const { run, pending: sending, formError: sendError } =
+        useActionFeedback();
 
     const threadEndRef = useRef(null);
 
@@ -163,15 +169,26 @@ function Messages() {
         return unsubscribe;
     }, [conversationId]);
 
-    const scrollToBottom = () => {
+    const threadRef = useRef(null);
+
+    // Scrolls the thread itself, not the document — `scrollIntoView` on the
+    // page would yank the whole screen down on a phone every time a message
+    // arrived.
+    const scrollToBottom = useCallback(() => {
         requestAnimationFrame(() => {
-            threadEndRef.current?.scrollIntoView({ block: "end" });
+            const el = threadRef.current;
+
+            if (el) {
+                el.scrollTop = el.scrollHeight;
+            } else {
+                threadEndRef.current?.scrollIntoView({ block: "end" });
+            }
         });
-    };
+    }, []);
 
     useEffect(() => {
         scrollToBottom();
-    }, [active?.messages?.length]);
+    }, [active?.messages?.length, scrollToBottom]);
 
     const selectConversation = (id) => {
         navigate(`${basePath}/${id}`);
@@ -180,24 +197,36 @@ function Messages() {
     const handleSend = async (e) => {
         e.preventDefault();
 
-        if (!draft.trim()) {
+        // The composer is a chat box, so an empty box is not an error worth a
+        // red field -- the send button is simply disabled. The check is here so
+        // the form cannot be submitted with the keyboard while it is disabled.
+        const text = draft.trim();
+
+        if (!text) {
             return;
         }
 
-        setSending(true);
+        const { ok } = await run(() => sendMessage(active.id, text), {
+            retry: true
+        });
+
+        // The draft is kept on failure so a dropped connection does not cost the
+        // user the message they had already typed.
+        if (!ok) {
+            return;
+        }
+
+        setDraft("");
 
         try {
-            await sendMessage(active.id, draft.trim());
-            setDraft("");
-
             const data = await fetchConversation(active.id);
 
             setActive(data.data);
             loadList();
         } catch {
-            setError("Message could not be sent.");
-        } finally {
-            setSending(false);
+            setError(
+                "Your message was sent, but the thread could not be refreshed."
+            );
         }
     };
 
@@ -221,7 +250,7 @@ function Messages() {
             </div>
 
             {error && (
-                <p className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+                <p role="alert" className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
                     {error}
                 </p>
             )}
@@ -229,15 +258,15 @@ function Messages() {
             <div className="grid gap-4 lg:grid-cols-3">
                 {/* Conversation list — hidden on phones while a thread is open */}
                 <Card
-                    className={`overflow-hidden lg:col-span-1 ${
-                        conversationId ? "hidden lg:block" : ""
+                    className={`qf-fill-viewport flex flex-col overflow-hidden lg:h-auto lg:min-h-[420px] lg:col-span-1 ${
+                        conversationId ? "hidden lg:flex" : ""
                     }`}
                 >
-                    <div className="border-b border-slate-100 px-4 py-3 text-sm font-medium text-slate-500">
+                    <div className="shrink-0 border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-500">
                         Conversations
                     </div>
 
-                    <div className="divide-y divide-slate-100">
+                    <div className="qf-scroll-x min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto overscroll-contain">
                         {conversations.map((conversation) => (
                             <button
                                 key={conversation.id}
@@ -246,7 +275,7 @@ function Messages() {
                                     selectConversation(conversation.id)
                                 }
                                 className={[
-                                    "flex w-full items-start gap-3 px-4 py-3 text-left transition",
+                                    "qf-press-dim flex w-full items-start gap-3 px-4 py-3 text-left transition-colors",
                                     Number(conversationId) === conversation.id
                                         ? "bg-indigo-50"
                                         : "hover:bg-slate-50"
@@ -281,7 +310,7 @@ function Messages() {
                         ))}
 
                         {conversations.length === 0 && (
-                            <div className="px-4 py-8 text-center text-sm text-slate-400">
+                            <div className="px-4 py-10 text-center text-sm text-slate-400">
                                 No conversations yet.
                             </div>
                         )}
@@ -291,7 +320,9 @@ function Messages() {
                 {/* Thread */}
                 <div
                     className={`${
-                        !conversationId ? "hidden lg:block lg:col-span-2" : "lg:col-span-2"
+                        !conversationId
+                            ? "hidden lg:block lg:col-span-2"
+                            : "lg:col-span-2"
                     }`}
                 >
                     {!conversationId || (loading && !active) ? (
@@ -323,24 +354,27 @@ function Messages() {
                             </Link>
                         </Card>
                     ) : (
-                        <Card className="flex h-[max(320px,calc(100dvh-18.5rem))] flex-col lg:h-auto lg:min-h-[420px]">
+                        <Card
+                            className="qf-fill-viewport flex flex-col overflow-hidden lg:h-auto lg:min-h-[420px]"
+                        >
                             {/* Header */}
-                            <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
+                            <div className="flex shrink-0 items-center gap-3 border-b border-slate-100 bg-white px-3 py-2.5 sm:px-4 sm:py-3">
                                 <Link
                                     to={basePath}
-                                    className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 lg:hidden"
+                                    className="qf-tap-sm -ml-1 shrink-0 rounded-xl p-2 text-slate-500 transition-colors hover:bg-slate-100 lg:hidden"
                                     title="Back"
+                                    aria-label="Back to conversations"
                                 >
                                     <Icon
-                                        name="chevronRight"
-                                        className="h-5 w-5 rotate-180"
+                                        name="arrowLeft"
+                                        className="h-5 w-5"
                                     />
                                 </Link>
-                                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
+                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
                                     {otherParty[0]}
                                 </span>
-                                <div className="min-w-0">
-                                    <p className="truncate font-medium text-slate-900">
+                                <div className="min-w-0 flex-1">
+                                    <p className="truncate font-semibold text-slate-900">
                                         {otherParty}
                                     </p>
                                     {active.request_title && (
@@ -352,7 +386,10 @@ function Messages() {
                             </div>
 
                             {/* Messages */}
-                            <div className="flex-1 space-y-3 overflow-y-auto bg-slate-50 p-4">
+                            <div
+                                ref={threadRef}
+                                className="qf-scroll-x min-h-0 flex-1 space-y-2.5 overflow-y-auto overscroll-contain bg-slate-50 p-3 sm:p-4"
+                            >
                                 {active.messages.length === 0 ? (
                                     <p className="text-center text-sm text-slate-400">
                                         No messages yet. Say hello.
@@ -408,22 +445,62 @@ function Messages() {
                             {/* Composer */}
                             <form
                                 onSubmit={handleSend}
-                                className="flex gap-2 border-t border-slate-100 p-3"
+                                noValidate
+                                className="shrink-0 border-t border-slate-100 bg-white p-2.5 sm:p-3"
                             >
-                                <Input
-                                    value={draft}
-                                    onChange={(e) => setDraft(e.target.value)}
-                                    placeholder="Type a message..."
-                                    aria-label="Message"
-                                    className="flex-1"
-                                />
-                                <Button
-                                    type="submit"
-                                    disabled={!draft.trim()}
-                                    loading={sending}
-                                >
-                                    Send
-                                </Button>
+                                {/* Kept next to the box that caused it: the
+                                    composer scrolls independently of the thread,
+                                    so a banner at the top of the page would be
+                                    off-screen when the failure happens. */}
+                                {sendError && (
+                                    <p
+                                        role="alert"
+                                        className="mb-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+                                    >
+                                        {sendError}
+                                    </p>
+                                )}
+
+                                <div className="flex items-center gap-2">
+                                    <div className="min-w-0 flex-1">
+                                        <Input
+                                            value={draft}
+                                            onChange={(e) =>
+                                                setDraft(
+                                                    e.target.value.slice(
+                                                        0,
+                                                        5000
+                                                    )
+                                                )
+                                            }
+                                            placeholder="Type a message..."
+                                            aria-label="Message"
+                                            aria-invalid={
+                                                sendError
+                                                    ? true
+                                                    : undefined
+                                            }
+                                            enterKeyHint="send"
+                                            autoComplete="off"
+                                            maxLength={5000}
+                                        />
+                                    </div>
+                                    <Button
+                                        type="submit"
+                                        disabled={!draft.trim()}
+                                        loading={sending}
+                                        className="shrink-0"
+                                        aria-label="Send message"
+                                    >
+                                        <Icon
+                                            name="send"
+                                            className="h-4 w-4 sm:hidden"
+                                        />
+                                        <span className="hidden sm:inline">
+                                            Send
+                                        </span>
+                                    </Button>
+                                </div>
                             </form>
                         </Card>
                     )}

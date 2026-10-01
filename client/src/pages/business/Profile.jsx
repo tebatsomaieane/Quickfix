@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
     fetchProfile,
     updateProfile,
@@ -12,6 +12,8 @@ import Textarea from "../../components/ui/Textarea";
 import Spinner from "../../components/ui/Spinner";
 import SmartImage from "../../components/ui/SmartImage";
 import FileUpload from "../../components/ui/FileUpload";
+import useActionFeedback from "../../hooks/useActionFeedback";
+import { rules } from "../../lib/validation";
 
 const VERIFICATION_COLORS = {
     PENDING: "amber",
@@ -19,22 +21,75 @@ const VERIFICATION_COLORS = {
     REJECTED: "red"
 };
 
+const EMPTY_FORM = {
+    name: "",
+    description: "",
+    phone: "",
+    email: "",
+    location: "",
+    operating_hours: "",
+    logo: "",
+    cover_image: ""
+};
+
+/**
+ * Mirrors `content.businessProfile` on the server, which is a partial update:
+ * an empty `email` is how a business removes its contact address, so blank is
+ * allowed there rather than treated as missing.
+ *
+ * The name is the one field required here, and only on this form. The server
+ * stays permissive because it also backs "remove the name" style calls, but a
+ * nameless public listing is not something a user means to publish.
+ */
+const SCHEMA = {
+    name: [
+        rules.required("Business name"),
+        rules.minLength(2, "Business name must be at least 2 characters"),
+        rules.maxLength(200, "Business name must be 200 characters or fewer")
+    ],
+    description: [
+        rules.maxLength(5000, "Description must be 5000 characters or fewer")
+    ],
+    phone: [rules.phone()],
+    email: [rules.email()],
+    location: [rules.maxLength(255, "Location is too long")],
+    operating_hours: [
+        rules.maxLength(1000, "Operating hours must be 1000 characters or fewer")
+    ],
+    logo: [rules.maxLength(500, "Logo reference is too long")],
+    cover_image: [rules.maxLength(500, "Cover photo reference is too long")]
+};
+
 function Profile() {
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
     const [editMode, setEditMode] = useState(false);
-    const [form, setForm] = useState({});
-    const [formError, setFormError] = useState("");
-    const [formSuccess, setFormSuccess] = useState("");
-    const [saving, setSaving] = useState(false);
-    const [requesting, setRequesting] = useState(false);
 
-    const load = () => {
+    const {
+        values: form,
+        fieldErrors,
+        formError,
+        announcement,
+        pending: saving,
+        setValue,
+        handleChange,
+        handleBlur,
+        validateAll,
+        reset,
+        run
+    } = useActionFeedback({ schema: SCHEMA, initialValues: EMPTY_FORM });
+
+    // Requesting verification is a separate one-click action with its own
+    // button, so it does not share the save button's pending state.
+    const { run: runVerification, pending: requesting } =
+        useActionFeedback();
+
+    const load = useCallback(() => {
         setLoading(true);
         fetchProfile()
             .then((data) => {
                 setProfile(data.data);
-                setForm({
+                reset({
                     name: data.data.name || "",
                     description: data.data.description || "",
                     phone: data.data.phone || "",
@@ -47,39 +102,36 @@ function Profile() {
             })
             .catch(() => {})
             .finally(() => setLoading(false));
-    };
+    }, [reset]);
 
-    useEffect(() => { load(); }, []);
-
-    const handleChange = (e) => {
-        setForm({ ...form, [e.target.name]: e.target.value });
-    };
+    useEffect(() => { load(); }, [load]);
 
     const handleSave = async (e) => {
         e.preventDefault();
-        setFormError("");
-        setFormSuccess("");
-        setSaving(true);
 
-        try {
-            await updateProfile(form);
-            setFormSuccess("Profile updated.");
+        if (!validateAll(form)) {
+            return;
+        }
+
+        const { ok } = await run(() => updateProfile(form), {
+            success: "Profile updated.",
+            retry: true
+        });
+
+        if (ok) {
             setEditMode(false);
             load();
-        } catch (err) {
-            setFormError(err.response?.data?.message || "Update failed.");
-        } finally {
-            setSaving(false);
         }
     };
 
     const handleRequestVerification = async () => {
-        setRequesting(true);
-        try {
-            await requestVerification();
+        const { ok } = await runVerification(() => requestVerification(), {
+            success: "Verification requested. We'll review it soon.",
+            retry: true
+        });
+
+        if (ok) {
             load();
-        } catch {} finally {
-            setRequesting(false);
         }
     };
 
@@ -119,47 +171,113 @@ function Profile() {
                 </div>
             </div>
 
-            {formSuccess && <div className="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">{formSuccess}</div>}
-
             {editMode ? (
                 <Card className="max-w-2xl p-6">
-                    {formError && <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</div>}
-                    <form onSubmit={handleSave} className="space-y-4">
-                        <Input label="Business name" id="name" name="name" value={form.name} onChange={handleChange} required />
-                        <div>
-                            <label htmlFor="description" className="mb-1.5 block text-sm font-medium text-slate-700">Description</label>
-                            <Textarea id="description" name="description" rows="3" value={form.description} onChange={handleChange} />
-                        </div>
+                    {formError && <div role="alert" className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</div>}
+                    <form onSubmit={handleSave} noValidate className="space-y-4">
+                        <Input
+                            label="Business name"
+                            id="name"
+                            name="name"
+                            value={form.name}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            maxLength={200}
+                            error={fieldErrors.name}
+                            required
+                        />
+
+                        <Textarea
+                            label="Description"
+                            id="description"
+                            name="description"
+                            rows="3"
+                            value={form.description}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            maxLength={5000}
+                            error={fieldErrors.description}
+                        />
+
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <Input label="Phone" id="phone" name="phone" type="tel" value={form.phone} onChange={handleChange} />
-                            <Input label="Email" id="email" name="email" type="email" value={form.email} onChange={handleChange} />
+                            <Input
+                                label="Phone"
+                                id="phone"
+                                name="phone"
+                                type="tel"
+                                inputMode="tel"
+                                value={form.phone}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                maxLength={30}
+                                error={fieldErrors.phone}
+                            />
+                            <Input
+                                label="Email"
+                                id="email"
+                                name="email"
+                                type="email"
+                                autoCapitalize="none"
+                                spellCheck="false"
+                                value={form.email}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                error={fieldErrors.email}
+                                hint="Leave blank to remove your contact address."
+                            />
                         </div>
+
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <Input label="Location" id="location" name="location" value={form.location} onChange={handleChange} />
-                            <Input label="Operating hours" id="operating_hours" name="operating_hours" value={form.operating_hours} onChange={handleChange} placeholder="Mon–Fri: 8:00–17:00" />
+                            <Input
+                                label="Location"
+                                id="location"
+                                name="location"
+                                value={form.location}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                maxLength={255}
+                                error={fieldErrors.location}
+                            />
+                            <Input
+                                label="Operating hours"
+                                id="operating_hours"
+                                name="operating_hours"
+                                value={form.operating_hours}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                maxLength={1000}
+                                error={fieldErrors.operating_hours}
+                                placeholder="Mon–Fri: 8:00–17:00"
+                            />
                         </div>
+
                         <div className="grid gap-4 sm:grid-cols-2">
                             <FileUpload
                                 label="Logo"
+                                name="logo"
                                 kind="image"
                                 value={form.logo}
-                                onChange={(url) =>
-                                    setForm({ ...form, logo: url })
-                                }
+                                onChange={(url) => setValue("logo", url)}
+                                error={fieldErrors.logo}
                             />
                             <FileUpload
                                 label="Cover photo"
+                                name="cover_image"
                                 kind="image"
                                 value={form.cover_image}
-                                onChange={(url) =>
-                                    setForm({ ...form, cover_image: url })
-                                }
+                                onChange={(url) => setValue("cover_image", url)}
+                                error={fieldErrors.cover_image}
                             />
                         </div>
+
                         <div className="flex gap-3">
                             <Button type="submit" loading={saving}>Save</Button>
                             <Button variant="secondary" type="button" onClick={() => { setEditMode(false); load(); }}>Cancel</Button>
                         </div>
+
+                        <p aria-live="polite" className="sr-only">
+                            {announcement}
+                        </p>
                     </form>
                 </Card>
             ) : (

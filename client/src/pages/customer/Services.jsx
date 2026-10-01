@@ -102,12 +102,12 @@ function Services() {
             </div>
 
             {/* Category image tabs */}
-            <div className="mt-6 flex gap-3 overflow-x-auto pb-2">
+            <div className="qf-snap-x qf-rail-fade-x mt-6 flex gap-3 overflow-x-auto pb-2">
                 <button
                     type="button"
                     onClick={() => navigate("/customer/services")}
                     className={[
-                        "group shrink-0 overflow-hidden rounded-2xl border-2 transition",
+                        "qf-snap-item qf-tap-sm group shrink-0 overflow-hidden rounded-2xl border-2 transition",
                         !activeCategoryId
                             ? "border-indigo-600 ring-2 ring-indigo-600/20"
                             : "border-transparent hover:border-indigo-300"
@@ -126,7 +126,7 @@ function Services() {
                             navigate(`/customer/services/${category.id}`)
                         }
                         className={[
-                            "group relative h-20 w-28 shrink-0 overflow-hidden rounded-2xl border-2 transition",
+                            "qf-snap-item qf-tap-sm group relative h-20 w-28 shrink-0 overflow-hidden rounded-2xl border-2 transition",
                             activeCategoryId === category.id
                                 ? "border-indigo-600 ring-2 ring-indigo-600/20"
                                 : "border-transparent hover:border-indigo-300"
@@ -137,7 +137,7 @@ function Services() {
                             alt={category.name}
                             seed={category.name}
                             icon="grid"
-                            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                            className="qf-img-zoom h-full w-full object-cover"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 to-transparent" />
                         <p className="absolute inset-x-0 bottom-0 p-2 text-left text-[11px] font-bold leading-tight text-white">

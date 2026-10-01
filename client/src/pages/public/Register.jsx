@@ -4,8 +4,11 @@ import { registerUser } from "../../services/authService";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
 import Select from "../../components/ui/Select";
+import PasswordInput from "../../components/ui/PasswordInput";
 import Logo from "../../components/ui/Logo";
 import AuthShell from "../../components/auth/AuthShell";
+import useFormValidation from "../../hooks/useFormValidation";
+import { rules } from "../../lib/validation";
 import customerRoleImage from "../../assets/servicerequestperson.jpg";
 import providerRoleImage from "../../assets/electrician.jpg";
 import businessRoleImage from "../../assets/restaurant.jpg";
@@ -40,102 +43,135 @@ const HIGHLIGHTS = [
     "Stores and cafés can advertise products too"
 ];
 
+const INITIAL_VALUES = {
+    first_name: "",
+    last_name: "",
+    email: "",
+    phone: "",
+    password: "",
+    confirm_password: "",
+    role: "CUSTOMER"
+};
+
+/**
+ * Mirrors the server's registration contract, then adds the two checks it does
+ * not perform: a password confirmation, and a password strong enough to have
+ * survived the years since the API's 6-character minimum was written.
+ *
+ * Note the client is deliberately stricter than the server. The server accepts
+ * a 6-character password, but anything this form allows is something the server
+ * will also accept, so a valid form never makes a pointless round-trip to be
+ * told what was wrong.
+ */
+const SCHEMA = {
+    first_name: [
+        rules.required("First name"),
+        rules.minLength(2, "First name is too short"),
+        rules.name(),
+        rules.maxLength(50, "First name must be 50 characters or fewer")
+    ],
+    last_name: [
+        rules.required("Last name"),
+        rules.minLength(2, "Last name is too short"),
+        rules.name(),
+        rules.maxLength(50, "Last name must be 50 characters or fewer")
+    ],
+    email: [rules.required("Email address"), rules.email()],
+    phone: [
+        rules.required("Phone number"),
+        rules.phone(),
+        rules.maxLength(30, "Phone number must be 30 characters or fewer")
+    ],
+    password: [
+        rules.required("Password"),
+        rules.strongPassword(),
+        rules.maxLength(128, "Password is too long")
+    ],
+    confirm_password: [
+        rules.required("Password confirmation"),
+        rules.matches("password")
+    ],
+    role: [rules.required("Account type")]
+};
+
 function Register() {
     const navigate = useNavigate();
 
-    const [formData, setFormData] = useState({
-        first_name: "",
-        last_name: "",
-        email: "",
-        phone: "",
-        password: "",
-        role: "CUSTOMER"
-    });
+    const {
+        values,
+        errors,
+        formError,
+        announcement,
+        handleChange,
+        handleBlur,
+        validateAll,
+        applyServerError,
+        reset
+    } = useFormValidation({ schema: SCHEMA, initialValues: INITIAL_VALUES });
 
-    const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
     const [loading, setLoading] = useState(false);
-
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-
-        setFormData((previousData) => ({
-            ...previousData,
-            [name]: value
-        }));
-    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        setError("");
         setSuccess("");
 
-        if (formData.password.length < 6) {
-            setError("Password must be at least 6 characters long.");
-            return;
-        }
-
-        if (!formData.phone.trim()) {
-            setError("Please enter your phone number.");
-            return;
-        }
-
-        if (formData.phone.trim().length > 30) {
-            setError("Phone number must be 30 characters or fewer.");
+        if (!validateAll(values)) {
             return;
         }
 
         setLoading(true);
 
         try {
+            // confirm_password is a client-side concern only and must not reach
+            // the API, which would reject or store an unknown column.
             const payload = {
-                ...formData,
-                first_name: formData.first_name.trim(),
-                last_name: formData.last_name.trim(),
-                email: formData.email.trim(),
-                phone: formData.phone.trim()
+                first_name: values.first_name.trim(),
+                last_name: values.last_name.trim(),
+                email: values.email.trim(),
+                phone: values.phone.trim(),
+                password: values.password,
+                role: values.role
             };
 
-            const data = await registerUser(payload);
+            const data = await registerUser({
+                ...payload,
+                first_name: payload.first_name.trim(),
+                last_name: payload.last_name.trim(),
+                email: payload.email.trim(),
+                phone: payload.phone.trim()
+            });
 
             if (data.success) {
-                if (data.verification === "sent") {
-                    setSuccess(
-                        "Account created! Check your email for the 6-digit verification PIN (check spam too)."
-                    );
-                } else {
-                    setSuccess("Registration successful!");
-                }
+                const message =
+                    data.verification === "sent"
+                        ? "Account created! Check your email for the 6-digit verification PIN (check spam too)."
+                        : "Registration successful!";
 
-                setFormData({
-                    first_name: "",
-                    last_name: "",
-                    email: "",
-                    phone: "",
-                    password: "",
-                    role: "CUSTOMER"
-                });
+                setSuccess(message);
+                reset(INITIAL_VALUES);
 
+                // Let the success message register before the route changes, so
+                // the user is not left wondering whether it worked.
                 await new Promise((resolve) => setTimeout(resolve, 1500));
 
-                navigate(`/verify-email?email=${encodeURIComponent(payload.email)}`);
-            } else {
-                setError(
-                    data.message || "Registration failed. Please try again."
+                navigate(
+                    `/verify-email?email=${encodeURIComponent(
+                        payload.email.trim()
+                    )}`
                 );
+            } else {
+                applyServerError({ data });
             }
-        } catch (error) {
-            setError(
-                error.response?.data?.message ||
-                "Unable to connect to QuickFix. Please try again."
-            );
+        } catch (requestError) {
+            applyServerError(requestError);
         } finally {
             setLoading(false);
         }
     };
 
-    const creative = ROLE_CREATIVE[formData.role] || ROLE_CREATIVE.CUSTOMER;
+    const creative = ROLE_CREATIVE[values.role] || ROLE_CREATIVE.CUSTOMER;
 
     return (
         <AuthShell
@@ -156,28 +192,37 @@ function Register() {
                 </p>
 
                 <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-                    {error && (
-                        <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-                            {error}
+                    {formError && (
+                        <div
+                            role="alert"
+                            className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700"
+                        >
+                            {formError}
                         </div>
                     )}
 
                     {success && (
-                        <div className="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
+                        <div
+                            role="status"
+                            className="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700"
+                        >
                             {success}
                         </div>
                     )}
 
-                    <form onSubmit={handleSubmit} className="space-y-4">
+                    <form onSubmit={handleSubmit} noValidate className="space-y-4">
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <Input
                                 label="First name"
                                 id="first_name"
                                 name="first_name"
                                 placeholder="First name"
-                                value={formData.first_name}
+                                value={values.first_name}
                                 onChange={handleChange}
+                                onBlur={handleBlur}
                                 autoComplete="given-name"
+                                maxLength={50}
+                                error={errors.first_name}
                                 required
                             />
 
@@ -186,9 +231,12 @@ function Register() {
                                 id="last_name"
                                 name="last_name"
                                 placeholder="Last name"
-                                value={formData.last_name}
+                                value={values.last_name}
                                 onChange={handleChange}
+                                onBlur={handleBlur}
                                 autoComplete="family-name"
+                                maxLength={50}
+                                error={errors.last_name}
                                 required
                             />
                         </div>
@@ -199,9 +247,14 @@ function Register() {
                             type="email"
                             name="email"
                             placeholder="example@email.com"
-                            value={formData.email}
+                            value={values.email}
                             onChange={handleChange}
+                            onBlur={handleBlur}
                             autoComplete="email"
+                            autoCapitalize="none"
+                            spellCheck="false"
+                            error={errors.email}
+                            hint="We'll send your verification PIN here."
                             required
                         />
 
@@ -211,25 +264,45 @@ function Register() {
                             type="tel"
                             name="phone"
                             placeholder="+266 ..."
-                            value={formData.phone}
+                            value={values.phone}
                             onChange={handleChange}
+                            onBlur={handleBlur}
                             autoComplete="tel"
-                            maxLength="30"
+                            inputMode="tel"
+                            maxLength={30}
+                            error={errors.phone}
                             hint="Required — e.g. +266 6222 2222"
                             required
                         />
 
-                        <Input
+                        <PasswordInput
                             label="Password"
                             id="password"
-                            type="password"
                             name="password"
                             placeholder="Create a password"
-                            value={formData.password}
+                            value={values.password}
                             onChange={handleChange}
+                            onBlur={handleBlur}
                             autoComplete="new-password"
-                            hint="Must be at least 6 characters long."
-                            minLength="6"
+                            maxLength={128}
+                            error={errors.password}
+                            hint="At least 8 characters with a letter and a number."
+                            strengthId="password-strength"
+                            showStrength
+                            required
+                        />
+
+                        <PasswordInput
+                            label="Confirm password"
+                            id="confirm_password"
+                            name="confirm_password"
+                            placeholder="Re-enter your password"
+                            value={values.confirm_password}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            autoComplete="new-password"
+                            maxLength={128}
+                            error={errors.confirm_password}
                             required
                         />
 
@@ -237,9 +310,11 @@ function Register() {
                             label="What are you here for?"
                             id="role"
                             name="role"
-                            value={formData.role}
+                            value={values.role}
                             onChange={handleChange}
+                            onBlur={handleBlur}
                             options={ROLE_OPTIONS}
+                            error={errors.role}
                         />
 
                         <Button
@@ -249,6 +324,12 @@ function Register() {
                         >
                             {loading ? "Creating account..." : "Create account"}
                         </Button>
+
+                        {/* Announces validation outcomes that are not tied to a
+                            single field, so the count is not purely visual. */}
+                        <p aria-live="polite" className="sr-only">
+                            {announcement}
+                        </p>
                     </form>
 
                     <p className="mt-6 text-center text-sm text-slate-600">

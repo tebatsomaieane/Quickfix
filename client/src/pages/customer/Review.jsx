@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { fetchJob } from "../../services/jobService";
 import { createReview } from "../../services/reviewService";
@@ -8,10 +8,44 @@ import Textarea from "../../components/ui/Textarea";
 import Spinner from "../../components/ui/Spinner";
 import EmptyState from "../../components/ui/EmptyState";
 import Icon from "../../components/ui/Icon";
+import useActionFeedback from "../../hooks/useActionFeedback";
+import { rules } from "../../lib/validation";
 import {
     formatCurrency,
     formatDateTime
 } from "../../lib/format";
+
+const RATING_LABELS = {
+    1: "Poor",
+    2: "Fair",
+    3: "Good",
+    4: "Very good",
+    5: "Excellent"
+};
+
+/**
+ * The rating is the only field the server insists on, and the comment is the
+ * only one it bounds.
+ *
+ * The rating rule is a bounds check rather than `required`, because 0 here means
+ * "not chosen yet" and `required` only treats null/undefined/"" as missing -- a
+ * zero would sail straight through it. `number` with a floor of 1 is what
+ * actually rejects an untouched rating.
+ */
+const SCHEMA = {
+    rating: [
+        rules.number({
+            label: "Rating",
+            integer: true,
+            min: 1,
+            max: 5,
+            message: "Please choose a rating between 1 and 5 stars"
+        })
+    ],
+    comment: [
+        rules.maxLength(2000, "Comment must be 2000 characters or fewer")
+    ]
+};
 
 function ReviewJob() {
     const { jobId } = useParams();
@@ -21,11 +55,25 @@ function ReviewJob() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
-    const [rating, setRating] = useState(0);
     const [hover, setHover] = useState(0);
-    const [comment, setComment] = useState("");
-    const [submitting, setSubmitting] = useState(false);
-    const [submitError, setSubmitError] = useState("");
+
+    // Memoised so the hook's reset target keeps a stable identity, and so the
+    // rating genuinely starts unset: defaulting it to 1 would file a score
+    // nobody gave.
+    const initialValues = useMemo(() => ({ rating: 0, comment: "" }), []);
+
+    const {
+        values,
+        fieldErrors,
+        formError,
+        announcement,
+        pending,
+        setValue,
+        handleChange,
+        handleBlur,
+        validateAll,
+        run
+    } = useActionFeedback({ schema: SCHEMA, initialValues });
 
     useEffect(() => {
         let cancelled = false;
@@ -64,32 +112,25 @@ function ReviewJob() {
         };
     }, [jobId]);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const handleSubmit = async (event) => {
+        event.preventDefault();
 
-        if (rating < 1) {
-            setSubmitError("Please select a rating between 1 and 5.");
-
+        if (!validateAll(values)) {
             return;
         }
 
-        setSubmitting(true);
-        setSubmitError("");
+        const { ok } = await run(
+            () =>
+                createReview({
+                    jobId: job.id,
+                    rating: Number(values.rating),
+                    comment: values.comment.trim() || undefined
+                }),
+            { retry: true }
+        );
 
-        try {
-            await createReview({
-                jobId: job.id,
-                rating,
-                comment: comment.trim() || undefined
-            });
-
+        if (ok) {
             navigate(`/customer/jobs/${job.id}`);
-        } catch (err) {
-            setSubmitError(
-                err.response?.data?.message ||
-                    "Review could not be submitted."
-            );
-            setSubmitting(false);
         }
     };
 
@@ -166,29 +207,41 @@ function ReviewJob() {
                 </dl>
             </Card>
 
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} noValidate>
                 <Card className="mt-6 p-6">
                     <h2 className="font-semibold text-slate-900">
                         How was the service?
                     </h2>
 
-                    {/* Rating picker */}
-                    <div className="mt-4 flex items-center gap-1">
+                    {/* The scale is exposed as a radiogroup so a screen reader
+                        hears one control with a position rather than five
+                        unlabelled buttons, and the chosen star is announced. */}
+                    <div
+                        role="radiogroup"
+                        aria-label="Overall rating out of 5"
+                        aria-describedby={
+                            fieldErrors.rating ? "rating-error" : undefined
+                        }
+                        aria-invalid={fieldErrors.rating ? true : undefined}
+                        onMouseLeave={() => setHover(0)}
+                        className="mt-4 flex items-center gap-1"
+                    >
                         {[1, 2, 3, 4, 5].map((value) => (
                             <button
                                 key={value}
                                 type="button"
-                                onClick={() => setRating(value)}
+                                role="radio"
+                                aria-checked={values.rating === value}
+                                aria-label={`${value} of 5 — ${RATING_LABELS[value]}`}
+                                onClick={() => setValue("rating", value)}
                                 onMouseEnter={() => setHover(value)}
-                                onMouseLeave={() => setHover(0)}
                                 className="rounded-lg p-1 text-slate-300 transition hover:text-amber-400"
-                                aria-label={`Rate ${value} star${value > 1 ? "s" : ""}`}
                             >
                                 <Icon
                                     name="star"
                                     className={[
                                         "h-8 w-8",
-                                        (hover || rating) >= value
+                                        (hover || values.rating) >= value
                                             ? "fill-amber-400 text-amber-400"
                                             : "text-slate-300"
                                     ].join(" ")}
@@ -196,11 +249,21 @@ function ReviewJob() {
                             </button>
                         ))}
                         <span className="ml-2 text-sm font-medium text-slate-700">
-                            {rating > 0
-                                ? `${rating} / 5`
+                            {values.rating > 0
+                                ? `${values.rating} / 5 — ${RATING_LABELS[values.rating]}`
                                 : "Select a rating"}
                         </span>
                     </div>
+
+                    {fieldErrors.rating && (
+                        <p
+                            id="rating-error"
+                            role="alert"
+                            className="mt-2 text-sm font-medium text-red-600"
+                        >
+                            {fieldErrors.rating}
+                        </p>
+                    )}
 
                     <div className="mt-5">
                         <label
@@ -211,31 +274,38 @@ function ReviewJob() {
                         </label>
                         <Textarea
                             id="review-comment"
+                            name="comment"
                             rows="4"
                             placeholder="Share what went well..."
-                            value={comment}
-                            onChange={(e) => setComment(e.target.value)}
+                            value={values.comment}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            maxLength={2000}
+                            error={fieldErrors.comment}
                         />
                     </div>
 
-                    {submitError && (
-                        <p className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-                            {submitError}
-                        </p>
+                    {formError && (
+                        <div
+                            role="alert"
+                            className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700"
+                        >
+                            {formError}
+                        </div>
                     )}
 
                     <div className="mt-6 flex gap-3">
-                        <Button
-                            type="submit"
-                            loading={submitting}
-                            disabled={rating < 1}
-                        >
+                        <Button type="submit" loading={pending}>
                             Submit review
                         </Button>
                         <Link to={`/customer/jobs/${job.id}`}>
                             <Button variant="outline">Cancel</Button>
                         </Link>
                     </div>
+
+                    <p aria-live="polite" className="sr-only">
+                        {announcement}
+                    </p>
                 </Card>
             </form>
         </div>

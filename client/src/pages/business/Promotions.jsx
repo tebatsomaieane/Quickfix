@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
     fetchMyPromotions,
     createPromotion,
@@ -12,37 +12,97 @@ import Input from "../../components/ui/Input";
 import Textarea from "../../components/ui/Textarea";
 import Spinner from "../../components/ui/Spinner";
 import EmptyState from "../../components/ui/EmptyState";
+import useActionFeedback from "../../hooks/useActionFeedback";
+import { rules } from "../../lib/validation";
 
+const EMPTY_FORM = {
+    title: "",
+    description: "",
+    discount: "",
+    start_date: "",
+    end_date: ""
+};
+
+/**
+ * Mirrors `content.promotion` on the server.
+ *
+ * The discount is a percentage off, so the ceiling is 100 -- "150% off" is not a
+ * discount, and a negative one would raise a price rather than lower it. The
+ * date range is checked the same way as an advertisement's, because a promotion
+ * that ends before it starts would simply never apply.
+ */
+const SCHEMA = {
+    title: [
+        rules.required("Title"),
+        rules.minLength(3, "Title must be at least 3 characters"),
+        rules.maxLength(200, "Title must be 200 characters or fewer")
+    ],
+    description: [
+        rules.maxLength(5000, "Description must be 5000 characters or fewer")
+    ],
+    discount: [
+        rules.required("Discount"),
+        rules.number({ label: "Discount", min: 0, max: 100 })
+    ],
+    start_date: [rules.required("Start date")],
+    end_date: [
+        rules.required("End date"),
+        rules.afterOrEqual("start_date", "End date")
+    ]
+};
 
 function Promotions() {
     const [promotions, setPromotions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [editId, setEditId] = useState(null);
-    const [form, setForm] = useState({ title: "", description: "", discount: "", start_date: "", end_date: "" });
-    const [formError, setFormError] = useState("");
-    const [submitting, setSubmitting] = useState(false);
     const [deleting, setDeleting] = useState(null);
 
-    const load = () => {
+    const {
+        values: form,
+        fieldErrors,
+        formError,
+        announcement,
+        pending: submitting,
+        handleChange,
+        handleBlur,
+        validateAll,
+        reset,
+        run
+    } = useActionFeedback({ schema: SCHEMA, initialValues: EMPTY_FORM });
+
+    const { run: runDelete } = useActionFeedback();
+
+    const load = useCallback(() => {
         setLoading(true);
         fetchMyPromotions()
             .then((data) => setPromotions(data.data))
             .catch(() => {})
             .finally(() => setLoading(false));
-    };
+    }, []);
 
-    useEffect(() => { load(); }, []);
+    useEffect(() => { load(); }, [load]);
 
-    const resetForm = () => {
-        setForm({ title: "", description: "", discount: "", start_date: "", end_date: "" });
+    const closeForm = () => {
+        reset(EMPTY_FORM);
         setEditId(null);
         setShowForm(false);
-        setFormError("");
+    };
+
+    const toggleForm = () => {
+        if (showForm) {
+            closeForm();
+
+            return;
+        }
+
+        reset(EMPTY_FORM);
+        setEditId(null);
+        setShowForm(true);
     };
 
     const handleEdit = (promo) => {
-        setForm({
+        reset({
             title: promo.title,
             description: promo.description || "",
             discount: String(promo.discount),
@@ -51,47 +111,53 @@ function Promotions() {
         });
         setEditId(promo.id);
         setShowForm(true);
-        setFormError("");
     };
-
-    const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setFormError("");
 
-        if (!form.title.trim()) { setFormError("Title is required."); return; }
-        if (!form.discount || Number(form.discount) < 0 || Number(form.discount) > 100) { setFormError("Discount must be 0–100."); return; }
-        if (!form.start_date) { setFormError("Start date is required."); return; }
-        if (!form.end_date) { setFormError("End date is required."); return; }
+        if (!validateAll(form)) {
+            return;
+        }
 
-        setSubmitting(true);
-        try {
-            const payload = {
-                title: form.title.trim(),
-                description: form.description.trim() || null,
-                discount: Number(form.discount),
-                start_date: form.start_date,
-                end_date: form.end_date
-            };
+        const payload = {
+            title: form.title.trim(),
+            description: form.description.trim() || null,
+            discount: Number(form.discount),
+            start_date: form.start_date,
+            end_date: form.end_date
+        };
 
-            if (editId) {
-                await updatePromotion(editId, payload);
-            } else {
-                await createPromotion(payload);
+        const { ok } = await run(
+            () =>
+                editId
+                    ? updatePromotion(editId, payload)
+                    : createPromotion(payload),
+            {
+                success: editId ? "Promotion updated." : "Promotion created.",
+                retry: true
             }
-            resetForm();
+        );
+
+        if (ok) {
+            closeForm();
             load();
-        } catch (err) {
-            setFormError(err.response?.data?.message || "Action failed.");
-        } finally {
-            setSubmitting(false);
         }
     };
 
     const handleDelete = async (id) => {
         setDeleting(id);
-        try { await deletePromotion(id); load(); } catch {} finally { setDeleting(null); }
+
+        const { ok } = await runDelete(() => deletePromotion(id), {
+            success: "Promotion deleted.",
+            retry: true
+        });
+
+        if (ok) {
+            load();
+        }
+
+        setDeleting(null);
     };
 
     return (
@@ -101,7 +167,7 @@ function Promotions() {
                     <h1 className="text-2xl font-bold text-slate-900">Promotions</h1>
                     <p className="mt-1 text-sm text-slate-500">Create time-limited promotions to attract customers.</p>
                 </div>
-                <Button onClick={() => { resetForm(); setShowForm((v) => !v); }}>
+                <Button onClick={toggleForm}>
                     {showForm ? "Close" : "+ New promotion"}
                 </Button>
             </div>
@@ -109,22 +175,82 @@ function Promotions() {
             {showForm && (
                 <Card className="mb-6 max-w-2xl p-6">
                     <h2 className="font-semibold text-slate-900">{editId ? "Edit promotion" : "New promotion"}</h2>
-                    {formError && <div className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</div>}
-                    <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-                        <Input label="Title" id="title" name="title" value={form.title} onChange={handleChange} required />
-                        <div>
-                            <label htmlFor="description" className="mb-1.5 block text-sm font-medium text-slate-700">Description</label>
-                            <Textarea id="description" name="description" rows="3" value={form.description} onChange={handleChange} />
-                        </div>
-                        <Input label="Discount %" id="discount" name="discount" type="number" min="0" max="100" step="0.01" value={form.discount} onChange={handleChange} required />
+                    {formError && <div role="alert" className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</div>}
+                    <form onSubmit={handleSubmit} noValidate className="mt-5 space-y-4">
+                        <Input
+                            label="Title"
+                            id="title"
+                            name="title"
+                            value={form.title}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            maxLength={200}
+                            error={fieldErrors.title}
+                            required
+                        />
+
+                        <Textarea
+                            label="Description"
+                            id="description"
+                            name="description"
+                            rows="3"
+                            value={form.description}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            maxLength={5000}
+                            error={fieldErrors.description}
+                        />
+
+                        <Input
+                            label="Discount %"
+                            id="discount"
+                            name="discount"
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={form.discount}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            error={fieldErrors.discount}
+                            hint="The percentage off, e.g. 15 for 15% off."
+                            required
+                        />
+
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <Input label="Start date" id="start_date" name="start_date" type="date" value={form.start_date} onChange={handleChange} required />
-                            <Input label="End date" id="end_date" name="end_date" type="date" value={form.end_date} onChange={handleChange} required />
+                            <Input
+                                label="Start date"
+                                id="start_date"
+                                name="start_date"
+                                type="date"
+                                value={form.start_date}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                error={fieldErrors.start_date}
+                                required
+                            />
+                            <Input
+                                label="End date"
+                                id="end_date"
+                                name="end_date"
+                                type="date"
+                                value={form.end_date}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                min={form.start_date || undefined}
+                                error={fieldErrors.end_date}
+                                required
+                            />
                         </div>
+
                         <div className="flex gap-3">
                             <Button type="submit" loading={submitting}>{editId ? "Update" : "Create"}</Button>
-                            <Button variant="secondary" type="button" onClick={resetForm}>Cancel</Button>
+                            <Button variant="secondary" type="button" onClick={closeForm}>Cancel</Button>
                         </div>
+
+                        <p aria-live="polite" className="sr-only">
+                            {announcement}
+                        </p>
                     </form>
                 </Card>
             )}
@@ -136,7 +262,7 @@ function Promotions() {
             ) : (
                 <>
                     <Card className="hidden overflow-hidden md:block">
-                        <div className="overflow-x-auto">
+                        <div className="qf-scroll-x overflow-x-auto">
                             <table className="w-full text-left text-sm">
                                 <thead className="border-b bg-slate-50 text-xs font-semibold tracking-wide text-slate-500">
                                     <tr>

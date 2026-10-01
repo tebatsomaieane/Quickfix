@@ -7,7 +7,7 @@ import Logo from "../ui/Logo";
 import ProviderAvatar from "../ui/ProviderAvatar";
 import VerificationBadge from "../ui/VerificationBadge";
 
-function ProviderSidebar({ navItems, onNavigate, profile }) {
+function ProviderSidebar({ navItems, onNavigate, onClose, profile }) {
     const { user, logout } = useAuth();
     const groups = groupNavItems(navItems);
     const verified = profile?.verification_status === "APPROVED";
@@ -15,7 +15,7 @@ function ProviderSidebar({ navItems, onNavigate, profile }) {
     return (
         <div className="flex h-full w-64 flex-col bg-slate-900 text-slate-300">
             {/* Logo */}
-            <div className="flex h-16 items-center border-b border-white/10 px-5">
+            <div className="flex min-h-16 items-center gap-2 border-b border-white/10 py-3 pl-5 pr-4 pt-safe">
                 <Logo
                     tone="pro"
                     onDark
@@ -23,6 +23,16 @@ function ProviderSidebar({ navItems, onNavigate, profile }) {
                     accent="Pro"
                     tagline="Provider workspace"
                 />
+                {onClose && (
+                    <button
+                        type="button"
+                        aria-label="Close menu"
+                        onClick={onClose}
+                        className="qf-tap-sm ml-auto rounded-xl p-2 text-slate-500 transition-colors hover:bg-white/10 hover:text-white"
+                    >
+                        <Icon name="x" className="h-5 w-5" />
+                    </button>
+                )}
             </div>
 
             {/* Provider card */}
@@ -30,7 +40,7 @@ function ProviderSidebar({ navItems, onNavigate, profile }) {
                 <Link
                     to="/provider/profile"
                     onClick={onNavigate}
-                    className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3 transition hover:border-emerald-400/30 hover:bg-white/10"
+                    className="qf-press-scale flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3 transition hover:border-emerald-400/30 hover:bg-white/10"
                 >
                     <ProviderAvatar
                         name={`${profile?.first_name || user?.first_name} ${profile?.last_name || user?.last_name}`}
@@ -64,7 +74,7 @@ function ProviderSidebar({ navItems, onNavigate, profile }) {
                 <Link
                     to="/provider/verification"
                     onClick={onNavigate}
-                    className="relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 p-4 text-white shadow-lg shadow-emerald-900/30"
+                    className="qf-press-scale relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 p-4 text-white shadow-lg shadow-emerald-900/30"
                 >
                     <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-white/10" />
                     <div className="flex items-center gap-2 text-sm font-semibold">
@@ -97,7 +107,7 @@ function ProviderSidebar({ navItems, onNavigate, profile }) {
                         type="button"
                         aria-label="Log out"
                         onClick={logout}
-                        className="ml-auto rounded-lg p-2 text-slate-500 transition hover:bg-rose-500/10 hover:text-rose-400"
+                        className="qf-tap-sm ml-auto rounded-lg p-2 text-slate-500 transition hover:bg-rose-500/10 hover:text-rose-400"
                     >
                         <Icon name="logout" className="h-5 w-5" />
                     </button>

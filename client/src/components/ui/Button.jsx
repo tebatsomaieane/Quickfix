@@ -1,6 +1,6 @@
 const VARIANT_STYLES = {
     primary:
-        "qf-btn-shine bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-600 bg-[length:200%_100%] bg-left hover:bg-right text-white shadow-md shadow-indigo-500/25 focus-visible:outline-indigo-600",
+        "qf-btn-shine bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-600 bg-[length:200%_100%] bg-left text-white shadow-md shadow-indigo-500/25 focus-visible:outline-indigo-600",
     secondary:
         "bg-slate-100 text-slate-900 hover:bg-slate-200 focus-visible:outline-slate-400",
     outline:
@@ -12,9 +12,9 @@ const VARIANT_STYLES = {
 };
 
 const SIZE_STYLES = {
-    sm: "px-3 py-1.5 text-sm",
-    md: "px-4 py-2.5 text-sm",
-    lg: "px-6 py-3 text-base"
+    sm: "min-h-9 px-3 py-1.5 text-sm",
+    md: "min-h-11 px-4 py-2.5 text-sm sm:min-h-0",
+    lg: "min-h-12 px-5 py-3 text-base sm:min-h-0 sm:px-6"
 };
 
 function Button({
@@ -24,6 +24,7 @@ function Button({
     type = "button",
     disabled = false,
     loading = false,
+    block = false,
     className = "",
     ...props
 }) {
@@ -31,15 +32,16 @@ function Button({
         <button
             type={type}
             disabled={disabled || loading}
+            aria-busy={loading || undefined}
             className={[
                 "group inline-flex items-center justify-center gap-2 rounded-xl font-semibold",
                 "transition-all duration-300 ease-out",
                 "disabled:cursor-not-allowed disabled:opacity-60",
                 "active:scale-[0.98]",
-                "hover:-translate-y-0.5",
                 "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2",
                 VARIANT_STYLES[variant],
                 SIZE_STYLES[size],
+                block ? "w-full" : "",
                 className
             ].join(" ")}
             {...props}

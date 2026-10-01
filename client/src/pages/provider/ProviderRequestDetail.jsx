@@ -17,9 +17,41 @@ import Spinner from "../../components/ui/Spinner";
 import EmptyState from "../../components/ui/EmptyState";
 import Icon from "../../components/ui/Icon";
 import { formatCurrency, formatDate } from "../../lib/format";
+import { useActionFeedback } from "../../hooks/useActionFeedback";
+import { rules } from "../../lib/validation";
 
-const toDatetimeLocal = (value) =>
-    value ? String(value).slice(0, 16) : "";
+// A `DATETIME` column read back as "2026-10-05 14:30:00"; the date input wants
+// only the leading date part.
+const toDateInput = (value) => (value ? String(value).slice(0, 10) : "");
+
+const INITIAL_VALUES = {
+    price: "",
+    estimated_hours: "",
+    message: "",
+    valid_until: ""
+};
+
+/**
+ * Mirrors `content.createOffer` / `content.updateOffer` on the server.
+ *
+ * `valid_until` is a plain date rather than a date-and-time. The API validates it
+ * as `YYYY-MM-DD`, and a `datetime-local` input produces "2026-10-05T14:30",
+ * which that check rejects outright -- so the picker sends the day the offer
+ * lapses and the server stores it at midnight.
+ */
+const SCHEMA = {
+    price: [
+        rules.required("Your price"),
+        rules.number({ label: "Your price", min: 0.01 })
+    ],
+    estimated_hours: [
+        rules.number({ label: "Estimated time", min: 0.5, max: 1000 })
+    ],
+    valid_until: [rules.notPast("Offer expiry")],
+    message: [
+        rules.maxLength(1000, "Message must be 1000 characters or fewer")
+    ]
+};
 
 function ProviderRequestDetail() {
     const { id } = useParams();
@@ -28,15 +60,23 @@ function ProviderRequestDetail() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
-    const [form, setForm] = useState({
-        price: "",
-        estimated_hours: "",
-        message: "",
-        valid_until: ""
-    });
-    const [submitting, setSubmitting] = useState(false);
-    const [formError, setFormError] = useState("");
-    const [withdrawing, setWithdrawing] = useState(false);
+    // Push button calls (submit/update/withdraw) through the shared feedback
+    // path: plain-language failures, a retry for network hiccups, and a
+    // confirmatory toast. The inline banner below the form only carries a
+    // rejection that names no single field, because the schema gives the hook
+    // somewhere better to put each validation problem.
+    const {
+        run,
+        pending: submitting,
+        formError,
+        announcement,
+        values: form,
+        fieldErrors,
+        handleChange,
+        handleBlur,
+        validateAll,
+        reset
+    } = useActionFeedback({ schema: SCHEMA, initialValues: INITIAL_VALUES });
 
     const load = () => {
         setLoading(true);
@@ -45,12 +85,14 @@ function ProviderRequestDetail() {
         fetchAvailableRequest(id)
             .then((data) => {
                 setRequest(data.data);
-                setForm({
+                // Seed the form from the loaded offer through the hook, so the
+                // values being validated are the ones actually on screen.
+                reset({
                     price: data.data.my_offer?.price ?? "",
                     estimated_hours:
                         data.data.my_offer?.estimated_hours ?? "",
                     message: data.data.my_offer?.message ?? "",
-                    valid_until: toDatetimeLocal(
+                    valid_until: toDateInput(
                         data.data.my_offer?.valid_until
                     )
                 });
@@ -69,14 +111,15 @@ function ProviderRequestDetail() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id]);
 
-    const handleChange = (e) => {
-        setForm({ ...form, [e.target.name]: e.target.value });
-    };
-
+    // The hook's `handleChange` reads name/value off the event and stores the
+    // raw string, so an emptied number input stays "" rather than becoming NaN,
+    // which the payload below turns back into "not specified".
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setFormError("");
-        setSubmitting(true);
+
+        if (!validateAll(form)) {
+            return;
+        }
 
         const payload = {
             price: form.price,
@@ -85,21 +128,21 @@ function ProviderRequestDetail() {
             valid_until: form.valid_until || undefined
         };
 
-        try {
-            if (request.my_offer) {
-                await updateOffer(request.my_offer.id, payload);
-            } else {
-                await createOffer({ ...payload, request_id: id });
+        const { ok } = await run(
+            () =>
+                request.my_offer
+                    ? updateOffer(request.my_offer.id, payload)
+                    : createOffer({ ...payload, request_id: id }),
+            {
+                success: request.my_offer
+                    ? "Offer updated."
+                    : "Offer submitted.",
+                retry: true
             }
+        );
 
+        if (ok) {
             load();
-        } catch (err) {
-            setFormError(
-                err.response?.data?.message ||
-                    "Offer could not be submitted."
-            );
-        } finally {
-            setSubmitting(false);
         }
     };
 
@@ -108,19 +151,13 @@ function ProviderRequestDetail() {
             return;
         }
 
-        setWithdrawing(true);
-        setFormError("");
+        const { ok } = await run(
+            () => withdrawOffer(request.my_offer.id),
+            { success: "Offer withdrawn.", retry: true }
+        );
 
-        try {
-            await withdrawOffer(request.my_offer.id);
+        if (ok) {
             load();
-        } catch (err) {
-            setFormError(
-                err.response?.data?.message ||
-                    "Offer could not be withdrawn."
-            );
-        } finally {
-            setWithdrawing(false);
         }
     };
 
@@ -272,13 +309,17 @@ function ProviderRequestDetail() {
                 </p>
 
                 {formError && (
-                    <p className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+                    <div
+                        role="alert"
+                        className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700"
+                    >
                         {formError}
-                    </p>
+                    </div>
                 )}
 
                 <form
                     onSubmit={handleSubmit}
+                    noValidate
                     className="mt-5 space-y-4"
                 >
                     <div className="grid gap-4 sm:grid-cols-2">
@@ -287,11 +328,14 @@ function ProviderRequestDetail() {
                             id="price"
                             name="price"
                             type="number"
-                            min="0"
+                            min="0.01"
                             step="0.01"
                             placeholder="e.g. 750"
                             value={form.price}
                             onChange={handleChange}
+                            onBlur={handleBlur}
+                            maxLength={12}
+                            error={fieldErrors.price}
                             required
                         />
                         <Input
@@ -299,47 +343,41 @@ function ProviderRequestDetail() {
                             id="estimated_hours"
                             name="estimated_hours"
                             type="number"
-                            min="0"
+                            min="0.5"
                             step="0.5"
                             placeholder="e.g. 2"
                             value={form.estimated_hours}
                             onChange={handleChange}
+                            onBlur={handleBlur}
+                            hint="Optional — half-hour steps."
+                            error={fieldErrors.estimated_hours}
                         />
                     </div>
 
-                    <div>
-                        <label
-                            htmlFor="valid_until"
-                            className="mb-1.5 block text-sm font-medium text-slate-700"
-                        >
-                            Offer valid until
-                        </label>
-                        <input
-                            id="valid_until"
-                            name="valid_until"
-                            type="datetime-local"
-                            className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                            value={form.valid_until}
-                            onChange={handleChange}
-                        />
-                    </div>
+                    <Input
+                        label="Offer valid until"
+                        id="valid_until"
+                        name="valid_until"
+                        type="date"
+                        value={form.valid_until}
+                        onChange={handleChange}
+                        onBlur={handleBlur}
+                        hint="Optional — after this date the customer can no longer accept it."
+                        error={fieldErrors.valid_until}
+                    />
 
-                    <div>
-                        <label
-                            htmlFor="message"
-                            className="mb-1.5 block text-sm font-medium text-slate-700"
-                        >
-                            Message (optional)
-                        </label>
-                        <Textarea
-                            id="message"
-                            name="message"
-                            rows="3"
-                            placeholder="Share your approach and why you are a good fit..."
-                            value={form.message}
-                            onChange={handleChange}
-                        />
-                    </div>
+                    <Textarea
+                        label="Message (optional)"
+                        id="message"
+                        name="message"
+                        rows="3"
+                        placeholder="Share your approach and why you are a good fit..."
+                        value={form.message}
+                        onChange={handleChange}
+                        onBlur={handleBlur}
+                        maxLength={1000}
+                        error={fieldErrors.message}
+                    />
 
                     <div className="flex flex-wrap gap-3 pt-1">
                         <Button
@@ -356,12 +394,16 @@ function ProviderRequestDetail() {
                             <Button
                                 variant="danger"
                                 onClick={handleWithdraw}
-                                loading={withdrawing}
+                                loading={submitting}
                             >
                                 Withdraw offer
                             </Button>
                         )}
                     </div>
+
+                    <p aria-live="polite" className="sr-only">
+                        {announcement}
+                    </p>
                 </form>
             </Card>
         </div>

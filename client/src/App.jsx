@@ -2,6 +2,7 @@ import { Suspense, lazy } from "react";
 import { Link } from "react-router-dom";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
+import RouteTitle from "./components/RouteTitle";
 import Home from "./pages/public/Home";
 import Login from "./pages/public/Login";
 import Register from "./pages/public/Register";
@@ -99,6 +100,7 @@ function FeaturePlaceholder() {
 function App() {
     return (
         <BrowserRouter>
+            <RouteTitle />
             <ErrorBoundary>
                 <Suspense fallback={<PageLoader />}>
                     <Routes>

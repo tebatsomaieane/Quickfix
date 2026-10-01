@@ -4,6 +4,7 @@ import Button from "../../components/ui/Button";
 import Icon from "../../components/ui/Icon";
 import Spinner from "../../components/ui/Spinner";
 import SmartImage from "../../components/ui/SmartImage";
+import MediaRail from "../../components/ui/MediaRail";
 import Reveal from "../../components/motion/Reveal";
 import AnimatedValue from "../../components/motion/AnimatedValue";
 import ServiceTicker from "../../components/motion/ServiceTicker";
@@ -121,6 +122,104 @@ const STORE_FEATURES = [
     }
 ];
 
+/**
+ * Shared between the phone rail and the desktop grid so both read as the same
+ * card. `wide` is set only inside the rail, where items are a fixed-ish width
+ * instead of stretching to fill a grid cell.
+ */
+function CategoryCard({ category, image, icon, obj, wide = false }) {
+    return (
+        <article
+            className={[
+                "qf-shine group relative overflow-hidden rounded-2xl shadow-sm ring-1 ring-slate-900/5",
+                "transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-indigo-500/20 hover:ring-indigo-200",
+                wide ? "h-44 w-[15rem] shrink-0" : "h-44"
+            ].join(" ")}
+        >
+            <SmartImage
+                src={image}
+                alt={category.name}
+                seed={category.name}
+                icon={icon}
+                className={`qf-img-zoom h-full w-full object-cover ${obj ?? "object-center"}`}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-900/25 to-transparent transition group-hover:from-indigo-950/90" />
+            <div className="absolute inset-x-0 bottom-0 p-4">
+                <h3 className="bg-gradient-to-b from-white to-indigo-100 bg-clip-text text-lg font-bold text-transparent">
+                    {category.name}
+                </h3>
+                <p className="mt-0.5 text-xs text-slate-200 line-clamp-1">
+                    {category.description}
+                </p>
+            </div>
+            {category.services?.length > 0 && (
+                <span className="absolute right-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-bold text-indigo-700 shadow">
+                    {category.services.length} services
+                </span>
+            )}
+        </article>
+    );
+}
+
+function OfferingCard({ offering, wide = false }) {
+    return (
+        <article
+            className={[
+                "group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg shadow-slate-900/5 ring-1 ring-slate-900/5",
+                "transition hover:-translate-y-1 hover:shadow-xl hover:shadow-indigo-500/10",
+                wide ? "w-[17rem] shrink-0" : "h-full"
+            ].join(" ")}
+        >
+            <div className="qf-shine relative h-52 overflow-hidden">
+                <SmartImage
+                    src={offering.image}
+                    alt={offering.title}
+                    seed={offering.seed}
+                    icon={offering.icon}
+                    className={`qf-img-zoom h-full w-full object-cover ${offering.obj ?? "object-center"}`}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent" />
+                <span className="absolute left-4 top-4 flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-500/30 ring-1 ring-white/20">
+                    <Icon name={offering.icon} className="h-6 w-6" />
+                </span>
+            </div>
+            <div className="p-6">
+                <h2 className="text-lg font-bold text-slate-900">
+                    {offering.title}
+                </h2>
+                <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                    {offering.description}
+                </p>
+            </div>
+        </article>
+    );
+}
+
+function StepCard({ step, index, wide = false }) {
+    return (
+        <article
+            className={[
+                "group relative rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm",
+                "transition duration-300 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-500/10",
+                wide ? "w-[16rem] shrink-0" : "h-full"
+            ].join(" ")}
+        >
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-200 transition group-hover:scale-105 group-hover:shadow-indigo-300">
+                <Icon name={step.icon} className="h-6 w-6" />
+            </div>
+            <span className="absolute -top-3 right-6 flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-slate-800 to-slate-950 text-sm font-bold text-white shadow ring-1 ring-white/20">
+                {index + 1}
+            </span>
+            <h3 className="mt-4 text-lg font-bold text-slate-900">
+                {step.title}
+            </h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                {step.description}
+            </p>
+        </article>
+    );
+}
+
 function Home() {
     const navigate = useNavigate();
     const [categories, setCategories] = useState([]);
@@ -229,7 +328,7 @@ function Home() {
                     aria-hidden="true"
                 />
 
-                <div className="relative mx-auto grid max-w-7xl gap-12 px-4 py-14 sm:px-6 lg:grid-cols-2 lg:items-center lg:gap-10 lg:px-8 lg:py-24">
+                <div className="relative mx-auto grid max-w-7xl gap-12 px-4 py-12 sm:px-6 sm:py-14 lg:grid-cols-2 lg:items-center lg:gap-10 lg:px-8 lg:py-24">
                     {/* Copy */}
                     <div>
                         <span className="qf-rise inline-flex items-center gap-2 rounded-full border border-white/20 bg-gradient-to-r from-indigo-500/20 to-violet-500/20 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-indigo-100 shadow-sm backdrop-blur">
@@ -239,14 +338,14 @@ function Home() {
                             Lesotho's local service marketplace
                         </span>
 
-                        <h1 className="qf-rise mt-6 text-4xl font-extrabold leading-tight tracking-tight text-white sm:text-5xl lg:text-[3.4rem]" style={{ animationDelay: "0.06s" }}>
+                        <h1 className="qf-rise mt-6 text-[2rem] font-extrabold leading-[1.12] tracking-tight text-white sm:text-5xl lg:text-[3.4rem]" style={{ animationDelay: "0.06s" }}>
                             Find a trusted provider for any job,{" "}
                             <span className="qf-text-shimmer bg-gradient-to-r from-indigo-300 via-violet-300 to-fuchsia-300 bg-clip-text text-transparent">
                                 close to home.
                             </span>
                         </h1>
 
-                        <p className="qf-rise mt-6 max-w-xl text-lg leading-relaxed text-slate-200" style={{ animationDelay: "0.12s" }}>
+                        <p className="qf-rise mt-5 max-w-xl text-base leading-relaxed text-slate-200 sm:mt-6 sm:text-lg" style={{ animationDelay: "0.12s" }}>
                             QuickFix connects you with verified Basotho service
                             providers for home repairs, electrical work,
                             plumbing, auto care, technology and beauty. Request a
@@ -254,7 +353,7 @@ function Home() {
                             all across Maseru, Berea, Leribe and beyond.
                         </p>
 
-                        <div className="qf-rise mt-8 flex flex-col gap-3 sm:flex-row" style={{ animationDelay: "0.18s" }}>
+                        <div className="qf-rise mt-7 flex flex-col gap-3 sm:mt-8 sm:flex-row" style={{ animationDelay: "0.18s" }}>
                             <Button
                                 size="lg"
                                 onClick={() => navigate("/register")}
@@ -274,7 +373,7 @@ function Home() {
                         </div>
 
                         {/* Districts */}
-                        <div className="qf-rise mt-8 flex flex-wrap items-center gap-2 border-t border-white/10 pt-5" style={{ animationDelay: "0.24s" }}>
+                        <div className="qf-rise mt-7 flex flex-wrap items-center gap-2 border-t border-white/10 pt-5 sm:mt-8" style={{ animationDelay: "0.24s" }}>
                             <span className="text-xs font-semibold uppercase tracking-widest text-indigo-300">
                                 Serving
                             </span>
@@ -372,35 +471,26 @@ function Home() {
 
             {/* ============================== OFFERINGS ============================== */}
             <section className="mx-auto max-w-7xl px-4 pb-4 sm:px-6 lg:px-8 -mt-6 sm:-mt-10 md:-mt-14 relative z-10">
-                <div className="grid gap-6 lg:grid-cols-3">
+                <div className="lg:hidden">
+                    <MediaRail
+                        label="Who QuickFix is for"
+                        speed={30}
+                        railClassName="qf-rail-fade"
+                    >
+                        {OFFERINGS.map((offering) => (
+                            <OfferingCard key={offering.title} offering={offering} wide />
+                        ))}
+                    </MediaRail>
+                </div>
+
+                <div className="hidden gap-6 lg:grid lg:grid-cols-3">
                     {OFFERINGS.map((offering, index) => (
                         <Reveal
                             key={offering.title}
                             delay={index * 110}
                             y={30}
-                            className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg shadow-slate-900/5 ring-1 ring-slate-900/5 transition hover:-translate-y-1 hover:shadow-xl hover:shadow-indigo-500/10"
                         >
-                            <div className="qf-shine relative h-52 overflow-hidden">
-                                <SmartImage
-                                    src={offering.image}
-                                    alt={offering.title}
-                                    seed={offering.seed}
-                                    icon={offering.icon}
-                                    className={`h-full w-full object-cover transition duration-500 group-hover:scale-105 ${offering.obj ?? "object-center"}`}
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent" />
-                                <span className="absolute left-4 top-4 flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-500/30 ring-1 ring-white/20">
-                                    <Icon name={offering.icon} className="h-6 w-6" />
-                                </span>
-                            </div>
-                            <div className="p-6">
-                                <h2 className="text-lg font-bold text-slate-900">
-                                    {offering.title}
-                                </h2>
-                                <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                                    {offering.description}
-                                </p>
-                            </div>
+                            <OfferingCard offering={offering} />
                         </Reveal>
                     ))}
                 </div>
@@ -443,42 +533,60 @@ function Home() {
                         <Spinner />
                     </div>
                 ) : (
-                    <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                        {categories.map((category, index) => {
-                            const visual = CATEGORY_VISUAL[category.name] || {};
-                            const image = visual.src || getCategoryImage(category);
-                            return (
-                                <Reveal
-                                    key={category.id}
-                                    delay={(index % 4) * 90}
-                                    y={26}
-                                    className="qf-shine group relative h-44 overflow-hidden rounded-2xl shadow-sm ring-1 ring-slate-900/5 transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-indigo-500/20 hover:ring-indigo-200"
-                                >
-                                    <SmartImage
-                                        src={image}
-                                        alt={category.name}
-                                        seed={category.name}
-                                        icon={visual.icon || "grid"}
-                                        className={`h-full w-full object-cover transition duration-500 group-hover:scale-105 ${visual.obj ?? "object-center"}`}
-                                    />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-900/25 to-transparent transition group-hover:from-indigo-950/90" />
-                                    <div className="absolute inset-x-0 bottom-0 p-4">
-                                        <h3 className="bg-gradient-to-b from-white to-indigo-100 bg-clip-text text-lg font-bold text-transparent">
-                                            {category.name}
-                                        </h3>
-                                        <p className="mt-0.5 text-xs text-slate-200 line-clamp-1">
-                                            {category.description}
-                                        </p>
-                                    </div>
-                                    {category.services?.length > 0 && (
-                                        <span className="absolute right-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-bold text-indigo-700 shadow">
-                                            {category.services.length} services
-                                        </span>
-                                    )}
-                                </Reveal>
-                            );
-                        })}
-                    </div>
+                    <>
+                        {/* Phones get a rail that drifts sideways past the
+                            fold; the grid only takes over from `lg` up. */}
+                        <div className="mt-8 lg:hidden">
+                            <MediaRail
+                                label="Service categories"
+                                speed={22}
+                                railClassName="qf-rail-fade"
+                            >
+                                {categories.map((category) => {
+                                    const visual =
+                                        CATEGORY_VISUAL[category.name] ||
+                                        {};
+                                    return (
+                                        <CategoryCard
+                                            key={category.id}
+                                            wide
+                                            category={category}
+                                            image={
+                                                visual.src ||
+                                                getCategoryImage(category)
+                                            }
+                                            icon={visual.icon || "grid"}
+                                            obj={visual.obj}
+                                        />
+                                    );
+                                })}
+                            </MediaRail>
+                        </div>
+
+                        <div className="mt-8 hidden grid-cols-1 gap-4 sm:grid-cols-2 lg:grid lg:grid-cols-4">
+                            {categories.map((category, index) => {
+                                const visual =
+                                    CATEGORY_VISUAL[category.name] || {};
+                                return (
+                                    <Reveal
+                                        key={category.id}
+                                        delay={(index % 4) * 90}
+                                        y={26}
+                                    >
+                                        <CategoryCard
+                                            category={category}
+                                            image={
+                                                visual.src ||
+                                                getCategoryImage(category)
+                                            }
+                                            icon={visual.icon || "grid"}
+                                            obj={visual.obj}
+                                        />
+                                    </Reveal>
+                                );
+                            })}
+                        </div>
+                    </>
                 )}
             </section>
 
@@ -496,32 +604,43 @@ function Home() {
                         </Reveal>
                     </div>
 
-                    <div className="relative mt-10 grid gap-6 lg:grid-cols-3">
+                    <div className="relative mt-10">
                         <div
-                            className="absolute left-0 right-0 top-1/2 hidden h-0.5 -translate-y-1/2 bg-gradient-to-r from-transparent via-indigo-200 to-transparent lg:block"
+                            className="absolute left-0 right-0 top-1/2 hidden h-0.2 -translate-y-1/2 bg-gradient-to-r from-transparent via-indigo-200 to-transparent lg:block"
                             aria-hidden="true"
                         />
-                        {CUSTOMER_STEPS.map((step, index) => (
-                            <Reveal
-                                key={step.title}
-                                delay={index * 120}
-                                y={30}
-                                className="group relative rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm transition duration-300 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-500/10"
+
+                        {/* Phones side-scroll the steps; they stay put on
+                            desktop where the connector line can show. */}
+                        <div className="lg:hidden">
+                            <MediaRail
+                                label="How it works"
+                                auto={false}
+                                showProgress={false}
+                                railClassName="qf-rail-fade"
                             >
-                                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-200 transition group-hover:scale-105 group-hover:shadow-indigo-300">
-                                    <Icon name={step.icon} className="h-6 w-6" />
-                                </div>
-                                <span className="absolute -top-3 right-6 flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-slate-800 to-slate-950 text-sm font-bold text-white shadow ring-1 ring-white/20">
-                                    {index + 1}
-                                </span>
-                                <h3 className="mt-4 text-lg font-bold text-slate-900">
-                                    {step.title}
-                                </h3>
-                                <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                                    {step.description}
-                                </p>
-                            </Reveal>
-                        ))}
+                                {CUSTOMER_STEPS.map((step, index) => (
+                                    <StepCard
+                                        key={step.title}
+                                        step={step}
+                                        index={index}
+                                        wide
+                                    />
+                                ))}
+                            </MediaRail>
+                        </div>
+
+                        <div className="hidden gap-6 lg:grid lg:grid-cols-3">
+                            {CUSTOMER_STEPS.map((step, index) => (
+                                <Reveal
+                                    key={step.title}
+                                    delay={index * 120}
+                                    y={30}
+                                >
+                                    <StepCard step={step} index={index} />
+                                </Reveal>
+                            ))}
+                        </div>
                     </div>
                 </div>
             </section>

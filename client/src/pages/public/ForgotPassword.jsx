@@ -5,6 +5,8 @@ import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
 import Logo from "../../components/ui/Logo";
 import AuthShell from "../../components/auth/AuthShell";
+import useFormValidation from "../../hooks/useFormValidation";
+import { rules } from "../../lib/validation";
 import forgotImage from "../../assets/cleaner.jpg";
 
 const HIGHLIGHTS = [
@@ -13,26 +15,49 @@ const HIGHLIGHTS = [
     "Back in your dashboard within minutes"
 ];
 
+const SCHEMA = {
+    email: [rules.required("Email address"), rules.email()]
+};
+
 function ForgotPassword() {
-    const [email, setEmail] = useState("");
+    const {
+        values: formData,
+        errors,
+        formError,
+        announcement,
+        handleChange,
+        handleBlur,
+        validateAll,
+        setFormError
+    } = useFormValidation({
+        schema: SCHEMA,
+        initialValues: { email: "" }
+    });
     const [message, setMessage] = useState("");
-    const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setMessage("");
-        setError("");
+
+        if (!validateAll(formData)) {
+            return;
+        }
+
         setLoading(true);
 
         try {
-            const data = await forgotPassword(email);
+            const data = await forgotPassword(formData.email.trim());
 
             if (data.success) {
                 setMessage(data.message);
             }
         } catch (err) {
-            setError(
+            // Reuse the shared mapping so a bad address is reported on the
+            // field instead of in a banner the user has to connect to a
+            // particular input.
+            setMessage("");
+            setFormError(
                 err.response?.data?.message ||
                     "Unable to request a password reset."
             );
@@ -61,20 +86,21 @@ function ForgotPassword() {
 
                 <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
                     {message && (
-                        <div className="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
+                        <div role="status" className="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
                             {message}
                         </div>
                     )}
 
-                    {error && (
-                        <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-                            {error}
+                    {formError && (
+                        <div role="alert" className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+                            {formError}
                         </div>
                     )}
 
                     {!message && (
                         <form
                             onSubmit={handleSubmit}
+                            noValidate
                             className="space-y-4"
                         >
                             <Input
@@ -83,9 +109,13 @@ function ForgotPassword() {
                                 type="email"
                                 name="email"
                                 placeholder="you@example.com"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                value={formData.email}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
                                 autoComplete="email"
+                                autoCapitalize="none"
+                                spellCheck="false"
+                                error={errors.email}
                                 required
                             />
 
@@ -96,6 +126,10 @@ function ForgotPassword() {
                             >
                                 Send reset link
                             </Button>
+
+                            <p aria-live="polite" className="sr-only">
+                                {announcement}
+                            </p>
                         </form>
                     )}
 

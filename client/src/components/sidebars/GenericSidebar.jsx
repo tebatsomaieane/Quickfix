@@ -4,14 +4,19 @@ import SidebarNav from "./SidebarNav";
 import Icon from "../ui/Icon";
 import Logo from "../ui/Logo";
 
-function GenericSidebar({ navItems, brand = "QuickFix", onNavigate }) {
+function GenericSidebar({
+    navItems,
+    brand = "QuickFix",
+    onNavigate,
+    onClose
+}) {
     const { user, logout } = useAuth();
     const groups = groupNavItems(navItems);
     const isAdmin = user?.role === "ADMIN";
 
     return (
         <div className="flex h-full w-64 flex-col border-r border-slate-200 bg-white">
-            <div className="flex h-16 items-center border-b border-slate-200/80 bg-gradient-to-b from-white to-indigo-50/40 px-5">
+            <div className="flex min-h-16 items-center gap-2 border-b border-slate-200/80 bg-gradient-to-b from-white to-indigo-50/40 py-3 pl-5 pr-4 pt-safe">
                 {isAdmin ? (
                     <Logo
                         brand={brand}
@@ -21,6 +26,16 @@ function GenericSidebar({ navItems, brand = "QuickFix", onNavigate }) {
                     />
                 ) : (
                     <Logo brand={brand} accent="Fix" />
+                )}
+                {onClose && (
+                    <button
+                        type="button"
+                        aria-label="Close menu"
+                        onClick={onClose}
+                        className="qf-tap-sm ml-auto rounded-xl p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                    >
+                        <Icon name="x" className="h-5 w-5" />
+                    </button>
                 )}
             </div>
 
@@ -48,7 +63,7 @@ function GenericSidebar({ navItems, brand = "QuickFix", onNavigate }) {
                         type="button"
                         aria-label="Log out"
                         onClick={logout}
-                        className="ml-auto rounded-lg p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+                        className="qf-tap-sm ml-auto rounded-lg p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
                     >
                         <Icon name="logout" className="h-5 w-5" />
                     </button>

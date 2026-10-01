@@ -1,17 +1,51 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
+
+/* ---------- Motion tokens ----------
+   Durations and easings live here so motion stays consistent. Typing
+   `cubic-bezier(0.22, 1, 0.36, 1)` into a dozen rules produced near-identical
+   animations that drifted apart by a few hundredths of a second, which reads
+   as sloppiness the moment two panels animate in sequence.
+
+   Durations are a small scale rather than free values: an element that is
+   decoration appears quickly, an element the user is waiting on takes just
+   long enough to be followed, and nothing blocks input longer than that. */
+:root {
+    /* A tap must feel acknowledged immediately; anything slower feels broken. */
+    --qf-dur-instant: 120ms;
+    --qf-dur-fast: 180ms;
+    --qf-dur-base: 260ms;
+    --qf-dur-slow: 340ms;
+    --qf-dur-slower: 500ms;
+
+    /* Motion that decelerates hard into place: entrances, drawers, sheets. */
+    --qf-ease-emphasized: cubic-bezier(0.22, 1, 0.36, 1);
+    /* For properties that start and end at rest, e.g. colour and opacity. */
+    --qf-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+    /* Exits accelerate away rather than easing out, so the arrival of the
+       next thing is not delayed. */
+    --qf-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+    --qf-ease-spring: cubic-bezier(0.34, 1.36, 0.64, 1);
+    --qf-ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    /* Cascade step for list/grid entrances. */
+    --qf-stagger-step: 45ms;
+}
 
 @theme {
     --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
-    --animate-fade-in-up: fade-in-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+    --animate-fade-in-up: fade-in-up var(--qf-dur-slower) var(--qf-ease-emphasized) both;
     --animate-float-slow: float-slow 9s ease-in-out infinite;
     --animate-shimmer: shimmer 2.4s linear infinite;
     --animate-glow-pulse: glow-pulse 5s ease-in-out infinite;
     --animate-ken-burns: ken-burns 28s ease-in-out infinite alternate;
     --animate-marquee: qf-marquee 46s linear infinite;
     --animate-badge-pop: badge-pop 2.4s ease-in-out infinite;
-    --animate-bounce-in: bounce-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    --animate-bounce-in: bounce-in var(--qf-dur-slower) var(--qf-ease-bounce) both;
     --animate-pulse-ring: pulse-ring 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    --animate-sheet-up: qf-sheet-up var(--qf-dur-slow) var(--qf-ease-emphasized) both;
+    --animate-spring-in: qf-spring-in var(--qf-dur-slower) var(--qf-ease-spring) both;
+    --animate-skeleton: qf-skeleton 1.5s ease-in-out infinite;
+    --animate-press: qf-press var(--qf-dur-fast) var(--qf-ease-standard) both;
 
     @keyframes fade-in-up {
         from { opacity: 0; transform: translateY(16px); }
@@ -37,8 +71,14 @@
 /* ---------- Base ---------- */
 html {
     scroll-behavior: smooth;
+    /* Keeps #anchor targets (e.g. #how-it-works) from landing underneath the
+       sticky navbar / app bar when JS scrolls them into view. */
+    scroll-padding-top: 5.5rem;
     -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
     max-width: 100%;
+    /* `clip` (not `hidden`) contains stray horizontal overflow without creating
+       a scroll container, so `position: sticky` keeps working. */
     overflow-x: clip;
     color-scheme: light;
 }
@@ -50,6 +90,38 @@ body {
     -webkit-tap-highlight-color: transparent;
     background-color: #f8fafc;
     color: #0f172a;
+    /* Stops iOS Safari rubber-banding the whole document when an inner panel is
+       already at its scroll boundary. */
+    overscroll-behavior-y: none;
+    min-height: 100dvh;
+}
+
+/* Applied by useScrollLock while a sheet/drawer/menu is open. */
+body.qf-scroll-locked {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    overflow: hidden;
+    touch-action: none;
+    overscroll-behavior: none;
+}
+
+#root {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+}
+
+img,
+svg,
+video,
+canvas {
+    max-width: 100%;
+}
+
+img,
+video {
+    height: auto;
 }
 
 /* Brand glow overlays used by layouts */
@@ -78,12 +150,34 @@ textarea:focus-visible {
     outline: none;
 }
 
-/* Prevent iOS auto-zoom on focus for form controls (font-size 16px+) */
+/* Keyboard focus fallback for the many plain links in the app, which mostly
+   carry no focus utility of their own. `:where()` keeps this at zero
+   specificity, so any component's own `focus-visible:` styling still wins and
+   this can never fight a deliberate ring. */
+:where(a, summary, [role="button"]):focus-visible {
+    outline: 2px solid rgba(99, 102, 241, 0.7);
+    outline-offset: 2px;
+}
+
+/* Long unbroken strings (URLs, emails, pasted references) would otherwise be
+   clipped by the document's `overflow-x: clip` with no way to scroll to them. */
+body {
+    overflow-wrap: break-word;
+}
+
+/* Prevent iOS auto-zoom on focus (font-size 16px+) and give touch a taller,
+   more forgiving hit area. */
 @media (max-width: 640px) {
     input,
     select,
     textarea {
         font-size: 16px !important;
+    }
+
+    input:not([type="checkbox"]):not([type="radio"]),
+    select,
+    textarea {
+        min-height: 48px;
     }
 }
 
@@ -94,11 +188,53 @@ textarea:focus-visible {
     .pl-safe { padding-left: env(safe-area-inset-left); }
     .pr-safe { padding-right: env(safe-area-inset-right); }
     .bottom-safe { bottom: env(safe-area-inset-bottom); }
+
+    /* Horizontal gutters for landscape / notched devices. */
+    .px-safe {
+        padding-left: max(env(safe-area-inset-left), 0px);
+        padding-right: max(env(safe-area-inset-right), 0px);
+    }
+}
+
+/* Single source of truth for the bottom tab-bar inset. Layouts reserve this much
+   space so the last row of content is never hidden behind the bar or the iOS
+   home indicator, whatever the device. */
+:root {
+    --qf-tabbar-h: 62px;
+    --qf-tabbar-space: calc(var(--qf-tabbar-h) + max(env(safe-area-inset-bottom), 0.75rem) + 1.25rem);
+    /* Matches the dashboard app bar so panes can size themselves to exactly
+       the space between the bar and the tab rail. */
+    --qf-appbar-h: calc(3.5rem + env(safe-area-inset-top, 0px));
+    --qf-viewport-body: calc(100dvh - var(--qf-appbar-h) - var(--qf-tabbar-space));
+}
+
+@media (min-width: 640px) {
+    :root {
+        --qf-appbar-h: 4rem;
+        --qf-viewport-body: auto;
+    }
+}
+
+.qf-tabbar-space {
+    padding-bottom: var(--qf-tabbar-space);
+}
+
+@media (min-width: 768px) {
+    .qf-tabbar-space {
+        padding-bottom: 1.5rem;
+    }
+}
+
+/* Fills the space between the app bar and the tab rail — used by panes that
+   manage their own scrolling (message threads, feeds). */
+.qf-fill-viewport {
+    height: max(320px, calc(var(--qf-viewport-body) - 1.5rem));
 }
 
 /* ---------- Scrollbars ---------- */
 .scrollbar-none {
     scrollbar-width: none;
+    -ms-overflow-style: none;
 }
 
 .scrollbar-none::-webkit-scrollbar {
@@ -125,6 +261,222 @@ textarea:focus-visible {
     background: linear-gradient(180deg, #a5b4fc, #818cf8);
     border: 2px solid transparent;
     background-clip: padding-box;
+}
+
+/* ---------- Momentum / snapping horizontal rails ---------- */
+.qf-scroll-x {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    /* Must stay `auto`: the browser needs both axes so a sideways swipe
+       produces native momentum. A `pan-x pan-y` pair reads like `auto` but
+       silently drops pinch-to-zoom, which is the one gesture users cannot
+       work around. */
+    touch-action: auto;
+}
+
+.qf-scroll-x::-webkit-scrollbar {
+    display: none;
+}
+
+.qf-snap-x {
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+}
+
+.qf-snap-x::-webkit-scrollbar {
+    display: none;
+}
+
+.qf-snap-item {
+    scroll-snap-align: start;
+    scroll-snap-stop: normal;
+}
+
+/* Fades both edges. */
+.qf-rail-fade-x {
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 2rem, #000 calc(100% - 2rem), transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, #000 2rem, #000 calc(100% - 2rem), transparent 100%);
+}
+
+/* Vertical rail (e.g. a column of cards) with edge fade. */
+.qf-rail-fade-y {
+    -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 2.5rem), transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 2.5rem), transparent 100%);
+}
+
+/* ---------- Auto-drifting media rail (MediaRail) ----------
+   A genuine scroll container, so native momentum, trackpad, keyboard and
+   assistive tech all behave. JS only nudges `scrollLeft` in a rAF loop. */
+.qf-rail {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    /* Reserve the gutter the edge mask eats into. */
+    padding-block: 0.25rem 0.5rem;
+    /* Must stay `auto`: the browser needs both axes so a sideways swipe
+       produces native momentum. `pan-y` here would silently kill horizontal
+       touch scrolling, and the rail would look frozen on a phone. */
+    touch-action: auto;
+}
+
+.qf-rail::-webkit-scrollbar {
+    display: none;
+}
+
+/* Edge fade that advertises off-frame content without hiding the item text. */
+.qf-rail-fade {
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 1.75rem, #000 calc(100% - 1.75rem), transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, #000 1.75rem, #000 calc(100% - 1.75rem), transparent 100%);
+}
+
+@media (min-width: 1024px) {
+    .qf-rail-fade {
+        -webkit-mask-image: linear-gradient(to right, transparent 0, #000 3rem, #000 calc(100% - 3rem), transparent 100%);
+        mask-image: linear-gradient(to right, transparent 0, #000 3rem, #000 calc(100% - 3rem), transparent 100%);
+    }
+}
+
+/* Keyboard users get a visible ring on the rail itself. */
+.qf-rail:focus-visible {
+    outline: 2px solid rgba(99, 102, 241, 0.55);
+    outline-offset: 4px;
+    border-radius: 1rem;
+}
+
+/* ---------- Mobile menu (portalled overlay) ---------- */
+.qf-menu-drop {
+    /* A short, weighty drop: quick enough to feel like a response, slow
+       enough that the destination rows are readable while they arrive. */
+    animation: qf-menu-drop var(--qf-dur-base) var(--qf-ease-emphasized) both;
+    max-height: calc(100dvh - var(--qf-menu-top, 0px) - env(safe-area-inset-bottom, 0px));
+}
+
+/* The panel is sized from the top edge down, so cap it to whatever room the
+   viewport actually has left. */
+.qf-scroll-y {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+}
+
+.qf-menu-row {
+    background: #f8fafc;
+    color: #0f172a;
+}
+
+.qf-menu-row:hover {
+    background: #eef2ff;
+}
+
+@keyframes qf-menu-drop {
+    from {
+        opacity: 0;
+        transform: translate3d(0, -12px, 0) scaleY(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) scaleY(1);
+    }
+}
+
+/* Rows cascade in behind the panel drop. */
+.qf-menu-row {
+    animation: qf-menu-row-in var(--qf-dur-slow) var(--qf-ease-emphasized) both;
+    animation-delay: calc(60ms + var(--qf-i, 0) * 45ms);
+}
+
+@keyframes qf-menu-row-in {
+    from {
+        opacity: 0;
+        transform: translate3d(0, 10px, 0);
+    }
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+/* ---------- Touch feedback ---------- */
+/* Hover-only affordances are gated behind a real hover-capable pointer so they
+   never stick after a tap. `qf-tap` supplies the press feedback instead.
+
+   These deliberately declare no `transition` property: unlayered declarations
+   out-rank Tailwind's layered `transition-*` utilities, and a shorthand here
+   would silently kill whatever timing a component had already chosen. Press
+   feedback is instant, which is what a native control does anyway. */
+.qf-tap,
+.qf-tap-sm,
+.qf-tap-none {
+    -webkit-tap-highlight-color: transparent;
+}
+
+.qf-tap:active {
+    transform: scale(0.97);
+}
+
+.qf-tap-sm:active {
+    transform: scale(0.94);
+}
+
+.qf-tap-none:active {
+    transform: none;
+}
+
+/* Opt-in easing for press states on elements with no transition of their own. */
+.qf-tap-smooth {
+    transition: transform var(--qf-dur-fast) var(--qf-ease-standard);
+}
+
+.qf-tap-smooth:active {
+    transform: scale(0.97);
+}
+
+/* Press state for whole rows/cards that should barely move (only dim). */
+.qf-press-dim:active {
+    background-color: rgba(99, 102, 241, 0.06);
+}
+
+.qf-press-scale:active {
+    transform: scale(0.985);
+}
+
+/* ---------- Pointer-aware hover lift ----------
+   Tailwind's `hover:` variants are unlayered-equivalent and would latch on
+   after a tap, so the desktop flourish lives here behind a real hover query and
+   touch gets a press response instead. */
+.qf-lift {
+    transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow 0.28s ease, border-color 0.28s ease;
+}
+
+.qf-lift:active {
+    transform: scale(0.985);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .qf-lift:hover {
+        transform: translateY(-4px);
+        border-color: rgba(99, 102, 241, 0.28);
+        box-shadow: 0 12px 32px rgba(15, 23, 42, 0.1),
+            0 4px 16px rgba(99, 102, 241, 0.12);
+    }
+}
+
+/* Slow zoom for card imagery, same pointer gating. */
+.qf-img-zoom {
+    transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .group:hover .qf-img-zoom {
+        transform: scale(1.05);
+    }
 }
 
 /* ---------- Glass surfaces ---------- */
@@ -167,10 +519,12 @@ textarea:focus-visible {
         box-shadow 0.25s ease, border-color 0.25s ease;
 }
 
-.qf-card-hover:hover {
-    transform: translateY(-3px);
-    border-color: rgba(99, 102, 241, 0.35);
-    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08), 0 16px 48px rgba(99, 102, 241, 0.12);
+@media (hover: hover) and (pointer: fine) {
+    .qf-card-hover:hover {
+        transform: translateY(-3px);
+        border-color: rgba(99, 102, 241, 0.35);
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08), 0 16px 48px rgba(99, 102, 241, 0.12);
+    }
 }
 
 /* Soft dotted texture for dark panels */
@@ -191,10 +545,64 @@ textarea:focus-visible {
     opacity: 1;
     transform: translate3d(0, 0, 0) scale(1);
     transition:
-        opacity var(--qf-rd, 0.7s) cubic-bezier(0.22, 1, 0.36, 1)
+        opacity var(--qf-rd, var(--qf-dur-slower)) var(--qf-ease-emphasized)
             var(--qf-rdelay, 0ms),
-        transform var(--qf-rd, 0.7s) cubic-bezier(0.22, 1, 0.36, 1)
+        transform var(--qf-rd, var(--qf-dur-slower)) var(--qf-ease-emphasized)
             var(--qf-rdelay, 0ms);
+}
+
+/* Staggered cascade for lists rendered on mount. */
+.qf-stagger > * {
+    animation: qf-spring-in var(--qf-dur-slower) var(--qf-ease-spring) both;
+    animation-delay: calc(var(--qf-i, 0) * var(--qf-stagger-step));
+}
+
+/* ---------- Skeleton loading ---------- */
+.qf-skeleton {
+    background: linear-gradient(
+        100deg,
+        #e9edf5 20%,
+        #f4f7fc 38%,
+        #e9edf5 56%
+    );
+    background-size: 220% 100%;
+    animation: qf-skeleton 1.5s ease-in-out infinite;
+}
+
+/* ---------- Sheets & overlays ---------- */
+.qf-sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(6px) saturate(120%);
+    -webkit-backdrop-filter: blur(6px) saturate(120%);
+    animation: fade-in-fast var(--qf-dur-fast) var(--qf-ease-standard) both;
+}
+
+.qf-sheet-panel {
+    /* No `fill-mode: both` here on purpose — a filled animation value would
+       out-rank the inline transform the drag gesture writes each move. */
+    animation: qf-sheet-up var(--qf-dur-slow) var(--qf-ease-emphasized);
+    will-change: transform;
+    transform: translate3d(0, 0, 0);
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+}
+
+/* Drag handle: the user is expected to pull down to dismiss. */
+.qf-sheet-grab {
+    touch-action: none;
+    cursor: grab;
+}
+
+.qf-sheet-grab:active {
+    cursor: grabbing;
+}
+
+/* Blocks the page behind an open drawer/menu on touch devices. */
+.qf-overlay-block {
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
 /* ---------- Button shine sweep ---------- */
@@ -204,26 +612,28 @@ textarea:focus-visible {
     isolation: isolate;
 }
 
-.qf-btn-shine::after {
-    content: "";
-    position: absolute;
-    inset: -1px;
-    z-index: -1;
-    pointer-events: none;
-    background: linear-gradient(
-        105deg,
-        transparent 32%,
-        rgba(255, 255, 255, 0.35) 46%,
-        rgba(255, 255, 255, 0.6) 50%,
-        rgba(255, 255, 255, 0.35) 54%,
-        transparent 68%
-    );
-    transform: translateX(-130%);
-    transition: transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
-}
+@media (hover: hover) and (pointer: fine) {
+    .qf-btn-shine::after {
+        content: "";
+        position: absolute;
+        inset: -1px;
+        z-index: -1;
+        pointer-events: none;
+        background: linear-gradient(
+            105deg,
+            transparent 32%,
+            rgba(255, 255, 255, 0.35) 46%,
+            rgba(255, 255, 255, 0.6) 50%,
+            rgba(255, 255, 255, 0.35) 54%,
+            transparent 68%
+        );
+        transform: translateX(-130%);
+        transition: transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+    }
 
-.qf-btn-shine:hover::after {
-    transform: translateX(130%);
+    .qf-btn-shine:hover::after {
+        transform: translateX(130%);
+    }
 }
 
 /* ---------- Card/image shine sweep (triggered by .group:hover) ---------- */
@@ -232,26 +642,28 @@ textarea:focus-visible {
     overflow: hidden;
 }
 
-.qf-shine::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: 5;
-    pointer-events: none;
-    background: linear-gradient(
-        105deg,
-        transparent 34%,
-        rgba(255, 255, 255, 0.4) 46%,
-        rgba(255, 255, 255, 0.65) 50%,
-        rgba(255, 255, 255, 0.4) 54%,
-        transparent 66%
-    );
-    transform: translateX(-130%);
-    transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
-}
+@media (hover: hover) and (pointer: fine) {
+    .qf-shine::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 5;
+        pointer-events: none;
+        background: linear-gradient(
+            105deg,
+            transparent 34%,
+            rgba(255, 255, 255, 0.4) 46%,
+            rgba(255, 255, 255, 0.65) 50%,
+            rgba(255, 255, 255, 0.4) 54%,
+            transparent 66%
+        );
+        transform: translateX(-130%);
+        transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+    }
 
-.group:hover .qf-shine::after {
-    transform: translateX(130%);
+    .group:hover .qf-shine::after {
+        transform: translateX(130%);
+    }
 }
 
 /* ---------- Marquee ---------- */
@@ -259,10 +671,6 @@ textarea:focus-visible {
     display: flex;
     width: max-content;
     animation: qf-marquee var(--qf-marquee-duration, 46s) linear infinite;
-}
-
-.qf-marquee:hover .qf-marquee-track {
-    animation-play-state: paused;
 }
 
 .qf-marquee-mask {
@@ -282,13 +690,39 @@ textarea:focus-visible {
     );
 }
 
+@media (hover: hover) and (pointer: fine) {
+    .qf-marquee:hover .qf-marquee-track {
+        animation-play-state: paused;
+    }
+}
+
 /* ---------- Drawer & fast fades ---------- */
 .qf-drawer-in {
-    animation: drawer-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: drawer-in var(--qf-dur-slow) var(--qf-ease-emphasized) both;
 }
 
 .qf-fade-in-fast {
-    animation: fade-in-fast 0.25s ease both;
+    animation: fade-in-fast var(--qf-dur-fast) var(--qf-ease-standard) both;
+}
+
+/* Collapsing large title: the in-bar label fades/slides in once the content
+   has scrolled past the top of the viewport. */
+@keyframes qf-title-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes qf-title-out {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(-8px); }
+}
+
+.qf-title-in {
+    animation: qf-title-in var(--qf-dur-base) var(--qf-ease-emphasized) both;
+}
+
+.qf-title-out {
+    animation: qf-title-out var(--qf-dur-fast) var(--qf-ease-exit) both;
 }
 
 /* ---------- Route loading bar ---------- */
@@ -374,6 +808,44 @@ textarea:focus-visible {
     }
 }
 
+@keyframes qf-sheet-up {
+    from {
+        transform: translate3d(0, 100%, 0);
+    }
+    to {
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+@keyframes qf-spring-in {
+    from {
+        opacity: 0;
+        transform: translate3d(0, 14px, 0) scale(0.985);
+    }
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) scale(1);
+    }
+}
+
+@keyframes qf-skeleton {
+    0% {
+        background-position: 160% 0;
+    }
+    100% {
+        background-position: -60% 0;
+    }
+}
+
+@keyframes qf-press {
+    from {
+        transform: scale(0.97);
+    }
+    to {
+        transform: scale(1);
+    }
+}
+
 /* Guarantee emission of theme keyframes referenced by .qf-* helpers and
    tokens even when the matching Tailwind utility is not used. */
 @keyframes fade-in-up {
@@ -428,10 +900,30 @@ textarea:focus-visible {
         transition-duration: 0.001ms !important;
         scroll-behavior: auto !important;
     }
+
+    /* `animation-delay` has to be cleared too, not just the duration. A
+       staggered item keeps its `both` fill-mode's starting keyframe — opacity
+       0 — until the delay elapses, so zeroing only the duration would leave
+       those rows invisible for the length of the cascade before snapping in. */
+    *,
+    *::before,
+    *::after {
+        animation-delay: 0s !important;
+        transition-delay: 0s !important;
+    }
+
+    .qf-reveal-pre {
+        opacity: 1;
+        transform: none;
+    }
+
+    .qf-skeleton {
+        background-position: 50% 0;
+    }
 }
 
 @media (prefers-reduced-motion: no-preference) {
     .qf-fade-in {
-        animation: fade-in-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+        animation: fade-in-up var(--qf-dur-slower) var(--qf-ease-emphasized) both;
     }
 }

@@ -3,8 +3,11 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { resetPassword } from "../../services/authService";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
+import PasswordInput from "../../components/ui/PasswordInput";
 import Logo from "../../components/ui/Logo";
 import AuthShell from "../../components/auth/AuthShell";
+import useFormValidation from "../../hooks/useFormValidation";
+import { rules } from "../../lib/validation";
 import resetImage from "../../assets/cleaner2.jpg";
 
 const HIGHLIGHTS = [
@@ -13,41 +16,61 @@ const HIGHLIGHTS = [
     "Log in straight after you're done"
 ];
 
+const SCHEMA = {
+    email: [rules.required("Email address"), rules.email()],
+    new_password: [
+        rules.required("New password"),
+        rules.strongPassword(),
+        rules.maxLength(128, "Password is too long")
+    ],
+    confirm_password: [
+        rules.required("Password confirmation"),
+        rules.matches("new_password")
+    ]
+};
+
 function ResetPassword() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const token = searchParams.get("token") || "";
 
-    const [form, setForm] = useState({
-        email: "",
-        new_password: "",
-        confirm_password: ""
+    const {
+        values: form,
+        errors,
+        formError,
+        announcement,
+        handleChange,
+        handleBlur,
+        validateAll,
+        setFormError
+    } = useFormValidation({
+        schema: SCHEMA,
+        initialValues: {
+            email: "",
+            new_password: "",
+            confirm_password: ""
+        }
     });
     const [message, setMessage] = useState("");
-    const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
-    const handleChange = (e) => {
-        setForm({ ...form, [e.target.name]: e.target.value });
-    };
+    // A missing token makes submission impossible, so it is surfaced as a
+    // blocking notice rather than as a field error the user cannot act on.
+    const missingToken = !token;
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setMessage("");
-        setError("");
 
-        if (!token) {
-            setError("Missing reset token. Click the link from your email.");
+        if (missingToken) {
+            setFormError(
+                "This reset link is missing its security token. Request a new link from the Forgot password page."
+            );
+
             return;
         }
 
-        if (form.new_password.length < 6) {
-            setError("New password must be at least 6 characters long.");
-            return;
-        }
-
-        if (form.new_password !== form.confirm_password) {
-            setError("Passwords do not match.");
+        if (!validateAll(form)) {
             return;
         }
 
@@ -56,7 +79,7 @@ function ResetPassword() {
         try {
             const data = await resetPassword({
                 token,
-                email: form.email,
+                email: form.email.trim(),
                 new_password: form.new_password
             });
 
@@ -66,7 +89,7 @@ function ResetPassword() {
                 setTimeout(() => navigate("/login"), 1800);
             }
         } catch (err) {
-            setError(
+            setFormError(
                 err.response?.data?.message ||
                     "Unable to reset your password."
             );
@@ -94,18 +117,25 @@ function ResetPassword() {
 
                 <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
                     {message && (
-                        <div className="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
+                        <div
+                            role="status"
+                            className="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700"
+                        >
                             {message}
                         </div>
                     )}
 
-                    {error && (
-                        <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-                            {error}
+                    {(formError || missingToken) && (
+                        <div
+                            role="alert"
+                            className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700"
+                        >
+                            {formError ||
+                                "Missing reset token. Click the link from your email."}
                         </div>
                     )}
 
-                    <form onSubmit={handleSubmit} className="space-y-4">
+                    <form onSubmit={handleSubmit} noValidate className="space-y-4">
                         <Input
                             label="Email address"
                             id="email"
@@ -114,37 +144,55 @@ function ResetPassword() {
                             placeholder="you@example.com"
                             value={form.email}
                             onChange={handleChange}
+                            onBlur={handleBlur}
                             autoComplete="email"
+                            autoCapitalize="none"
+                            spellCheck="false"
+                            error={errors.email}
                             required
                         />
 
-                        <Input
+                        <PasswordInput
                             label="New password"
                             id="new_password"
                             name="new_password"
-                            type="password"
                             value={form.new_password}
                             onChange={handleChange}
+                            onBlur={handleBlur}
                             autoComplete="new-password"
-                            hint="Must be at least 6 characters long."
-                            minLength="6"
+                            maxLength={128}
+                            error={errors.new_password}
+                            hint="At least 8 characters with a letter and a number."
+                            strengthId="new-password-strength"
+                            showStrength
                             required
                         />
 
-                        <Input
+                        <PasswordInput
                             label="Confirm new password"
                             id="confirm_password"
                             name="confirm_password"
-                            type="password"
                             value={form.confirm_password}
                             onChange={handleChange}
+                            onBlur={handleBlur}
                             autoComplete="new-password"
+                            maxLength={128}
+                            error={errors.confirm_password}
                             required
                         />
 
-                        <Button type="submit" loading={loading} className="w-full">
+                        <Button
+                            type="submit"
+                            loading={loading}
+                            disabled={missingToken}
+                            className="w-full"
+                        >
                             {loading ? "Resetting..." : "Reset password"}
                         </Button>
+
+                        <p aria-live="polite" className="sr-only">
+                            {announcement}
+                        </p>
                     </form>
 
                     <p className="mt-6 text-center text-sm text-slate-600">

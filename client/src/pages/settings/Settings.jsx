@@ -4,29 +4,93 @@ import { changePassword, resendVerification, updateProfile } from "../../service
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import Input from "../../components/ui/Input";
+import PasswordInput from "../../components/ui/PasswordInput";
 import FileUpload from "../../components/ui/FileUpload";
+import useFormValidation from "../../hooks/useFormValidation";
+import { rules } from "../../lib/validation";
+
+const PROFILE_SCHEMA = {
+    first_name: [
+        rules.required("First name"),
+        rules.name(),
+        rules.maxLength(100, "First name must be 100 characters or fewer")
+    ],
+    last_name: [
+        rules.required("Last name"),
+        rules.name(),
+        rules.maxLength(100, "Last name must be 100 characters or fewer")
+    ],
+    phone: [
+        rules.required("Phone number"),
+        rules.phone(),
+        rules.maxLength(30, "Phone number must be 30 characters or fewer")
+    ]
+};
+
+const PASSWORD_SCHEMA = {
+    current_password: [rules.required("Current password")],
+    new_password: [
+        rules.required("New password"),
+        rules.strongPassword(),
+        rules.maxLength(128, "Password is too long")
+    ],
+    confirm_password: [
+        rules.required("Password confirmation"),
+        rules.matches("new_password")
+    ]
+};
 
 function Settings() {
     const { user, setUser } = useAuth();
 
-    const [profileForm, setProfileForm] = useState({
-        first_name: user?.first_name || "",
-        last_name: user?.last_name || "",
-        phone: user?.phone || "",
-        profile_image: user?.profile_image || "",
-        location: user?.location || ""
-    });
-    const [profileMessage, setProfileMessage] = useState("");
-    const [profileError, setProfileError] = useState("");
-    const [profileLoading, setProfileLoading] = useState(false);
+    // The API only stores photo and location on the customer profile row, so
+    // showing those controls to any other role produced a form that reported
+    // "Profile updated" while silently discarding both values.
+    const canEditPhotoAndLocation = user?.role === "CUSTOMER";
 
-    const [form, setForm] = useState({
-        current_password: "",
-        new_password: "",
-        confirm_password: ""
+    const {
+        values: profileForm,
+        errors: profileErrors,
+        formError: profileFormError,
+        setValue: setProfileValue,
+        setFormError: setProfileFormError,
+        handleChange: handleProfileChange,
+        handleBlur: handleProfileBlur,
+        validateAll: validateProfile
+    } = useFormValidation({
+        schema: PROFILE_SCHEMA,
+        initialValues: {
+            first_name: user?.first_name || "",
+            last_name: user?.last_name || "",
+            phone: user?.phone || "",
+            profile_image: user?.profile_image || "",
+            location: user?.location || ""
+        }
     });
+
+    const {
+        values: form,
+        errors,
+        formError,
+        announcement,
+        handleChange,
+        handleBlur,
+        validateAll,
+        applyServerError,
+        setFormError,
+        reset
+    } = useFormValidation({
+        schema: PASSWORD_SCHEMA,
+        initialValues: {
+            current_password: "",
+            new_password: "",
+            confirm_password: ""
+        }
+    });
+
+    const [profileMessage, setProfileMessage] = useState("");
+    const [profileLoading, setProfileLoading] = useState(false);
     const [message, setMessage] = useState("");
-    const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const [verifySent, setVerifySent] = useState(false);
     const [verifyError, setVerifyError] = useState("");
@@ -50,33 +114,41 @@ function Settings() {
         }
     };
 
-    const handleProfileChange = (e) => {
-        setProfileForm({ ...profileForm, [e.target.name]: e.target.value });
-    };
-
     const handleProfileSubmit = async (e) => {
         e.preventDefault();
         setProfileMessage("");
-        setProfileError("");
+
+        if (!validateProfile(profileForm)) {
+            return;
+        }
+
         setProfileLoading(true);
 
         try {
-            const data = await updateProfile({
-                first_name: profileForm.first_name,
-                last_name: profileForm.last_name,
-                phone: profileForm.phone,
-                profile_image: profileForm.profile_image,
-                location: profileForm.location
-            });
+            const payload = {
+                first_name: profileForm.first_name.trim(),
+                last_name: profileForm.last_name.trim(),
+                phone: profileForm.phone.trim()
+            };
+
+            // Only send the customer-only columns when the API will actually
+            // store them; otherwise they are stripped server-side and the save
+            // would claim success without changing anything.
+            if (canEditPhotoAndLocation) {
+                payload.profile_image = profileForm.profile_image;
+                payload.location = profileForm.location.trim();
+            }
+
+            const data = await updateProfile(payload);
 
             if (data.success) {
                 setProfileMessage("Profile updated.");
                 if (setUser && typeof setUser === "function") {
-                    setUser(data.user);
+                    setUser({ ...user, ...data.user });
                 }
             }
         } catch (err) {
-            setProfileError(
+            setProfileFormError(
                 err.response?.data?.message || "Unable to update profile."
             );
         } finally {
@@ -84,22 +156,11 @@ function Settings() {
         }
     };
 
-    const handleChange = (e) => {
-        setForm({ ...form, [e.target.name]: e.target.value });
-    };
-
     const handleSubmit = async (e) => {
         e.preventDefault();
         setMessage("");
-        setError("");
 
-        if (form.new_password.length < 6) {
-            setError("New password must be at least 6 characters long.");
-            return;
-        }
-
-        if (form.new_password !== form.confirm_password) {
-            setError("New password and confirmation do not match.");
+        if (!validateAll(form)) {
             return;
         }
 
@@ -113,17 +174,37 @@ function Settings() {
 
             if (data.success) {
                 setMessage(data.message);
-                setForm({
-                    current_password: "",
-                    new_password: "",
-                    confirm_password: ""
-                });
+                reset();
             }
         } catch (err) {
-            setError(
-                err.response?.data?.message ||
-                    "Unable to change your password."
-            );
+            // "Current password is incorrect" has to land on the current
+            // password field. The shared mapper keys on "password", which is
+            // not a field in this form, so it is retargeted here.
+            const message = err.response?.data?.message;
+
+            if (message?.toLowerCase().includes("current password")) {
+                applyServerError({
+                    ...err,
+                    response: {
+                        ...err.response,
+                        data: { message: "Current password is incorrect" }
+                    }
+                });
+            } else if (message?.toLowerCase().includes("password")) {
+                // A rejected new password is reported on `new_password`, not
+                // on a `password` field this form does not have.
+                applyServerError({
+                    ...err,
+                    response: {
+                        ...err.response,
+                        data: { message: `New ${message}` }
+                    }
+                });
+            } else {
+                setFormError(
+                    message || "Unable to change your password."
+                );
+            }
         } finally {
             setLoading(false);
         }
@@ -182,24 +263,27 @@ function Settings() {
                     )}
 
                     {profileMessage && (
-                        <div className="mt-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
+                        <div role="status" className="mt-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
                             {profileMessage}
                         </div>
                     )}
 
-                    {profileError && (
-                        <div className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-                            {profileError}
+                    {profileFormError && (
+                        <div role="alert" className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+                            {profileFormError}
                         </div>
                     )}
 
-                    <form onSubmit={handleProfileSubmit} className="mt-5 space-y-4">
+                    <form onSubmit={handleProfileSubmit} noValidate className="mt-5 space-y-4">
                         <Input
                             label="First name"
                             id="first_name"
                             name="first_name"
                             value={profileForm.first_name}
                             onChange={handleProfileChange}
+                            onBlur={handleProfileBlur}
+                            maxLength={100}
+                            error={profileErrors.first_name}
                             required
                         />
 
@@ -209,41 +293,52 @@ function Settings() {
                             name="last_name"
                             value={profileForm.last_name}
                             onChange={handleProfileChange}
+                            onBlur={handleProfileBlur}
+                            maxLength={100}
+                            error={profileErrors.last_name}
                             required
                         />
 
                         <Input
                             label="Phone"
                             id="phone"
+                            type="tel"
                             name="phone"
                             value={profileForm.phone}
                             onChange={handleProfileChange}
+                            onBlur={handleProfileBlur}
+                            autoComplete="tel"
+                            maxLength={30}
+                            error={profileErrors.phone}
                             required
-                            maxLength="30"
                         />
 
-                        <Input
-                            label="Location"
-                            id="location"
-                            name="location"
-                            value={profileForm.location}
-                            onChange={handleProfileChange}
-                            placeholder="e.g. Maseru"
-                            maxLength="255"
-                        />
+                        {canEditPhotoAndLocation && (
+                            <>
+                                <Input
+                                    label="Location"
+                                    id="location"
+                                    name="location"
+                                    value={profileForm.location}
+                                    onChange={handleProfileChange}
+                                    onBlur={handleProfileBlur}
+                                    placeholder="e.g. Maseru"
+                                    maxLength={255}
+                                    hint="Helps providers find jobs near you."
+                                />
 
-                        <FileUpload
-                            label="Profile photo"
-                            kind="image"
-                            value={profileForm.profile_image}
-                            onChange={(url) =>
-                                setProfileForm({
-                                    ...profileForm,
-                                    profile_image: url
-                                })
-                            }
-                            hint="Your photo lets customers see who they are talking to."
-                        />
+                                <FileUpload
+                                    label="Profile photo"
+                                    name="profile_image"
+                                    kind="image"
+                                    value={profileForm.profile_image}
+                                    onChange={(url) =>
+                                        setProfileValue("profile_image", url)
+                                    }
+                                    hint="Your photo lets customers see who they are talking to."
+                                />
+                            </>
+                        )}
 
                         <Button type="submit" loading={profileLoading}>
                             Update profile
@@ -260,56 +355,66 @@ function Settings() {
                     </p>
 
                     {message && (
-                        <div className="mt-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
+                        <div role="status" className="mt-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
                             {message}
                         </div>
                     )}
 
-                    {error && (
-                        <div className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-                            {error}
+                    {formError && (
+                        <div role="alert" className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+                            {formError}
                         </div>
                     )}
 
-                    <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-                        <Input
+                    <form onSubmit={handleSubmit} noValidate className="mt-5 space-y-4">
+                        <PasswordInput
                             label="Current password"
                             id="current_password"
                             name="current_password"
-                            type="password"
                             value={form.current_password}
                             onChange={handleChange}
+                            onBlur={handleBlur}
                             autoComplete="current-password"
+                            error={errors.current_password}
                             required
                         />
 
-                        <Input
+                        <PasswordInput
                             label="New password"
                             id="new_password"
                             name="new_password"
-                            type="password"
                             value={form.new_password}
                             onChange={handleChange}
+                            onBlur={handleBlur}
                             autoComplete="new-password"
-                            hint="Must be at least 6 characters long."
-                            minLength="6"
+                            maxLength={128}
+                            error={errors.new_password}
+                            hint="At least 8 characters with a letter and a number."
+                            strengthId="new-password-strength"
+                            showStrength
                             required
                         />
 
-                        <Input
+                        <PasswordInput
                             label="Confirm new password"
                             id="confirm_password"
                             name="confirm_password"
-                            type="password"
                             value={form.confirm_password}
                             onChange={handleChange}
+                            onBlur={handleBlur}
                             autoComplete="new-password"
+                            maxLength={128}
+                            error={errors.confirm_password}
                             required
                         />
 
                         <Button type="submit" loading={loading}>
                             Update password
                         </Button>
+
+                        <p aria-live="polite" className="sr-only">
+                            {announcement}
+                        </p>
                     </form>
                 </Card>
             </div>
