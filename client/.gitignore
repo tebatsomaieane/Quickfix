@@ -27,3 +27,10 @@ dist-ssr
 *.sw?
 
 .vercel
+
+# Scratch output from scripts/check-form-a11y.mjs
+.a11y-check-*
+
+# Scratch output from scripts/check-action-feedback.mjs
+.feedback-check-*
+.env*
