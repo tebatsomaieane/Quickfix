@@ -53,6 +53,7 @@ const STATUS_MESSAGES = {
  */
 export function describeError(error, options = {}) {
     const status = error?.response?.status;
+    const serverCode = error?.response?.data?.code || "";
     const serverMessage = error?.response?.data?.message || "";
     const isNetwork = !error?.response && NETWORK_PATTERN.test(String(error?.message || ""));
     const isOffline =
@@ -134,6 +135,20 @@ export function describeError(error, options = {}) {
             kind: "rate",
             title: "Too many attempts",
             detail: "Please wait a little before trying again.",
+            retryable: true
+        };
+    }
+
+    // Email could not be handed to the mail server. Checked before the generic
+    // 5xx branch because the default text blames maintenance, which is not what
+    // is happening, and this is the one 5xx a retry genuinely fixes.
+    if (serverCode === "EMAIL_DELIVERY_UNAVAILABLE") {
+        return {
+            kind: "email",
+            title: "We could not send that email",
+            detail:
+                serverMessage ||
+                "Our email service is not available right now. Please try again in a few minutes.",
             retryable: true
         };
     }

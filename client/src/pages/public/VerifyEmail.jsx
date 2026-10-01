@@ -97,13 +97,20 @@ function VerifyEmail() {
 
         setResendNotice("");
 
-        const { ok } = await run(() => resendVerification(email), {
+        const { ok, error } = await run(() => resendVerification(email), {
             success: "A new verification PIN is on its way",
             retry: true
         });
 
         if (ok) {
             setResendNotice("Check your inbox and spam folder for the new PIN.");
+        } else if (error?.response?.data?.code === "EMAIL_DELIVERY_UNAVAILABLE") {
+            // Said here too, not only as a toast, because this is the screen the
+            // user is on when they retry and a missing toast leaves it looking
+            // like the button did nothing.
+            setResendNotice(
+                "We could not send a PIN just now. Please try again in a few minutes."
+            );
         }
     };
 
