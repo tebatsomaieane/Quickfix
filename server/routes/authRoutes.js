@@ -26,6 +26,16 @@ const { auth } = require("../validators/schemas");
 
 const router = express.Router();
 
+// Sign-in budget, raised because a shared public IP (campus/mobile CGNAT) can
+// put many real users behind one limiter key. Overridable per environment
+// without a code change; the window stays fixed so the cap still bounds
+// brute-force attempts per account.
+const LOGIN_MAX_ATTEMPTS = Number.parseInt(
+    process.env.LOGIN_RATE_LIMIT_MAX,
+    10
+) || 100;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+
 // Every public auth route validates its body before the controller runs, so a
 // malformed request is answered from the schema alone -- no database round
 // trip, no bcrypt, no email. Each rejection comes back as
@@ -39,7 +49,7 @@ router.post(
 );
 router.post(
     "/login",
-    rateLimit({ max: 20 }),
+    rateLimit({ max: LOGIN_MAX_ATTEMPTS, windowMs: LOGIN_WINDOW_MS }),
     validate(auth.login),
     login
 );
