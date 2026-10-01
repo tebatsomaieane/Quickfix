@@ -5,7 +5,8 @@ const db = require("../config/db");
 const {
     sendPasswordResetEmail,
     sendEmailVerificationPin,
-    sendLoginOtp
+    sendLoginOtp,
+    EmailDeliveryError
 } = require("../utils/email");
 
 const JWT_MAX_AGE = 60 * 60 * 24; // 1 day in seconds
@@ -46,6 +47,19 @@ const otpExpiry = () => new Date(Date.now() + OTP_WINDOW_MINUTES * 60 * 1000);
 // Whether sign-in is blocked until the account's email is verified.
 const emailVerificationRequired = () =>
     process.env.REQUIRE_EMAIL_VERIFICATION === "true";
+
+// An email we promised to send but could not. Reported instead of a "sent"
+// response so the client can tell the user to retry rather than leaving them
+// waiting on a message that will never arrive.
+const EMAIL_UNAVAILABLE_MESSAGE =
+    "We could not send the email right now. Please try again in a few minutes.";
+
+const emailUnavailable = (res) =>
+    res.status(503).json({
+        success: false,
+        code: "EMAIL_DELIVERY_UNAVAILABLE",
+        message: EMAIL_UNAVAILABLE_MESSAGE
+    });
 
 // Anti-spam: at most one OTP resend per email per window.
 const OTP_RESEND_WINDOW_MS = 60 * 1000;
@@ -187,6 +201,12 @@ const register = async (req, res) => {
                 [hashOtp(verificationPin), otpExpiry(), userId]
             );
 
+            // The account exists either way, so the PIN is reported honestly:
+            // "sent" only once the mail server has accepted the message. The
+            // stored hash stays put so the user can still request a new PIN
+            // from the verification page instead of registering again.
+            let verification = "sent";
+
             try {
                 await sendEmailVerificationPin(
                     emailValue,
@@ -198,6 +218,34 @@ const register = async (req, res) => {
                     "[auth] Failed to send verification PIN:",
                     error
                 );
+
+                if (error instanceof EmailDeliveryError) {
+                    verification = "unavailable";
+                } else {
+                    verification = "failed";
+                }
+            }
+
+            if (verification !== "sent") {
+                console.error(
+                    `[auth] Account ${userId} created but verification PIN was not delivered (${verification})`
+                );
+
+                return res.status(503).json({
+                    success: false,
+                    code: "EMAIL_DELIVERY_UNAVAILABLE",
+                    message:
+                        "Your account was created, but we could not email you a verification PIN. Use the 'Resend PIN' option on the verification page in a few minutes.",
+                    verification,
+                    user: {
+                        id: userId,
+                        first_name: firstName,
+                        last_name: lastName,
+                        email: emailValue,
+                        phone: phoneValue,
+                        role
+                    }
+                });
             }
 
             res.status(201).json({
@@ -310,6 +358,21 @@ const login = async (req, res) => {
                 await sendLoginOtp(user.email, user.first_name, loginOtp);
             } catch (error) {
                 console.error("[auth] Failed to send login OTP:", error);
+
+                // No code means no way in. Clear the unused hash so the next
+                // sign-in attempt mints a fresh code rather than leaving the
+                // user on a code screen for a PIN that was never delivered.
+                if (error instanceof EmailDeliveryError) {
+                    await db.query(
+                        `UPDATE users
+                         SET login_otp_hash = NULL,
+                             login_otp_expires = NULL
+                         WHERE id = ?`,
+                        [user.id]
+                    );
+
+                    return emailUnavailable(res);
+                }
             }
 
             return res.status(200).json({
@@ -547,6 +610,10 @@ const resendVerification = async (req, res) => {
             await sendEmailVerificationPin(user.email, user.first_name, verificationPin);
         } catch (error) {
             console.error("[auth] Failed to resend verification PIN:", error);
+
+            if (error instanceof EmailDeliveryError) {
+                return emailUnavailable(res);
+            }
         }
 
         return res.json({
@@ -704,6 +771,10 @@ const resendOtp = async (req, res) => {
             await sendLoginOtp(user.email, user.first_name, loginOtp);
         } catch (error) {
             console.error("[auth] Failed to resend login code:", error);
+
+            if (error instanceof EmailDeliveryError) {
+                return emailUnavailable(res);
+            }
         }
 
         return res.json({
@@ -1063,7 +1134,17 @@ const requestPasswordReset = async (req, res) => {
             [users[0].id, tokenHash]
         );
 
-        await sendPasswordResetEmail(users[0].email, token);
+        try {
+            await sendPasswordResetEmail(users[0].email, token);
+        } catch (error) {
+            console.error("[auth] Failed to send password reset email:", error);
+
+            // Still no confirmation that the address exists. A 503 here would
+            // otherwise turn a delivery outage into an account oracle.
+            if (error instanceof EmailDeliveryError) {
+                return emailUnavailable(res);
+            }
+        }
 
         return res.json({
             success: true,

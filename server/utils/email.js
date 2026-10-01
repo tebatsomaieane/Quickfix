@@ -17,6 +17,35 @@ const isEmailConfigured = () => {
     return Boolean(SMTP_HOST && SMTP_USER && SMTP_PASSWORD);
 };
 
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+
+// Thrown when a caller asked for an email that cannot be delivered, so the
+// controller can report the failure instead of telling the user a PIN was
+// sent. Silently returning would be worse than throwing: the user would sit
+// in front of a code entry box waiting for a message that never arrives.
+class EmailDeliveryError extends Error {
+    constructor(message, code) {
+        super(message);
+        this.name = "EmailDeliveryError";
+        this.code = code;
+    }
+}
+
+// Guards a send in production, where "no SMTP configured" is a deployment
+// fault rather than the intended dev shortcut of logging the code.
+const assertDeliverable = () => {
+    if (!IS_PRODUCTION) {
+        return;
+    }
+
+    if (!isEmailConfigured()) {
+        throw new EmailDeliveryError(
+            "Email delivery is unavailable: SMTP is not configured",
+            "EMAIL_DELIVERY_UNAVAILABLE"
+        );
+    }
+};
+
 let transporter = null;
 
 const getTransporter = () => {
@@ -56,11 +85,16 @@ const sendMail = async ({ to, subject, text, html }) => {
 const sendOtpEmail = async ({ to, firstName, code, subject, heading, body, expiresInMinutes }) => {
     // In development/test without SMTP, surface the code in the server
     // console so the PIN/OTP flow can be exercised end-to-end without an
-    // email account or domain.
+    // email account or domain. In production this throws instead, because
+    // telling a user their PIN was sent when no mail was ever handed to a
+    // mail server strands them on a code screen.
     if (!isEmailConfigured()) {
         console.warn(
             `[mail] SMTP not configured - OTP for ${to} not sent (dev: ${code}, expires in ${expiresInMinutes} min)`
         );
+
+        assertDeliverable();
+
         return null;
     }
 
@@ -133,6 +167,9 @@ const sendPasswordResetEmail = async (to, resetToken) => {
             "not sent. Link:",
             resetUrl
         );
+
+        assertDeliverable();
+
         return null;
     }
 
@@ -171,6 +208,7 @@ const sendPasswordResetEmail = async (to, resetToken) => {
 
 module.exports = {
     isEmailConfigured,
+    EmailDeliveryError,
     sendMail,
     sendEmailVerificationPin,
     sendLoginOtp,
