@@ -13,7 +13,8 @@ const {
     verifyEmail,
     resendVerification,
     verifyTwoFactor,
-    resendOtp
+    resendOtp,
+    updateTwoFactor
 } = require("../controllers/authController");
 
 const {
@@ -94,6 +95,13 @@ router.post(
                 : undefined
     }),
     changePassword
+);
+router.patch(
+    "/2fa",
+    protect,
+    rateLimit({ max: 10 }),
+    validate(auth.toggleTwoFactor),
+    updateTwoFactor
 );
 router.post(
     "/forgot-password",

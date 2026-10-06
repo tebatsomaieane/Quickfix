@@ -224,7 +224,7 @@ cd client
 npm ci
 VITE_API_URL=https://api.your-domain npm run build   # or set it in client/.env
 npx wrangler login                                   # once
-npm run deploy                                       # deploys dist/
+npm run deploy:cloudflare                            # deploys dist/
 ```
 
 The repo ships `wrangler.toml`, `client/public/_redirects` (SPA fallback),

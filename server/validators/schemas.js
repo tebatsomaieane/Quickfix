@@ -193,6 +193,10 @@ const auth = {
         ]
     },
 
+    toggleTwoFactor: {
+        enabled: [rules.required("Two-factor authentication"), rules.boolean()]
+    },
+
     forgotPassword: {
         email: [rules.required("Email"), rules.email()]
     },

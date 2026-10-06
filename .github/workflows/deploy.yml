@@ -1,0 +1,123 @@
+# ─────────────────────────────────────────────
+# Build the QuickFix client and deploy it to Cloudflare Pages.
+#
+# One-time setup (repo → Settings → Secrets and variables → Actions):
+#   Secrets:   CLOUDFLARE_API_TOKEN   (Cloudflare Pages: Edit)
+#              CLOUDFLARE_ACCOUNT_ID
+#   Variables: VITE_API_URL           e.g. https://quickfix-api-production-0d46.up.railway.app
+#              CF_PAGES_PROJECT        optional, defaults to "quickfix"
+#
+# The API (Railway) and the client (Pages) are different origins, so the API
+# needs these too -- otherwise the session cookie is dropped and CORS rejects
+# the app: CLIENT_ORIGIN=https://quickfix.pages.dev, COOKIE_SAMESITE=none,
+# PUBLIC_API_URL=https://<railway-domain>, PUBLIC_APP_URL=https://quickfix.pages.dev
+#
+# Every push to main (and manual runs) deploys; pull requests only run lint,
+# the deploy-config checks and a build. Do NOT also connect this repo through
+# Cloudflare's Git integration, or each push would deploy twice.
+#
+# This workflow was removed once before because the Cloudflare secrets were
+# never configured, leaving a permanently red check. Configure the secrets
+# above before the first push, or keep it in draft.
+# ─────────────────────────────────────────────
+name: Deploy client to Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "client/**"
+      - "wrangler.toml"
+      - ".nvmrc"
+      - ".github/workflows/deploy.yml"
+  pull_request:
+    paths:
+      - "client/**"
+      - "wrangler.toml"
+      - ".nvmrc"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: pages-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-deploy:
+    name: Build & deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Validate VITE_API_URL is configured
+        shell: bash
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+        run: |
+          if [ -z "$VITE_API_URL" ]; then
+            echo "::error::VITE_API_URL repository variable is not set."
+            echo "Set it under Settings → Secrets and variables → Actions → Variables."
+            exit 1
+          fi
+          case "$VITE_API_URL" in
+            https://*) ;;
+            *)
+              echo "::error::VITE_API_URL must be an https:// origin, got: $VITE_API_URL"
+              exit 1
+              ;;
+          esac
+          echo "API origin: $VITE_API_URL"
+
+      - name: Install client dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Lint client
+        working-directory: client
+        run: npm run lint
+
+      - name: Check deploy configuration
+        working-directory: client
+        run: npm run check:deploy
+
+      - name: Build client
+        working-directory: client
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+        run: npm run build
+
+      - name: Verify the build output is complete
+        shell: bash
+        run: |
+          # The SPA fallback and the security-header file are load-bearing.
+          # Deploying without them serves the app with no CSP and makes every
+          # deep link 404, which only shows up after the publish.
+          for f in client/dist/index.html client/dist/_redirects client/dist/_headers; do
+            if [ ! -f "$f" ]; then
+              echo "::error::Missing $f in the build output."
+              exit 1
+            fi
+          done
+          echo "Build output verified."
+
+      - name: Deploy to Cloudflare Pages
+        if: github.event_name != 'pull_request'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: client
+          command: >-
+            pages deploy dist
+            --project-name ${{ vars.CF_PAGES_PROJECT || 'quickfix' }}
+            --branch ${{ github.ref_name }}

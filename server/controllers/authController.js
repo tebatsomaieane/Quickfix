@@ -6,6 +6,7 @@ const {
     sendPasswordResetEmail,
     sendEmailVerificationPin,
     sendLoginOtp,
+    isEmailConfigured,
     EmailDeliveryError
 } = require("../utils/email");
 
@@ -119,6 +120,19 @@ const register = async (req, res) => {
         const lastName = last_name;
         const emailValue = email;
         const phoneValue = phone;
+
+        // In production an unattributable account is worse than a refused
+        // registration: without a mail server the user is created and told
+        // "your account was created", then permanently stuck on the email
+        // verification screen because the PIN that unlocks it was never
+        // delivered. Refuse up front when delivery is structurally impossible.
+        if (process.env.NODE_ENV === "production" && !isEmailConfigured()) {
+            return res.status(503).json({
+                success: false,
+                code: "EMAIL_SMTP_NOT_CONFIGURED",
+                message: "Sign-up is temporarily unavailable. Please try again later."
+            });
+        }
 
         const [existingUsers] = await db.query(
             // Plain equality, not `LOWER(email) = ?`. Wrapping the column in a
@@ -343,43 +357,57 @@ const login = async (req, res) => {
         // A fresh 6-digit code is emailed and the session is created only
         // after /auth/verify-2fa confirms it.
         if (user.two_factor_enabled) {
-            const loginOtp = generateOtp();
+            // If no mail server is configured, a login code can never be
+            // delivered and every 2FA-flagged account is locked out forever
+            // (the delivery code path alone threw a 503). Fall through to the
+            // password-only session rather than bricking real users; note it
+            // loudly so the operator fixes the environment, not the app.
+            const twoFactorEmailUnavailable = !isEmailConfigured();
 
-            await db.query(
-                `UPDATE users
-                 SET login_otp_hash = ?,
-                     login_otp_expires = ?,
-                     login_otp_attempts = 0
-                 WHERE id = ?`,
-                [hashOtp(loginOtp), otpExpiry(), user.id]
-            );
+            if (twoFactorEmailUnavailable) {
+                console.warn(
+                    `[auth] Two-factor login skipped for user ${user.id}: SMTP is not configured. Set SMTP_* env vars in production to enforce two-factor login.`
+                );
+            } else {
+                const loginOtp = generateOtp();
 
-            try {
-                await sendLoginOtp(user.email, user.first_name, loginOtp);
-            } catch (error) {
-                console.error("[auth] Failed to send login OTP:", error);
+                await db.query(
+                    `UPDATE users
+                     SET login_otp_hash = ?,
+                         login_otp_expires = ?,
+                         login_otp_attempts = 0
+                     WHERE id = ?`,
+                    [hashOtp(loginOtp), otpExpiry(), user.id]
+                );
 
-                // No code means no way in. Clear the unused hash so the next
-                // sign-in attempt mints a fresh code rather than leaving the
-                // user on a code screen for a PIN that was never delivered.
-                if (error instanceof EmailDeliveryError) {
-                    await db.query(
-                        `UPDATE users
-                         SET login_otp_hash = NULL,
-                             login_otp_expires = NULL
-                         WHERE id = ?`,
-                        [user.id]
-                    );
+                try {
+                    await sendLoginOtp(user.email, user.first_name, loginOtp);
+                } catch (error) {
+                    console.error("[auth] Failed to send login OTP:", error);
 
-                    return emailUnavailable(res);
+                    // No code means no way in. Clear the unused hash so the
+                    // next sign-in attempt mints a fresh code rather than
+                    // leaving the user on a code screen for a PIN that was
+                    // never delivered.
+                    if (error instanceof EmailDeliveryError) {
+                        await db.query(
+                            `UPDATE users
+                             SET login_otp_hash = NULL,
+                                 login_otp_expires = NULL
+                             WHERE id = ?`,
+                            [user.id]
+                        );
+
+                        return emailUnavailable(res);
+                    }
                 }
-            }
 
-            return res.status(200).json({
-                success: false,
-                code: "OTP_REQUIRED",
-                message: "For your security, enter the 6-digit code that was sent to your email to finish signing in."
-            });
+                return res.status(200).json({
+                    success: false,
+                    code: "OTP_REQUIRED",
+                    message: "For your security, enter the 6-digit code that was sent to your email to finish signing in."
+                });
+            }
         }
 
         // 6. Create JWT
@@ -412,7 +440,6 @@ const login = async (req, res) => {
         res.json({
             success: true,
             message: "Login successful",
-            token,
             user: {
                 id: user.id,
                 first_name: user.first_name,
@@ -421,6 +448,7 @@ const login = async (req, res) => {
                 phone: user.phone,
                 role: user.role,
                 email_verified: user.email_verified,
+                two_factor_enabled: user.two_factor_enabled,
                 profile_image: customerProfile[0]?.profile_image || null,
                 location: customerProfile[0]?.location || null
             }
@@ -458,7 +486,6 @@ const issueSession = (user, res) => {
     return res.json({
         success: true,
         message: "Login successful",
-        token,
         user: {
             id: user.id,
             first_name: user.first_name,
@@ -466,7 +493,8 @@ const issueSession = (user, res) => {
             email: user.email,
             phone: user.phone,
             role: user.role,
-            email_verified: user.email_verified
+            email_verified: user.email_verified,
+            two_factor_enabled: user.two_factor_enabled
         }
     });
 };
@@ -832,7 +860,8 @@ const session = async (req, res) => {
 
         const [users] = await db.query(
             `SELECT id, first_name, last_name, email, phone,
-                    role, email_verified, is_active
+                    role, email_verified, is_active,
+                    two_factor_enabled
              FROM users
              WHERE id = ?`,
             [decoded.id]
@@ -879,7 +908,8 @@ const me = async (req, res) => {
     try {
         const [users] = await db.query(
             `SELECT id, first_name, last_name, email, phone,
-                    role, email_verified, is_active
+                    role, email_verified, is_active,
+                    two_factor_enabled
              FROM users
              WHERE id = ?`,
             [req.user.id]
@@ -994,7 +1024,8 @@ const updateProfile = async (req, res) => {
 
         const [users] = await db.query(
             `SELECT id, first_name, last_name, email, phone,
-                    role, email_verified, is_active
+                    role, email_verified, is_active,
+                    two_factor_enabled
              FROM users WHERE id = ?`,
             [req.user.id]
         );
@@ -1090,6 +1121,39 @@ const changePassword = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "Server error while changing password"
+        });
+    }
+};
+
+
+// SET / UNSET TWO-FACTOR  (authenticated user)
+// PATCH /api/auth/2fa  { enabled: boolean }
+const updateTwoFactor = async (req, res) => {
+    try {
+        // Presence and shape are settled by the `auth.toggleTwoFactor`
+        // schema. We only flip the stored flag; whatever the setting, the
+        // codes themselves continue to flow through the same sendLoginOtp
+        // path used at sign-in.
+        const enabled = !!req.body.enabled;
+
+        await db.query(
+            "UPDATE users SET two_factor_enabled = ? WHERE id = ?",
+            [enabled ? 1 : 0, req.user.id]
+        );
+
+        return res.json({
+            success: true,
+            message: enabled
+                ? "Two-factor authentication is now on."
+                : "Two-factor authentication is now off.",
+            two_factor_enabled: enabled
+        });
+    } catch (error) {
+        console.error("Update two-factor error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Server error while updating two-factor settings"
         });
     }
 };
@@ -1242,6 +1306,7 @@ module.exports = {
     updateProfile,
     logout,
     changePassword,
+    updateTwoFactor,
     requestPasswordReset,
     resetPassword
 };

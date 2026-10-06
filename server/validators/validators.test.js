@@ -240,6 +240,23 @@ test("a partial update accepts a single field", () => {
     assert.deepEqual(req.body, { phone: "+266 5000 0000" });
 });
 
+test("the two-factor toggle accepts an explicit true and false", () => {
+    const on = execute(auth.toggleTwoFactor, { enabled: true });
+    assert.equal(on.nexted, true);
+    assert.deepEqual(on.req.body, { enabled: true });
+
+    const off = execute(auth.toggleTwoFactor, { enabled: false });
+    assert.equal(off.nexted, true);
+    assert.deepEqual(off.req.body, { enabled: false });
+});
+
+test("the two-factor toggle rejects a non-boolean value", () => {
+    const { nexted, res } = execute(auth.toggleTwoFactor, { enabled: "yes" });
+
+    assert.equal(nexted, false);
+    assert.deepEqual(errorKeys(res), ["enabled"]);
+});
+
 test("a role outside the allowed set is rejected", () => {
     const { nexted, res } = execute(auth.register, {
         ...VALID_REGISTRATION,

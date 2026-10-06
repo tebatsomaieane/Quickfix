@@ -182,6 +182,20 @@ export const verifyTwoFactor = async (email, pin) => {
 
 
 // ==========================================
+// SET / UNSET TWO-FACTOR LOGIN (authenticated)
+// ==========================================
+export const updateTwoFactor = async (enabled) => {
+    const response = await api.patch("/auth/2fa", { enabled });
+
+    if (response.data.success) {
+        cacheUser({ ...getCachedUser(), two_factor_enabled: enabled });
+    }
+
+    return response.data;
+};
+
+
+// ==========================================
 // RESEND LOGIN 2FA CODE (public)
 // ==========================================
 export const resendOtp = async (email) => {

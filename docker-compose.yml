@@ -57,6 +57,11 @@ services:
       # email links when this API sits behind a proxy / second origin.
       PUBLIC_API_URL: ${PUBLIC_API_URL:-}
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:-}
+      # Content-Security-Policy origins. These must match the two public
+      # addresses below, or the browser blocks the app's own API calls and
+      # uploaded media. PUBLIC_API_URL is used as the API origin fallback.
+      API_ORIGIN: ${API_ORIGIN:-${PUBLIC_API_URL:-}}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-}
       # SMTP for verification PINs, login 2FA codes and password resets.
       # Leave SMTP_* empty to run without email (PINs/codes are then printed
       # to the server console for local testing).

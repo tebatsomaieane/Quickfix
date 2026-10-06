@@ -1,3 +1,11 @@
-# Cloudflare Pages SPA fallback: every path serves the app shell,
+# Cloudflare Pages routing.
+#
+# /api is never served from this origin: VITE_API_URL points the built app at
+# the Railway API. Answering /api/* with the SPA shell would look like a
+# successful 200 whose body is HTML, which surfaces in the app as a JSON
+# parse error rather than as a routing bug -- so fail it loudly instead.
+/api/*  404  404
+
+# Cloudflare Pages SPA fallback: every other path serves the app shell,
 # routing is handled client-side by React Router.
 /*  /index.html  200

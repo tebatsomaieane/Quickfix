@@ -43,7 +43,26 @@ app.disable("x-powered-by");
 // `API_ORIGIN` is the API's own public address (it serves user uploads from
 // /uploads, so media has to be allowed from it too). Both are env-driven so a
 // staging host does not silently fall back to production.
-const apiOrigin = (process.env.API_ORIGIN || "").replace(/\/+$/, "");
+//
+// `PUBLIC_API_URL` is the documented name for that same public API address --
+// it is what every deploy manifest (.env.example, render.yaml, the compose
+// files, the README) already tells an operator to set, and it is what
+// uploadRoutes.js uses to build absolute media URLs. Falling back to it here
+// means a deploy configured only as documented still gets a usable policy.
+// Without the fallback the policy collapses to same-origin, which on a
+// Cloudflare Pages + Railway split blocks every API call and every uploaded
+// image while still returning 200 from the health check -- a deploy that
+// looks healthy and cannot load a single screen.
+const apiOrigin = (
+    process.env.API_ORIGIN ||
+    process.env.PUBLIC_API_URL ||
+    ""
+).replace(/\/+$/, "");
+
+// `PUBLIC_ORIGIN` is where the built app is served from (the Pages domain).
+// Only needed to widen `img-src`/`media-src` when the app's own origin is
+// not the API's; connectSrc does not require it because the browser will
+// send to any origin CORS and connect-src both allow.
 const publicOrigin = (process.env.PUBLIC_ORIGIN || "").replace(/\/+$/, "");
 
 const mediaOrigins = [apiOrigin, publicOrigin].filter(Boolean);

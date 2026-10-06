@@ -57,6 +57,11 @@ services:
       COOKIE_SAMESITE: ${COOKIE_SAMESITE:-lax}
       PUBLIC_API_URL: ${PUBLIC_API_URL:-}
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:-}
+      # Content-Security-Policy origins. On the same-origin Caddy setup these
+      # are optional (everything is 'self'); they matter when the client is
+      # split onto another host such as Cloudflare Pages.
+      API_ORIGIN: ${API_ORIGIN:-${PUBLIC_API_URL:-}}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-}
       LOG_FORMAT: ${LOG_FORMAT:-combined}
     volumes:
       - uploads_data:/app/uploads

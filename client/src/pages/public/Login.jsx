@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { useSearchParams, Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
     resendOtp,
@@ -45,7 +45,13 @@ const CREDENTIAL_SCHEMA = {
 
 function Login() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const { user, loading, login, setUser } = useAuth();
+
+    // The API bounces a request made with an expired token here with
+    // `?expired=1`. Without reading it, a user whose session died mid-task
+    // lands on a bare login form with no idea why they were signed out.
+    const sessionExpired = searchParams.get("expired") === "1";
 
     const [step, setStep] = useState("credentials"); // credentials | otp
     const {
@@ -307,6 +313,18 @@ function Login() {
                         </form>
                     ) : (
                         <>
+                            {sessionExpired && step === "credentials" && (
+                                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                                    <p className="text-sm font-medium text-amber-800">
+                                        Your session expired.
+                                    </p>
+                                    <p className="mt-1 text-xs text-amber-700">
+                                        For your security you were signed out.
+                                        Log in again to continue.
+                                    </p>
+                                </div>
+                            )}
+
                             {verifyPendingEmail && (
                                 <div className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3">
                                     <p className="text-sm text-indigo-800">

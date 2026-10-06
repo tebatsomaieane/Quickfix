@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { changePassword, resendVerification, updateProfile } from "../../services/authService";
+import {
+    changePassword,
+    resendVerification,
+    updateProfile,
+    updateTwoFactor
+} from "../../services/authService";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import Input from "../../components/ui/Input";
@@ -94,6 +99,36 @@ function Settings() {
     const [loading, setLoading] = useState(false);
     const [verifySent, setVerifySent] = useState(false);
     const [verifyError, setVerifyError] = useState("");
+    const [twoFactorMessage, setTwoFactorMessage] = useState("");
+    const [twoFactorError, setTwoFactorError] = useState("");
+    const [twoFactorLoading, setTwoFactorLoading] = useState(false);
+
+    const handleTwoFactorToggle = async () => {
+        setTwoFactorMessage("");
+        setTwoFactorError("");
+        setTwoFactorLoading(true);
+
+        const enabled = !user?.two_factor_enabled;
+
+        try {
+            const data = await updateTwoFactor(enabled);
+
+            if (data.success) {
+                setTwoFactorMessage(data.message);
+                if (setUser && typeof setUser === "function") {
+                    setUser({ ...user, two_factor_enabled: data.two_factor_enabled });
+                }
+            } else {
+                setTwoFactorError(data.message || "Could not update two-factor settings.");
+            }
+        } catch (err) {
+            setTwoFactorError(
+                err.response?.data?.message || "Could not update two-factor settings."
+            );
+        } finally {
+            setTwoFactorLoading(false);
+        }
+    };
 
     const handleResendVerification = async () => {
         setVerifySent(false);
@@ -416,6 +451,39 @@ function Settings() {
                             {announcement}
                         </p>
                     </form>
+
+                    <div className="mt-8 border-t border-slate-100 pt-6">
+                        <h3 className="font-semibold text-slate-900">
+                            Two-factor login
+                        </h3>
+                        <p className="mt-1 text-sm text-slate-500">
+                            When this is on, signing in also requires a 6-digit
+                            code sent to your email.
+                        </p>
+
+                        {twoFactorMessage && (
+                            <div role="status" className="mt-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
+                                {twoFactorMessage}
+                            </div>
+                        )}
+
+                        {twoFactorError && (
+                            <div role="alert" className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+                                {twoFactorError}
+                            </div>
+                        )}
+
+                        <Button
+                            className="mt-4"
+                            variant={user?.two_factor_enabled ? "outline" : "primary"}
+                            loading={twoFactorLoading}
+                            onClick={handleTwoFactorToggle}
+                        >
+                            {user?.two_factor_enabled
+                                ? "Turn off two-factor login"
+                                : "Turn on two-factor login"}
+                        </Button>
+                    </div>
                 </Card>
             </div>
         </div>
