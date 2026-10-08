@@ -10,6 +10,9 @@ import ForgotPassword from "./pages/public/ForgotPassword";
 import ResetPassword from "./pages/public/ResetPassword";
 import VerifyEmail from "./pages/public/VerifyEmail";
 import NotFound from "./pages/public/NotFound";
+import Terms from "./pages/public/legal/Terms";
+import Privacy from "./pages/public/legal/Privacy";
+import Cookies from "./pages/public/legal/Cookies";
 
 const CustomerDashboard = lazy(() => import("./pages/customer/Dashboard"));
 const MyRequests = lazy(() => import("./pages/customer/MyRequests"));
@@ -55,6 +58,7 @@ import ProtectedRoute from "./routes/ProtectedRoute";
 import Button from "./components/ui/Button";
 import Icon from "./components/ui/Icon";
 import ErrorBoundary from "./components/ui/ErrorBoundary";
+import CookieConsent from "./components/ui/CookieConsent";
 
 import {
     CUSTOMER_NAV,
@@ -101,6 +105,10 @@ function App() {
     return (
         <BrowserRouter>
             <RouteTitle />
+            {/* Outside the error boundary so the cookie notice still renders
+                if a route crashes, and inside the router so its policy links
+                are real client-side navigations. */}
+            <CookieConsent />
             <ErrorBoundary>
                 <Suspense fallback={<PageLoader />}>
                     <Routes>
@@ -120,6 +128,18 @@ function App() {
                             <Route
                                 path="/reset-password"
                                 element={<ResetPassword />}
+                            />
+                            <Route
+                                path="/terms"
+                                element={<Terms />}
+                            />
+                            <Route
+                                path="/privacy"
+                                element={<Privacy />}
+                            />
+                            <Route
+                                path="/cookies"
+                                element={<Cookies />}
                             />
                             <Route path="*" element={<NotFound />} />
                         </Route>

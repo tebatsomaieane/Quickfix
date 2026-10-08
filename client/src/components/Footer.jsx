@@ -20,11 +20,41 @@ function Footer() {
                 { label: "How it works", to: "/#how-it-works" },
                 { label: "Create an account", to: "/register" }
             ]
+        },
+        {
+            heading: "Legal",
+            links: [
+                { label: "Terms & Conditions", to: "/terms" },
+                { label: "Privacy Policy", to: "/privacy" },
+                { label: "Cookie Policy", to: "/cookies" },
+                // Reopens the consent banner in place rather than linking to a
+                // page: changing your mind about cookies should be one click.
+                { label: "Cookie settings", action: "cookie-settings" }
+            ]
         }
     ];
 
     const renderColumnLinks = (links) =>
         links.map((link) => {
+            if (link.action === "cookie-settings") {
+                return (
+                    <li key={link.label}>
+                        <button
+                            type="button"
+                            onClick={() =>
+                                window.dispatchEvent(
+                                    new CustomEvent("qf:cookie-settings")
+                                )
+                            }
+                            className="group inline-flex items-center gap-1.5 transition hover:text-white"
+                        >
+                            <span className="h-px w-0 bg-indigo-400 transition-all duration-300 group-hover:w-3" />
+                            {link.label}
+                        </button>
+                    </li>
+                );
+            }
+
             return (
                 <li key={link.label}>
                     <Link
@@ -47,7 +77,7 @@ function Footer() {
             />
 
             <div className="relative mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
-                <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-5">
                     <div className="lg:pr-6">
                         <div className="flex items-center gap-2">
                             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-sm font-bold text-white shadow-lg shadow-indigo-900/40">

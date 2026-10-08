@@ -50,7 +50,8 @@ const INITIAL_VALUES = {
     phone: "",
     password: "",
     confirm_password: "",
-    role: "CUSTOMER"
+    role: "CUSTOMER",
+    terms_accepted: false
 };
 
 /**
@@ -91,7 +92,15 @@ const SCHEMA = {
         rules.required("Password confirmation"),
         rules.matches("password")
     ],
-    role: [rules.required("Account type")]
+    role: [rules.required("Account type")],
+    // A plain boolean rule rather than `required`, which treats false as a
+    // provided value. Client-side only: the API never sees this field.
+    terms_accepted: [
+        (value) =>
+            value
+                ? null
+                : "Please accept the Terms & Conditions and Privacy Policy"
+    ]
 };
 
 function Register() {
@@ -104,6 +113,7 @@ function Register() {
         announcement,
         handleChange,
         handleBlur,
+        setValue,
         validateAll,
         applyServerError,
         reset
@@ -336,6 +346,81 @@ function Register() {
                             options={ROLE_OPTIONS}
                             error={errors.role}
                         />
+
+                        <div>
+                            <label
+                                htmlFor="terms_accepted"
+                                className="flex cursor-pointer items-start gap-3"
+                            >
+                                <input
+                                    type="checkbox"
+                                    id="terms_accepted"
+                                    name="terms_accepted"
+                                    checked={values.terms_accepted}
+                                    onChange={(event) =>
+                                        setValue(
+                                            "terms_accepted",
+                                            event.target.checked
+                                        )
+                                    }
+                                    aria-invalid={
+                                        errors.terms_accepted
+                                            ? "true"
+                                            : undefined
+                                    }
+                                    aria-describedby={
+                                        errors.terms_accepted
+                                            ? "terms_accepted-error"
+                                            : undefined
+                                    }
+                                    className="mt-0.5 h-4 w-4 shrink-0 accent-indigo-600"
+                                />
+                                <span className="text-sm text-slate-600">
+                                    I agree to the{" "}
+                                    <Link
+                                        to="/terms"
+                                        onClick={(event) =>
+                                            event.stopPropagation()
+                                        }
+                                        className="font-semibold text-indigo-600 hover:text-indigo-700"
+                                    >
+                                        Terms &amp; Conditions
+                                    </Link>{" "}
+                                    and{" "}
+                                    <Link
+                                        to="/privacy"
+                                        onClick={(event) =>
+                                            event.stopPropagation()
+                                        }
+                                        className="font-semibold text-indigo-600 hover:text-indigo-700"
+                                    >
+                                        Privacy Policy
+                                    </Link>
+                                    , including the use of cookies as described
+                                    in the{" "}
+                                    <Link
+                                        to="/cookies"
+                                        onClick={(event) =>
+                                            event.stopPropagation()
+                                        }
+                                        className="font-semibold text-indigo-600 hover:text-indigo-700"
+                                    >
+                                        Cookie Policy
+                                    </Link>
+                                    .
+                                </span>
+                            </label>
+
+                            {errors.terms_accepted && (
+                                <p
+                                    id="terms_accepted-error"
+                                    role="alert"
+                                    className="mt-1.5 pl-7 text-xs font-medium text-red-600"
+                                >
+                                    {errors.terms_accepted}
+                                </p>
+                            )}
+                        </div>
 
                         <Button
                             type="submit"

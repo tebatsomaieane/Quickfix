@@ -25,6 +25,9 @@ const ROUTES = [
     [/^\/verify-email$/, "Verify your email"],
     [/^\/forgot-password$/, "Forgot password"],
     [/^\/reset-password$/, "Reset password"],
+    [/^\/terms$/, "Terms & Conditions"],
+    [/^\/privacy$/, "Privacy Policy"],
+    [/^\/cookies$/, "Cookie Policy"],
 
     // Customer
     [/^\/customer\/dashboard$/, "Dashboard"],
