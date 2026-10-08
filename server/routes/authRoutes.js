@@ -10,8 +10,6 @@ const {
     changePassword,
     requestPasswordReset,
     resetPassword,
-    verifyEmail,
-    resendVerification,
     verifyTwoFactor,
     resendOtp,
     updateTwoFactor
@@ -53,18 +51,6 @@ router.post(
     rateLimit({ max: LOGIN_MAX_ATTEMPTS, windowMs: LOGIN_WINDOW_MS }),
     validate(auth.login),
     login
-);
-router.post(
-    "/verify-email",
-    rateLimit({ max: 10 }),
-    validate(auth.verifyEmail),
-    verifyEmail
-);
-router.post(
-    "/resend-verification",
-    rateLimit({ max: 5 }),
-    validate(auth.resend),
-    resendVerification
 );
 router.post(
     "/verify-2fa",

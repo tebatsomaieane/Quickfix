@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { registerUser } from "../../services/authService";
+import { useAuth } from "../../context/AuthContext";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
 import Select from "../../components/ui/Select";
@@ -43,6 +44,12 @@ const HIGHLIGHTS = [
     "Stores and cafés can advertise products too"
 ];
 
+const ROLE_PATHS = {
+    CUSTOMER: "/customer/dashboard",
+    PROVIDER: "/provider/dashboard",
+    BUSINESS_OWNER: "/business/dashboard"
+};
+
 const INITIAL_VALUES = {
     first_name: "",
     last_name: "",
@@ -55,13 +62,10 @@ const INITIAL_VALUES = {
 };
 
 /**
- * Mirrors the server's registration contract, then adds the two checks it does
- * not perform: a password confirmation, and a password strong enough to have
- * survived the years since the API's 6-character minimum was written.
- *
- * Note the client is deliberately stricter than the server. The server accepts
- * a 6-character password, but anything this form allows is something the server
- * will also accept, so a valid form never makes a pointless round-trip to be
+ * Mirrors the server's registration contract, then adds one check it does
+ * not perform: a password confirmation. The strength and identity rules are
+ * the same on both sides, so a form this form accepts is a form the API
+ * accepts, and a valid submission never makes a pointless round-trip to be
  * told what was wrong.
  */
 const SCHEMA = {
@@ -86,6 +90,7 @@ const SCHEMA = {
     password: [
         rules.required("Password"),
         rules.strongPassword(),
+        rules.passwordExcludesIdentity(),
         rules.maxLength(128, "Password is too long")
     ],
     confirm_password: [
@@ -105,6 +110,7 @@ const SCHEMA = {
 
 function Register() {
     const navigate = useNavigate();
+    const { setUser } = useAuth();
 
     const {
         values,
@@ -154,43 +160,18 @@ function Register() {
             });
 
             if (data.success) {
-                const message =
-                    data.verification === "sent"
-                        ? "Account created! Check your email for the 6-digit verification PIN (check spam too)."
-                        : "Registration successful!";
-
-                setSuccess(message);
+                // The API issues the session cookie in the same response, so
+                // the account is usable immediately: seed the auth state and
+                // go straight to the dashboard the role was chosen for.
+                setSuccess("Account created! Taking you to your dashboard…");
                 reset(INITIAL_VALUES);
+                setUser(data.user);
 
-                // Let the success message register before the route changes, so
-                // the user is not left wondering whether it worked.
-                await new Promise((resolve) => setTimeout(resolve, 1500));
+                // Let the success message register before the route changes,
+                // so the user is not left wondering whether it worked.
+                await new Promise((resolve) => setTimeout(resolve, 900));
 
-                navigate(
-                    `/verify-email?email=${encodeURIComponent(
-                        payload.email.trim()
-                    )}`
-                );
-            } else if (
-                data.code === "EMAIL_DELIVERY_UNAVAILABLE" &&
-                data.user
-            ) {
-                // The account exists; only the PIN did not go out. Sent to the
-                // verification page rather than left here, because that is
-                // where Resend PIN lives. Registering again would fail on a
-                // duplicate email.
-                setSuccess(
-                    "Account created, but we could not email your PIN. Use 'Resend PIN' on the next page in a few minutes."
-                );
-                reset(INITIAL_VALUES);
-
-                await new Promise((resolve) => setTimeout(resolve, 1500));
-
-                navigate(
-                    `/verify-email?email=${encodeURIComponent(
-                        payload.email.trim()
-                    )}&delivery=unavailable`
-                );
+                navigate(ROLE_PATHS[data.user.role] || "/");
             } else {
                 applyServerError({ data });
             }
@@ -284,7 +265,7 @@ function Register() {
                             autoCapitalize="none"
                             spellCheck="false"
                             error={errors.email}
-                            hint="We'll send your verification PIN here."
+                            hint="You'll sign in with this address."
                             required
                         />
 

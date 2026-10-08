@@ -62,18 +62,15 @@ services:
       # uploaded media. PUBLIC_API_URL is used as the API origin fallback.
       API_ORIGIN: ${API_ORIGIN:-${PUBLIC_API_URL:-}}
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-}
-      # SMTP for verification PINs, login 2FA codes and password resets.
-      # Leave SMTP_* empty to run without email (PINs/codes are then printed
-      # to the server console for local testing).
+      # SMTP for login 2FA codes and password resets. Leave SMTP_* empty to
+      # run without email (codes are then printed to the server console for
+      # local testing); registration and login work either way.
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_SECURE: ${SMTP_SECURE:-false}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: ${SMTP_FROM:-QuickFix <no-reply@quickfix.co.ls>}
-      # When true, accounts must verify their email (6-digit PIN) before
-      # they can log in.
-      REQUIRE_EMAIL_VERIFICATION: ${REQUIRE_EMAIL_VERIFICATION:-false}
     expose:
       - "5000"
     volumes:

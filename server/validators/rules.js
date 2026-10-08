@@ -435,6 +435,65 @@ const strongPassword = (label = "Password") => {
     return rule;
 };
 
+/**
+ * Passwords that repeat the account's own details, or that sit on any
+ * well-known guess list, are rejected.
+ *
+ * Only registration can make this check: the identity fields are in that
+ * schema and nowhere else, and sign-in deliberately accepts whatever was
+ * stored (see `auth.login`) so existing accounts are never locked out by a
+ * policy they never agreed to.
+ */
+const COMMON_PASSWORDS = new Set([
+    "password1", "password12", "password123", "password1234",
+    "password12345", "passw0rd1", "p@ssw0rd1", "qwerty123",
+    "qwerty1234", "qwerty12345", "12345678", "123456789", "1234567890",
+    "abc12345", "abcd1234", "abc123456", "letmein1", "letmein123",
+    "welcome123", "welcome1234", "admin1234", "admin12345", "iloveyou1",
+    "monkey123", "dragon123", "sunshine1", "princess1", "trustno1",
+    "football1", "baseball1", "superman1", "starwars1", "whatever1",
+    "master123", "shadow123", "michael1", "jennifer1", "jordan123",
+    "harley123", "ranger123", "buster123", "thomas123", "robert123",
+    "soccer123", "batman123", "andrew123", "test1234", "demo1234",
+    "sample123", "change123", "changeme1", "secret123", "summer123",
+    "winter123", "freedom123", "liverpool1", "arsenal123", "chelsea123",
+    "1qaz2wsx", "q1w2e3r4", "1q2w3e4r", "asdfgh123", "qazwsx123"
+]);
+
+const passwordExcludesIdentity = (label = "Password") => {
+    const rule = rules.fn((context) => {
+        if (isBlank(context.value)) return undefined;
+
+        const value = asString(context.value).toLowerCase();
+
+        if (COMMON_PASSWORDS.has(value)) {
+            return `${label} is one of the most commonly used passwords. Please choose a different one.`;
+        }
+
+        // The email is still un-normalised when field rules run (the schema
+        // lowercases afterwards), so compare case-insensitively here. Parts
+        // shorter than three characters are skipped: "ab" would flag almost
+        // any password that merely contains those two letters.
+        const parts = [
+            String(context.email || "").trim().split("@")[0],
+            String(context.first_name || ""),
+            String(context.last_name || "")
+        ]
+            .map((part) => part.trim().toLowerCase())
+            .filter((part) => part.length >= 3);
+
+        if (parts.some((part) => value.includes(part))) {
+            return `${label} must not contain your name or email address`;
+        }
+
+        return undefined;
+    });
+
+    preservesWhitespace.add(rule);
+
+    return rule;
+};
+
 module.exports = {
     rules,
     messages,
@@ -442,6 +501,7 @@ module.exports = {
     asString,
     asNumber,
     strongPassword,
+    passwordExcludesIdentity,
     normalisesToLowercase,
     preservesWhitespace,
     PASSWORD_MIN_LENGTH,

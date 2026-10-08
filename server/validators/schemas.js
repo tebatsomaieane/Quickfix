@@ -1,4 +1,9 @@
-const { rules, strongPassword, PASSWORD_MIN_LENGTH } = require("./rules");
+const {
+    rules,
+    strongPassword,
+    passwordExcludesIdentity,
+    PASSWORD_MIN_LENGTH
+} = require("./rules");
 
 // Column-width ceilings, read off `database/schema.sql`. Every bound here exists
 // because the column has one: MySQL truncates an over-long VARCHAR in
@@ -131,6 +136,7 @@ const auth = {
         password: [
             rules.required("Password"),
             strongPassword("Password"),
+            passwordExcludesIdentity("Password"),
             rules.maxLength(LIMITS.password, "Password")
         ],
         role: [rules.required("Account type"), rules.oneOf(ROLES, "Account type")]
@@ -146,11 +152,6 @@ const auth = {
             rules.required("Password"),
             rules.maxLength(LIMITS.password, "Password")
         ]
-    },
-
-    verifyEmail: {
-        email: [rules.required("Email"), rules.email()],
-        pin: [rules.required("Verification code"), rules.otp("Verification code")]
     },
 
     verifyTwoFactor: {

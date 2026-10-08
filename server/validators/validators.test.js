@@ -183,6 +183,45 @@ test("password policy is 8+ characters with a letter and a digit", () => {
     }
 });
 
+test("a password that repeats the account's own details is rejected", () => {
+    const cases = [
+        ["nthabeleng1", { ...VALID_REGISTRATION }, "contains the first name"],
+        ["Mokoena42", { ...VALID_REGISTRATION }, "contains the last name"],
+        [
+            "boitumelo77",
+            { ...VALID_REGISTRATION, email: "boitumelo@example.com" },
+            "contains the email's local part"
+        ],
+        ["password123", { ...VALID_REGISTRATION }, "is a well-known guess"],
+        [
+            "1qaz2wsx",
+            { ...VALID_REGISTRATION, email: "totally@example.com" },
+            "is on the common list even without a name match"
+        ]
+    ];
+
+    for (const [password, registration, why] of cases) {
+        const { nexted, res } = execute(auth.register, {
+            ...registration,
+            password
+        });
+
+        assert.equal(nexted, false, `expected "${password}" to be rejected: ${why}`);
+        assert.deepEqual(errorKeys(res), ["password"]);
+    }
+});
+
+test("an unrelated password, and identity fragments under three characters, pass", () => {
+    for (const password of ["riverstone7", "garden42", "Li-ion9x"]) {
+        const { nexted } = execute(auth.register, {
+            ...VALID_REGISTRATION,
+            password
+        });
+
+        assert.equal(nexted, true, `expected "${password}" to be accepted`);
+    }
+});
+
 // ---------------------------------------------------------------------------
 // Normalisation
 // ---------------------------------------------------------------------------
@@ -482,7 +521,7 @@ test("a required document cannot be left blank", () => {
 
 test("a verification PIN must be exactly six digits", () => {
     for (const pin of ["12345", "1234567", "12a456", "      "]) {
-        const { nexted } = execute(auth.verifyEmail, {
+        const { nexted } = execute(auth.verifyTwoFactor, {
             email: "someone@example.com",
             pin
         });
@@ -490,7 +529,7 @@ test("a verification PIN must be exactly six digits", () => {
         assert.equal(nexted, false, `expected PIN "${pin}" to be rejected`);
     }
 
-    const { nexted } = execute(auth.verifyEmail, {
+    const { nexted } = execute(auth.verifyTwoFactor, {
         email: "someone@example.com",
         pin: "123456"
     });

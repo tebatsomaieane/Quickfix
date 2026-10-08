@@ -14,10 +14,10 @@
 -- Admin default password:  Admin@Lesotho2026
 --   CHANGE THIS after your first login.
 --
--- The seeded admin is pre-verified and has two-factor authentication
--- disabled (two_factor_enabled = FALSE) so a fresh install can be
--- administered even before SMTP is configured. Every account created
--- through the app has 2FA enabled by default.
+-- The seeded admin has two-factor authentication disabled
+-- (two_factor_enabled = FALSE) so a fresh install can be administered
+-- before SMTP is configured. Two-factor login is opt-in for every
+-- account, from Settings -> Two-factor login.
 -- =========================================================
 
 SET FOREIGN_KEY_CHECKS = 0;

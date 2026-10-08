@@ -34,16 +34,14 @@ CREATE TABLE users (
         'ADMIN'
     ) NOT NULL DEFAULT 'CUSTOMER',
 
-    email_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    -- Kept for account display (admin user list). Registration creates
+    -- accounts already set to TRUE: there is no email verification step.
+    email_verified BOOLEAN NOT NULL DEFAULT TRUE,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
 
-    -- Email PIN (registration) + login 2FA OTP. PINs are stored hashed,
-    -- never in plaintext. NULL means no PIN is pending.
-    two_factor_enabled BOOLEAN NOT NULL DEFAULT TRUE,
-
-    verification_code_hash VARCHAR(64),
-    verification_code_expires DATETIME,
-    verification_attempts INT NOT NULL DEFAULT 0,
+    -- Login 2FA OTP, stored hashed, never in plaintext. Opt-in from
+    -- Settings -> Two-factor login, so new accounts default to FALSE.
+    two_factor_enabled BOOLEAN NOT NULL DEFAULT FALSE,
 
     login_otp_hash VARCHAR(64),
     login_otp_expires DATETIME,

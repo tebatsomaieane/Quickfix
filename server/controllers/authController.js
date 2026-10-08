@@ -4,7 +4,6 @@ const jwt = require("jsonwebtoken");
 const db = require("../config/db");
 const {
     sendPasswordResetEmail,
-    sendEmailVerificationPin,
     sendLoginOtp,
     isEmailConfigured,
     EmailDeliveryError
@@ -14,7 +13,14 @@ const JWT_MAX_AGE = 60 * 60 * 24; // 1 day in seconds
 
 const BCRYPT_ROUNDS = 10;
 
-// One-time PIN (registration email verification + login 2FA).
+// A real bcrypt hash compared against when the submitted email matches no
+// account, so a miss and a wrong password cost the same wall-clock time.
+// Without it, the fast "no such user" return is a reliable signal that the
+// address does not exist.
+const BCRYPT_DUMMY_HASH =
+    "$2b$10$XidJoeJ8jS/nj8ksraazTOAixSFGT2J2SpjSuL7MHljm7YU.J4i2O";
+
+// One-time PIN (login 2FA).
 const OTP_LENGTH = 6;
 const OTP_WINDOW_MINUTES = 10;
 const MAX_OTP_ATTEMPTS = 5;
@@ -45,9 +51,50 @@ const safeEqual = (a, b) => {
 
 const otpExpiry = () => new Date(Date.now() + OTP_WINDOW_MINUTES * 60 * 1000);
 
-// Whether sign-in is blocked until the account's email is verified.
-const emailVerificationRequired = () =>
-    process.env.REQUIRE_EMAIL_VERIFICATION === "true";
+// Failed sign-in attempts, counted per account rather than per IP. The IP
+// limiter in routes/authRoutes.js is deliberately generous because many real
+// users share one address (campus/mobile CGNAT); this counter is what bounds
+// password guessing against a single account regardless of where it comes
+// from. Counted for every address -- including ones that do not exist -- so
+// the response is identical either way and the counter cannot be used to
+// discover which accounts are real.
+const LOGIN_FAILURE_WINDOW_MS = 15 * 60 * 1000;
+const MAX_LOGIN_FAILURES = 8;
+const loginFailures = new Map();
+
+const recordLoginFailure = (email) => {
+    const now = Date.now();
+    const entry = loginFailures.get(email);
+
+    if (!entry || entry.resetAt <= now) {
+        loginFailures.set(email, {
+            count: 1,
+            resetAt: now + LOGIN_FAILURE_WINDOW_MS
+        });
+
+        return 1;
+    }
+
+    entry.count += 1;
+
+    return entry.count;
+};
+
+const loginFailuresExceeded = (email) => {
+    const entry = loginFailures.get(email);
+
+    if (!entry) {
+        return false;
+    }
+
+    if (entry.resetAt <= Date.now()) {
+        loginFailures.delete(email);
+
+        return false;
+    }
+
+    return entry.count >= MAX_LOGIN_FAILURES;
+};
 
 // An email we promised to send but could not. Reported instead of a "sent"
 // response so the client can tell the user to retry rather than leaving them
@@ -121,18 +168,10 @@ const register = async (req, res) => {
         const emailValue = email;
         const phoneValue = phone;
 
-        // In production an unattributable account is worse than a refused
-        // registration: without a mail server the user is created and told
-        // "your account was created", then permanently stuck on the email
-        // verification screen because the PIN that unlocks it was never
-        // delivered. Refuse up front when delivery is structurally impossible.
-        if (process.env.NODE_ENV === "production" && !isEmailConfigured()) {
-            return res.status(503).json({
-                success: false,
-                code: "EMAIL_SMTP_NOT_CONFIGURED",
-                message: "Sign-up is temporarily unavailable. Please try again later."
-            });
-        }
+        // Creating an account needs no mail server: there is no verification
+        // PIN to deliver. The account is active from the first response, so
+        // sign-up works even when SMTP is unset, and the session cookie is
+        // issued in the same response so the user lands signed in.
 
         const [existingUsers] = await db.query(
             // Plain equality, not `LOWER(email) = ?`. Wrapping the column in a
@@ -163,8 +202,9 @@ const register = async (req, res) => {
 
             const [result] = await connection.query(
                 `INSERT INTO users
-                (first_name, last_name, email, phone, password, role)
-                VALUES (?, ?, ?, ?, ?, ?)`,
+                (first_name, last_name, email, phone, password, role,
+                 email_verified, two_factor_enabled)
+                VALUES (?, ?, ?, ?, ?, ?, TRUE, FALSE)`,
                 [
                     firstName,
                     lastName,
@@ -200,79 +240,43 @@ const register = async (req, res) => {
 
             await connection.commit();
 
-            // Account is created as UNVERIFIED. Generate a 6-digit PIN and
-            // email it. The account cannot be used until email_verified is
-            // set via /auth/verify-email. Registration does NOT log the user
-            // in - they verify first, then sign in.
-            const verificationPin = generateOtp();
-
-            await db.query(
-                `UPDATE users
-                 SET verification_code_hash = ?,
-                     verification_code_expires = ?,
-                     verification_attempts = 0
-                 WHERE id = ?`,
-                [hashOtp(verificationPin), otpExpiry(), userId]
+            // Two-factor login is opt-in (Settings -> Two-factor login), not
+            // a default: a flag that is on for everyone but silently skipped
+            // whenever SMTP is missing is worse than an honest default, and it
+            // would otherwise put a code screen between every new user and
+            // their dashboard.
+            //
+            // The session is issued now, so registration ends signed in: the
+            // account is usable the moment it exists, with no email round
+            // trip standing between the form and the dashboard.
+            const token = jwt.sign(
+                {
+                    id: userId,
+                    email: emailValue,
+                    role
+                },
+                process.env.JWT_SECRET,
+                {
+                    expiresIn: "1d"
+                }
             );
 
-            // The account exists either way, so the PIN is reported honestly:
-            // "sent" only once the mail server has accepted the message. The
-            // stored hash stays put so the user can still request a new PIN
-            // from the verification page instead of registering again.
-            let verification = "sent";
-
-            try {
-                await sendEmailVerificationPin(
-                    emailValue,
-                    firstName,
-                    verificationPin
-                );
-            } catch (error) {
-                console.error(
-                    "[auth] Failed to send verification PIN:",
-                    error
-                );
-
-                if (error instanceof EmailDeliveryError) {
-                    verification = "unavailable";
-                } else {
-                    verification = "failed";
-                }
-            }
-
-            if (verification !== "sent") {
-                console.error(
-                    `[auth] Account ${userId} created but verification PIN was not delivered (${verification})`
-                );
-
-                return res.status(503).json({
-                    success: false,
-                    code: "EMAIL_DELIVERY_UNAVAILABLE",
-                    message:
-                        "Your account was created, but we could not email you a verification PIN. Use the 'Resend PIN' option on the verification page in a few minutes.",
-                    verification,
-                    user: {
-                        id: userId,
-                        first_name: firstName,
-                        last_name: lastName,
-                        email: emailValue,
-                        phone: phoneValue,
-                        role
-                    }
-                });
-            }
+            res.cookie("token", token, COOKIE_OPTIONS);
 
             res.status(201).json({
                 success: true,
-                message: "Registration successful. A 6-digit verification PIN has been sent to your email.",
-                verification: "sent",
+                message: "Registration successful. You are now signed in.",
                 user: {
                     id: userId,
                     first_name: firstName,
                     last_name: lastName,
                     email: emailValue,
                     phone: phoneValue,
-                    role
+                    role,
+                    email_verified: true,
+                    two_factor_enabled: false,
+                    profile_image: null,
+                    location: null
                 }
             });
         } catch (error) {
@@ -299,6 +303,18 @@ const login = async (req, res) => {
     try {
         const { email, password } = req.body;
 
+        // Throttled addresses are rejected before the lookup, with the same
+        // response a wrong password would get the request before, so the
+        // counter never confirms whether an account exists.
+        if (loginFailuresExceeded(email)) {
+            return res.status(429).json({
+                success: false,
+                code: "LOGIN_THROTTLED",
+                message:
+                    "Too many failed sign-in attempts for this account. Please wait a few minutes and try again."
+            });
+        }
+
         // 1. Find user.
         //
         // Plain equality against the UNIQUE index rather than `LOWER(email) = ?`,
@@ -315,6 +331,11 @@ const login = async (req, res) => {
         );
 
         if (users.length === 0) {
+            // Spend the same bcrypt time an existing account would, so response
+            // latency does not reveal which addresses are registered.
+            await bcrypt.compare(password, BCRYPT_DUMMY_HASH);
+            recordLoginFailure(email);
+
             return res.status(401).json({
                 success: false,
                 message: "Invalid email or password"
@@ -338,22 +359,19 @@ const login = async (req, res) => {
         );
 
         if (!passwordMatch) {
+            recordLoginFailure(email);
+
             return res.status(401).json({
                 success: false,
                 message: "Invalid email or password"
             });
         }
 
-        // 4. Email verification gate (when enabled).
-        if (emailVerificationRequired() && !user.email_verified) {
-            return res.status(403).json({
-                success: false,
-                code: "EMAIL_NOT_VERIFIED",
-                message: "Please verify your email address before logging in. Request a verification PIN and enter it on the email verification page."
-            });
-        }
+        // A correct password is proof of ownership: clear the counter so a
+        // user who simply mistyped a few times is not punished afterwards.
+        loginFailures.delete(email);
 
-        // 5. Two-factor step: correct password is only the first factor.
+        // 4. Two-factor step: correct password is only the first factor.
         // A fresh 6-digit code is emailed and the session is created only
         // after /auth/verify-2fa confirms it.
         if (user.two_factor_enabled) {
@@ -410,7 +428,7 @@ const login = async (req, res) => {
             }
         }
 
-        // 6. Create JWT
+        // 5. Create JWT
         const token = jwt.sign(
             {
                 id: user.id,
@@ -423,10 +441,10 @@ const login = async (req, res) => {
             }
         );
 
-        // 7. Set the session token as an httpOnly cookie
+        // 6. Set the session token as an httpOnly cookie
         res.cookie("token", token, COOKIE_OPTIONS);
 
-        // 8. Return user + token
+        // 7. Return user + token
         // The customer profile columns are joined in so a freshly logged-in
         // customer lands on Settings with their photo and location already
         // populated, rather than blank until a later refetch.
@@ -500,165 +518,6 @@ const issueSession = (user, res) => {
 };
 
 
-// VERIFY EMAIL WITH PIN  (public)
-// POST /api/auth/verify-email  { email, pin }
-const verifyEmail = async (req, res) => {
-    try {
-        const { email, pin } = req.body;
-
-        // Already trimmed and lowercased by the `auth.verifyEmail` schema.
-        const emailValue = email;
-
-        const [rows] = await db.query(
-            `SELECT id, email_verified,
-                    verification_code_hash, verification_code_expires,
-                    verification_attempts
-             FROM users
-             WHERE email = ?`,
-            [emailValue]
-        );
-
-        if (rows.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: "Invalid or expired verification PIN"
-            });
-        }
-
-        const user = rows[0];
-
-        if (user.email_verified) {
-            return res.json({
-                success: true,
-                message: "Your email is already verified. You can log in."
-            });
-        }
-
-        if (
-            !user.verification_code_hash ||
-            !user.verification_code_expires ||
-            new Date(user.verification_code_expires).getTime() < Date.now()
-        ) {
-            return res.status(400).json({
-                success: false,
-                message: "This verification PIN has expired. Please request a new one."
-            });
-        }
-
-        if (!safeEqual(user.verification_code_hash, hashOtp(pin))) {
-            const attempts = user.verification_attempts + 1;
-            const lockedOut = attempts >= MAX_OTP_ATTEMPTS;
-
-            await db.query(
-                `UPDATE users
-                 SET verification_attempts = ?,
-                     verification_code_hash = CASE WHEN ? THEN NULL ELSE verification_code_hash END,
-                     verification_code_expires = CASE WHEN ? THEN NULL ELSE verification_code_expires END
-                 WHERE id = ?`,
-                [attempts, lockedOut ? 1 : 0, lockedOut ? 1 : 0, user.id]
-            );
-
-            return res.status(400).json({
-                success: false,
-                message: lockedOut
-                    ? "Too many incorrect attempts. Request a new verification PIN."
-                    : "Incorrect verification PIN. Please try again."
-            });
-        }
-
-        await db.query(
-            `UPDATE users
-             SET email_verified = TRUE,
-                 verification_code_hash = NULL,
-                 verification_code_expires = NULL,
-                 verification_attempts = 0
-             WHERE id = ?`,
-            [user.id]
-        );
-
-        return res.json({
-            success: true,
-            message: "Email verified. You can now log in."
-        });
-    } catch (error) {
-        console.error("Email verification error:", error);
-
-        return res.status(500).json({
-            success: false,
-            message: "Server error while verifying email"
-        });
-    }
-};
-
-
-// RESEND VERIFICATION PIN  (public)
-// POST /api/auth/resend-verification  { email }
-const resendVerification = async (req, res) => {
-    try {
-        const emailValue = req.body.email;
-
-        const waitVerificationMs = consumeOtpResendCooldown(emailValue);
-
-        if (waitVerificationMs > 0) {
-            return res.status(429).json({
-                success: false,
-                code: "RESEND_TOO_SOON",
-                message: `Please wait about ${Math.ceil(waitVerificationMs / 1000)}s before requesting another PIN.`
-            });
-        }
-
-        const [rows] = await db.query(
-            `SELECT id, first_name, email_verified
-             FROM users
-             WHERE email = ?`,
-            [emailValue]
-        );
-
-        // Never reveal whether an account exists.
-        if (rows.length === 0 || rows[0].email_verified) {
-            return res.json({
-                success: true,
-                message: "If that email exists, a new verification PIN has been sent."
-            });
-        }
-
-        const user = rows[0];
-        const verificationPin = generateOtp();
-
-        await db.query(
-            `UPDATE users
-             SET verification_code_hash = ?,
-                 verification_code_expires = ?,
-                 verification_attempts = 0
-             WHERE id = ?`,
-            [hashOtp(verificationPin), otpExpiry(), user.id]
-        );
-
-        try {
-            await sendEmailVerificationPin(user.email, user.first_name, verificationPin);
-        } catch (error) {
-            console.error("[auth] Failed to resend verification PIN:", error);
-
-            if (error instanceof EmailDeliveryError) {
-                return emailUnavailable(res);
-            }
-        }
-
-        return res.json({
-            success: true,
-            message: "A new 6-digit verification PIN has been sent to your email."
-        });
-    } catch (error) {
-        console.error("Resend verification error:", error);
-
-        return res.status(500).json({
-            success: false,
-            message: "Server error while resending verification PIN"
-        });
-    }
-};
-
-
 // VERIFY LOGIN CODE (2FA)  (public, second factor)
 // POST /api/auth/verify-2fa  { email, pin }
 const verifyTwoFactor = async (req, res) => {
@@ -727,14 +586,12 @@ const verifyTwoFactor = async (req, res) => {
             });
         }
 
-        // Code confirmed: clear the OTP, mark the email verified (entering a
-        // code sent to that address proves ownership) and create the session.
+        // Code confirmed: clear the spent OTP and create the session.
         await db.query(
             `UPDATE users
              SET login_otp_hash = NULL,
                  login_otp_expires = NULL,
-                 login_otp_attempts = 0,
-                 email_verified = TRUE
+                 login_otp_attempts = 0
              WHERE id = ?`,
             [user.id]
         );
@@ -1297,8 +1154,6 @@ const resetPassword = async (req, res) => {
 module.exports = {
     register,
     login,
-    verifyEmail,
-    resendVerification,
     verifyTwoFactor,
     resendOtp,
     me,

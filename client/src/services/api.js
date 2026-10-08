@@ -175,8 +175,6 @@ api.interceptors.response.use(
             !url.includes("/auth/register") &&
             !url.includes("/auth/forgot-password") &&
             !url.includes("/auth/reset-password") &&
-            !url.includes("/auth/verify-email") &&
-            !url.includes("/auth/resend-verification") &&
             !url.includes("/auth/verify-2fa") &&
             !url.includes("/auth/resend-otp") &&
             !url.includes("/auth/session") &&

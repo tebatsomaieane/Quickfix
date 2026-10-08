@@ -8,9 +8,9 @@
  * can sit off-screen.
  *
  * These rules mirror the server's contract exactly (see the register endpoint:
- * required names/phone, RFC-ish email, 6+ character password) so that a
- * correct form never round-trips to learn what was wrong, and every message
- * lands on the field that caused it.
+ * required names/phone, RFC-ish email, an 8+ character password with a letter
+ * and a number) so that a correct form never round-trips to learn what was
+ * wrong, and every message lands on the field that caused it.
  *
  * Deliberately hand-rolled: this app has no schema library, and pulling one in
  * for six rules would be the larger risk.
@@ -72,6 +72,25 @@ const isStrongEnough = (value) => {
 
     return raw.length >= 8 && /[A-Za-z]/.test(raw) && /\d/.test(raw);
 };
+
+// Kept in step with COMMON_PASSWORDS in server/validators/rules.js: entries
+// that would already fail the 8+ letter-and-digit check are pointless here,
+// so only plausible-but-guessable passwords are listed.
+const COMMON_PASSWORDS = new Set([
+    "password1", "password12", "password123", "password1234",
+    "password12345", "passw0rd1", "p@ssw0rd1", "qwerty123",
+    "qwerty1234", "qwerty12345", "12345678", "123456789", "1234567890",
+    "abc12345", "abcd1234", "abc123456", "letmein1", "letmein123",
+    "welcome123", "welcome1234", "admin1234", "admin12345", "iloveyou1",
+    "monkey123", "dragon123", "sunshine1", "princess1", "trustno1",
+    "football1", "baseball1", "superman1", "starwars1", "whatever1",
+    "master123", "shadow123", "michael1", "jennifer1", "jordan123",
+    "harley123", "ranger123", "buster123", "thomas123", "robert123",
+    "soccer123", "batman123", "andrew123", "test1234", "demo1234",
+    "sample123", "change123", "changeme1", "secret123", "summer123",
+    "winter123", "freedom123", "liverpool1", "arsenal123", "chelsea123",
+    "1qaz2wsx", "q1w2e3r4", "1q2w3e4r", "asdfgh123", "qazwsx123"
+]);
 
 /**
  * Rule definitions. Each returns an error string, or null when the value passes.
@@ -145,6 +164,46 @@ export const rules = {
             isBlank(value) || isStrongEnough(value)
                 ? null
                 : message || messages.passwordWeak,
+
+    /**
+     * Registration only, mirrored from the server's `passwordExcludesIdentity`:
+     * a password that repeats the account's own details, or that sits on the
+     * common-guess list, is rejected on the form rather than on a round-trip.
+     */
+    passwordExcludesIdentity:
+        (_label, message) =>
+        (value, values) => {
+            if (isBlank(value)) {
+                return null;
+            }
+
+            const password = String(value).toLowerCase();
+
+            if (COMMON_PASSWORDS.has(password)) {
+                return (
+                    message ||
+                    "That is one of the most commonly used passwords. Please choose a different one."
+                );
+            }
+
+            // Same floor as the server: fragments under three characters would
+            // flag almost any password that merely contains those letters.
+            const identity = [
+                String(values?.email || "").trim().split("@")[0],
+                String(values?.first_name || ""),
+                String(values?.last_name || "")
+            ]
+                .map((part) => part.trim().toLowerCase())
+                .filter((part) => part.length >= 3);
+
+            if (identity.some((part) => password.includes(part))) {
+                return (
+                    message || "Password must not contain your name or email address"
+                );
+            }
+
+            return null;
+        },
 
     /**
      * Numeric field with optional bounds. Blank is left alone so an optional

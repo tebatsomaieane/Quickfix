@@ -15,19 +15,6 @@ async function columnExists(connection, table, column) {
 }
 
 
-async function tableExists(connection, table) {
-    const [rows] = await connection.query(
-        `SELECT COUNT(*) AS n
-         FROM information_schema.TABLES
-         WHERE TABLE_SCHEMA = DATABASE()
-           AND TABLE_NAME = ?`,
-        [table]
-    );
-
-    return Number(rows[0].n) > 0;
-}
-
-
 async function ensureSchema() {
     const connection = await db.getConnection();
 
@@ -39,14 +26,12 @@ async function ensureSchema() {
             );
         }
 
-        // Email PIN (registration) + login 2FA OTP columns.
-        // Shipped hashed, never plaintext. Each ALTER is only run when the
-        // column is missing so existing databases migrate in place.
+        // Login 2FA OTP columns. Shipped hashed, never plaintext. Each ALTER
+        // is only run when the column is missing so existing databases
+        // migrate in place. Two-factor login is opt-in, so the column
+        // defaults to FALSE for accounts created without it being set.
         const otpColumns = [
-            ["two_factor_enabled", "BOOLEAN NOT NULL DEFAULT TRUE"],
-            ["verification_code_hash", "VARCHAR(64) NULL"],
-            ["verification_code_expires", "DATETIME NULL"],
-            ["verification_attempts", "INT NOT NULL DEFAULT 0"],
+            ["two_factor_enabled", "BOOLEAN NOT NULL DEFAULT FALSE"],
             ["login_otp_hash", "VARCHAR(64) NULL"],
             ["login_otp_expires", "DATETIME NULL"],
             ["login_otp_attempts", "INT NOT NULL DEFAULT 0"]
@@ -64,23 +49,6 @@ async function ensureSchema() {
             await connection.query(
                 `ALTER TABLE service_requests
                  ADD COLUMN preferred_provider_id INT NULL AFTER service_id`
-            );
-        }
-
-        if (!(await tableExists(connection, "email_verification_tokens"))) {
-            await connection.query(
-                `CREATE TABLE email_verification_tokens (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    user_id INT NOT NULL,
-                    token_hash VARCHAR(64) NOT NULL UNIQUE,
-                    expires_at DATETIME NOT NULL,
-                    used BOOLEAN NOT NULL DEFAULT FALSE,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    CONSTRAINT fk_email_verification_user
-                        FOREIGN KEY (user_id)
-                        REFERENCES users(id)
-                        ON DELETE CASCADE
-                )`
             );
         }
     } finally {

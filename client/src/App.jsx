@@ -8,7 +8,6 @@ import Login from "./pages/public/Login";
 import Register from "./pages/public/Register";
 import ForgotPassword from "./pages/public/ForgotPassword";
 import ResetPassword from "./pages/public/ResetPassword";
-import VerifyEmail from "./pages/public/VerifyEmail";
 import NotFound from "./pages/public/NotFound";
 import Terms from "./pages/public/legal/Terms";
 import Privacy from "./pages/public/legal/Privacy";
@@ -117,9 +116,11 @@ function App() {
                             <Route path="/" element={<Home />} />
                             <Route path="/login" element={<Login />} />
                             <Route path="/register" element={<Register />} />
+                            {/* Email verification was removed: old links and
+                                bookmarks land on login rather than a 404. */}
                             <Route
                                 path="/verify-email"
-                                element={<VerifyEmail />}
+                                element={<Navigate to="/login" replace />}
                             />
                             <Route
                                 path="/forgot-password"

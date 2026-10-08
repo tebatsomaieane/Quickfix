@@ -1,11 +1,7 @@
 import { useState } from "react";
 import { useSearchParams, Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import {
-    resendOtp,
-    resendVerification,
-    verifyTwoFactor
-} from "../../services/authService";
+import { resendOtp, verifyTwoFactor } from "../../services/authService";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
 import PasswordInput from "../../components/ui/PasswordInput";
@@ -71,7 +67,6 @@ function Login() {
     const [pinError, setPinError] = useState("");
     const [error, setError] = useState("");
     const [loggingIn, setLoggingIn] = useState(false);
-    const [verifyPendingEmail, setVerifyPendingEmail] = useState("");
     const [resendMessage, setResendMessage] = useState("");
 
     if (!loading && user) {
@@ -129,10 +124,6 @@ function Login() {
                 setError(
                     serverError?.message || "Login failed. Please try again."
                 );
-            }
-
-            if (serverError?.code === "EMAIL_NOT_VERIFIED") {
-                setVerifyPendingEmail(formData.email.trim());
             }
         } finally {
             setLoggingIn(false);
@@ -195,30 +186,6 @@ function Login() {
             setResendMessage(
                 error.response?.data?.message ||
                 "Could not resend the code. Try again later."
-            );
-        }
-    };
-
-    // Resend the registration verification PIN (unverified account).
-    const handleResendVerification = async () => {
-        setResendMessage("");
-
-        if (!verifyPendingEmail) {
-            return;
-        }
-
-        try {
-            const data = await resendVerification(verifyPendingEmail);
-
-            setResendMessage(
-                data?.success
-                    ? data.message || "A new verification PIN has been sent."
-                    : data?.message || "Could not resend the PIN. Try again later."
-            );
-        } catch (error) {
-            setResendMessage(
-                error.response?.data?.message ||
-                "Could not resend the PIN. Try again later."
             );
         }
     };
@@ -322,39 +289,6 @@ function Login() {
                                         For your security you were signed out.
                                         Log in again to continue.
                                     </p>
-                                </div>
-                            )}
-
-                            {verifyPendingEmail && (
-                                <div className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3">
-                                    <p className="text-sm text-indigo-800">
-                                        This account isn't verified yet. Use
-                                        the 6-digit PIN we emailed you
-                                        (check spam too) on the verification
-                                        page, then log in again.
-                                    </p>
-                                    <div className="mt-3 flex flex-wrap gap-2">
-                                        <Button
-                                            size="sm"
-                                            onClick={handleResendVerification}
-                                        >
-                                            Send new verification PIN
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() =>
-                                                navigate(`/verify-email?email=${encodeURIComponent(verifyPendingEmail)}`)
-                                            }
-                                        >
-                                            Open verification page
-                                        </Button>
-                                    </div>
-                                    {resendMessage && (
-                                        <p className="mt-2 text-sm text-indigo-700">
-                                            {resendMessage}
-                                        </p>
-                                    )}
                                 </div>
                             )}
 

@@ -32,7 +32,7 @@ const SECTIONS = [
                 list: [
                     "Registration details must be yours or, for a business account, genuinely represent that business.",
                     "One person may not operate multiple accounts to manipulate reviews, requests, or verification.",
-                    "We may require email verification and, where offered, two-factor authentication to protect accounts.",
+                    "Where two-factor login is offered, you can switch it on from Settings; a code sent to your email will then be required at every sign-in.",
                     "Tell us promptly if your email address, phone number, or circumstances change so we can keep reaching you."
                 ]
             }

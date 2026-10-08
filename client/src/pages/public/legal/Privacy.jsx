@@ -38,7 +38,7 @@ const SECTIONS = [
                 list: [
                     "To create and operate your account, and to keep you signed in securely.",
                     "To show your profile, listings, and reviews to other users as the marketplace requires.",
-                    "To deliver messages, notifications, verification PINs, and password resets by email.",
+                    "To deliver messages, notifications, two-factor sign-in codes, and password resets by email.",
                     "To verify providers and to review content against our Terms & Conditions.",
                     "To detect spam, fraud, and misuse, and to protect the platform and its users.",
                     "To respond to support requests and improve how QuickFix works.",

@@ -4,12 +4,18 @@ const USER_STORAGE_KEY = "quickfix_user";
 
 // ==========================================
 // REGISTER USER
+// The API creates the account and issues the session cookie in one
+// response, so the user is signed in from the moment this resolves.
 // ==========================================
 export const registerUser = async (userData) => {
     const response = await api.post(
         "/auth/register",
         userData
     );
+
+    if (response.data.success && response.data.user) {
+        cacheUser(response.data.user);
+    }
 
     return response.data;
 };
@@ -135,29 +141,6 @@ export const forgotPassword = async (email) => {
 // ==========================================
 export const resetPassword = async (data) => {
     const response = await api.post("/auth/reset-password", data);
-
-    return response.data;
-};
-
-
-// ==========================================
-// VERIFY EMAIL WITH PIN (public)
-// ==========================================
-export const verifyEmail = async (email, pin) => {
-    const response = await api.post(
-        "/auth/verify-email",
-        { email, pin }
-    );
-
-    return response.data;
-};
-
-
-// ==========================================
-// RESEND VERIFICATION PIN (public)
-// ==========================================
-export const resendVerification = async (email) => {
-    const response = await api.post("/auth/resend-verification", { email });
 
     return response.data;
 };

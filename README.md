@@ -157,18 +157,20 @@ with no extra configuration. Railway also provides the MySQL database and a free
    PUBLIC_API_URL=https://<your-service>.up.railway.app
    PUBLIC_APP_URL=https://quickfix.pages.dev
    ```
-   For real verification PIN / login code emails, also add SMTP credentials
-   (any provider that speaks SMTP — Resend, Brevo, Mailtrap, SendGrid…):
+   For real two-factor login codes and password-reset emails, also add SMTP
+   credentials (any provider that speaks SMTP — Resend, Brevo, Mailtrap,
+   SendGrid…):
    ```
    SMTP_HOST=smtp.resend.com          # or your provider's host / port
    SMTP_PORT=465
    SMTP_USER=resend                   # provider-specific (often the API key)
    SMTP_PASSWORD=<api-key-or-password>
    SMTP_FROM="QuickFix <no-reply@quickfix.co.ls>"
-   REQUIRE_EMAIL_VERIFICATION=true    # block logins until email is verified
    ```
    Without SMTP, every code is printed to the server logs instead and no email
-   is sent — fine for local development, not for a real deployment.
+   is sent — fine for local development, and fine for sign-up/sign-in, which
+   do not depend on email. Only opt-in two-factor login and password resets
+   need a working mail server.
 5. **Settings → Networking → Generate Domain** → that
    `https://<name>.up.railway.app` URL is your `VITE_API_URL`.
 6. Add a **Volume** mounted at `/app/uploads` so uploaded media survives deploys.
@@ -328,12 +330,11 @@ uploads are ephemeral unless you attach a disk.
 | `LOG_FORMAT` | No | `combined` | Morgan log format |
 | `PUBLIC_API_URL` | No | derived from request | Absolute base used when building uploaded-file URLs |
 | `PUBLIC_APP_URL` | No | `CLIENT_ORIGIN` | Frontend origin used in password-reset email links |
-| `SMTP_HOST` | No | — | SMTP host for sending verification/log-in PINs; unset → codes go to the server log |
+| `SMTP_HOST` | No | — | SMTP host for two-factor login codes and password-reset emails; unset → codes go to the server log |
 | `SMTP_PORT` | No | `465` | SMTP port (465 = SMTPS, 587 = STARTTLS) |
 | `SMTP_USER` | No | — | SMTP username |
 | `SMTP_PASSWORD` | No | — | SMTP password or API key |
 | `SMTP_FROM` | No | `QuickFix <no-reply@quickfix.co.ls>` | From address for transactional emails |
-| `REQUIRE_EMAIL_VERIFICATION` | No | `false` | `true` blocks logins until the email's verification PIN has been entered |
 
 ### Client (`client/.env`, build-time)
 
@@ -406,9 +407,7 @@ All API routes are prefixed with `/api`. Responses follow the format:
 ### Auth
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/api/auth/register` | — | Create account (CUSTOMER/PROVIDER/BUSINESS_OWNER); returns `verification:"sent"` |
-| POST | `/api/auth/verify-email` | — | Verify registration email with the 6-digit PIN |
-| POST | `/api/auth/resend-verification` | — | Resend the verification PIN (60s cooldown) |
+| POST | `/api/auth/register` | — | Create account (CUSTOMER/PROVIDER/BUSINESS_OWNER); signs the user in immediately |
 | POST | `/api/auth/login` | — | Login; with 2FA on returns `code:"OTP_REQUIRED"` (first factor OK) |
 | POST | `/api/auth/verify-2fa` | — | Complete login with the 6-digit login code |
 | POST | `/api/auth/resend-otp` | — | Resend the login code (60s cooldown) |
@@ -541,10 +540,16 @@ All API routes are prefixed with `/api`. Responses follow the format:
   only admins may approve them for public visibility.
 - Password-reset tokens are hashed in storage and never leaked through the
   API; they are delivered by email in a real deployment.
-- Registration and login use 6-digit **one-time PINs** (email verification +
-  2FA). PINs are SHA-256 hashed in storage, expire after 10 minutes, are
-  invalidated after 5 wrong attempts, and resends are limited to one per
-  60 seconds.
+- Registration and login work without email: accounts are usable from the
+  moment they are created, and there is no email-verification step.
+- Sign-in is defended in depth: a generous per-IP limiter (shared public IPs
+  are common in Lesotho), a per-account counter   that locks an address after 8
+  failed attempts in 15 minutes, a fixed bcrypt cost on unknown addresses so
+  response timing does not reveal which ones exist, and generic
+  "invalid email or password" wording for every failure.
+- Opt-in two-factor login uses 6-digit codes that are SHA-256 hashed in
+  storage, expire after 10 minutes, are invalidated after 5 wrong attempts,
+  and resends are limited to one per 60 seconds.
 
 ---
 
