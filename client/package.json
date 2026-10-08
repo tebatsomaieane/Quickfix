@@ -17,12 +17,13 @@
     "check:errors": "node scripts/check-error-messages.mjs",
     "check:feedback": "node scripts/check-action-feedback.mjs",
     "check:deploy": "node scripts/check-deploy-config.mjs",
+    "verify:pages": "node scripts/verify-pages-build.mjs",
     "check": "npm run lint && npm run check:menu && npm run check:a11y && npm run check:titles && npm run check:connection && npm run check:format && npm run check:validation && npm run check:apicache && npm run check:errors && npm run check:feedback && npm run check:deploy",
     "preview": "vite preview",
     "deploy": "npm run build && cd .. && vercel --prod --yes",
     "deploy:preview": "npm run build && cd .. && vercel --yes",
-    "deploy:cloudflare": "npm run build && wrangler pages deploy dist --project-name quickfix --commit-dirty=true",
-    "deploy:cloudflare:preview": "npm run build && wrangler pages deploy dist --project-name quickfix --branch preview --commit-dirty=true"
+    "deploy:cloudflare": "npm run build && npm run verify:pages && wrangler pages deploy dist --project-name quickfix --commit-dirty=true",
+    "deploy:cloudflare:preview": "npm run build && npm run verify:pages && wrangler pages deploy dist --project-name quickfix --branch preview --commit-dirty=true"
   },
   "dependencies": {
     "axios": "^1.20.0",

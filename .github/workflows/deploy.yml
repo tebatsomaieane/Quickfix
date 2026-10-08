@@ -110,6 +110,12 @@ jobs:
           done
           echo "Build output verified."
 
+      - name: Verify the bundle calls the API origin
+        working-directory: client
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+        run: npm run verify:pages
+
       - name: Deploy to Cloudflare Pages
         if: github.event_name != 'pull_request'
         uses: cloudflare/wrangler-action@v3

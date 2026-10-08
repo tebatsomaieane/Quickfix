@@ -32,13 +32,12 @@
     />
     <link rel="preconnect" href="https://thumb.wikimedia.org" crossorigin />
     <link rel="preconnect" href="https://quickfix-api-production-0d46.up.railway.app" crossorigin />
-    <link
-        rel="preload"
-        as="image"
-        href="https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8d/Maletsunyanefalls.JPG/1920px-Maletsunyanefalls.JPG"
-        imagesrcset="https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8d/Maletsunyanefalls.JPG/960px-Maletsunyanefalls.JPG 960w, https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8d/Maletsunyanefalls.JPG/1920px-Maletsunyanefalls.JPG 1920w"
-        imagesizes="100vw"
-    />
+    <!-- The Maletsunyane Falls hero is deliberately NOT preloaded here. This
+         shell is shared by every route, and only Home renders that image, so a
+         static preload makes every other page (/login, /signup, ...) download a
+         1920px photo it never uses and log "preloaded but not used". Home marks
+         the image loading="eager" fetchpriority="high" instead, and the
+         preconnect above already warms the connection. -->
     <title>QuickFix — Trusted service providers, close to home</title>
     <style>
       @keyframes qf-rise {
