@@ -177,9 +177,30 @@ check(
     "the SPA fallback rewrites unknown paths to index.html",
     /\/\*\s+\/index\.html\s+200/.test(redirects)
 );
+
+// /api/* cannot be 404ed from _redirects: Pages' default SPA behavior rewrites
+// every unknown GET to index.html before redirects are consulted, so a 404
+// redirect line silently never fires (verified on the live edge). The guard
+// that actually works is build-time: verify-pages-build.mjs refuses to publish
+// a bundle whose axios base is same-origin "/api".
+const packageJsonText = read("package.json");
+
 check(
-    "/api/* does not fall through to the SPA shell",
-    /\/api\/\*\s+\S+\s+404/.test(redirects)
+    "a dead /api 404 redirect does not pretend to guard the API",
+    !/\/api\/\*\s+\S+\s+404/.test(redirects)
+);
+check(
+    "the Pages deploy runs the bundle-origin check",
+    /deploy:cloudflare/.test(packageJsonText) &&
+        /verify:pages/.test(packageJsonText)
+);
+check(
+    "workflow verifies the bundle targets the API origin",
+    /Verify the bundle calls the API origin/.test(workflow)
+);
+check(
+    "workflow runs verify:pages",
+    /npm run verify:pages/.test(workflow) && /VITE_API_URL: \$/.test(workflow)
 );
 
 const headerText = headers;

@@ -28,6 +28,9 @@ dist-ssr
 
 .vercel
 
+# Wrangler (Cloudflare Pages) local state
+.wrangler
+
 # Scratch output from scripts/check-form-a11y.mjs
 .a11y-check-*
 
