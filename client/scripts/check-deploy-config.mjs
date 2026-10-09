@@ -125,7 +125,7 @@ if (existsSync(workflowPath)) {
 check(".github/workflows/deploy.yml exists", workflow.length > 0);
 check("the workflow deploys to Cloudflare Pages", /wrangler-action@/.test(workflow));
 check("the workflow publishes with `pages deploy`", /pages deploy/.test(workflow));
-check("the workflow refuses to build without VITE_API_URL", /VITE_API_URL repository variable is not set/.test(workflow));
+check("the workflow falls back to the standard API origin when VITE_API_URL is unset", /vars\.VITE_API_URL \|\| 'https:\/\//.test(workflow));
 check("the workflow rejects a non-https API origin", /must be an https:\/\/ origin/.test(workflow));
 check("the workflow runs lint", /npm run lint/.test(workflow));
 check("the workflow runs this deploy check", /check:deploy/.test(workflow));
