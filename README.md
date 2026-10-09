@@ -201,10 +201,13 @@ One-time setup:
    from the dashboard sidebar.
 2. In GitHub → **Settings → Secrets and variables → Actions**:
    - *Secrets*: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
-   - *Variables*: `VITE_API_URL` = `https://api.your-domain`
-     (optional `CF_PAGES_PROJECT`, defaults to `quickfix`)
+   - *Variables*: `VITE_API_URL` (optional — the workflow falls back to the
+     standard quickfix API URL; set it here only if that ever changes),
+     `CF_PAGES_PROJECT` (optional, defaults to `quickfix`)
 3. Push to `main` (or run the workflow manually). The first run creates the
-   Pages project if it does not exist.
+   Pages project if it does not exist. If the Cloudflare secrets are not yet
+   configured the deploy step is skipped with a warning and the check still
+   passes — deploy locally with `npm run deploy:cloudflare` until then.
 4. Add your custom domain under **Pages → quickfix → Custom domains**.
 
 ### Deploy the client (Cloudflare Git integration — alternative)
