@@ -54,6 +54,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      # Secrets are not allowed in `if:` conditions, so flip this flag at the
+      # job level (job `env` may reference secrets) and test it with `env.`.
+      CF_DEPLOY_ENABLED: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -125,16 +129,14 @@ jobs:
       - name: Check Cloudflare secrets are configured
         if: github.event_name != 'pull_request'
         shell: bash
-        env:
-          HAS_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
         run: |
-          if [ "$HAS_TOKEN" != "true" ]; then
+          if [ "$CF_DEPLOY_ENABLED" != "true" ]; then
             echo "::warning::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID secrets are not set; skipping the deploy."
             echo "Deploy manually: cd client && npm run deploy:cloudflare"
           fi
 
       - name: Deploy to Cloudflare Pages
-        if: github.event_name != 'pull_request' && secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != ''
+        if: github.event_name != 'pull_request' && env.CF_DEPLOY_ENABLED == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
