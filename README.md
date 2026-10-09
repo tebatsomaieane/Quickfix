@@ -136,12 +136,14 @@ docker compose up -d --build        # db + server + nginx ingress on :80
 
 ### Deploy the API (Railway)
 
-The repo ships `server/Dockerfile` and `server/railway.json`, so the API builds
-with no extra configuration. Railway also provides the MySQL database and a free
-`*.up.railway.app` subdomain.
+The repo ships `server/Dockerfile` and (at the repo root) `railway.json`, so
+the API builds with no extra configuration — the Dockerfile expects a **root
+build context** with the Dockerfile at `server/Dockerfile`. Railway also
+provides the MySQL database and a free `*.up.railway.app` subdomain.
 
 1. **railway.app → New Project → Deploy from GitHub repo → `Quickfix`.**
-2. Open the service → **Settings → Source → Root Directory** = `server`.
+   (Root Directory can stay empty — the repo-root `railway.json` tells
+   Railway where the Dockerfile is.)
 3. **New → Database → MySQL** to add the database.
 4. Service → **Variables → Raw Editor**, add:
    ```
