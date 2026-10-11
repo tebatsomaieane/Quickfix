@@ -143,8 +143,13 @@ check(
     /client\/dist\/_redirects/.test(workflow)
 );
 check(
-    "PRs build but do not publish",
-    /github\.event_name != 'pull_request'/.test(workflow)
+    "PRs deploy to a pr- preview branch, never production",
+    /--branch \$\{\{ steps\.pagebranch/.test(workflow) &&
+        /pr-\$/.test(workflow)
+);
+check(
+    "fork PRs cannot deploy (no secrets leaked)",
+    /!github\.event\.pull_request\.head\.repo\.fork/.test(workflow)
 );
 
 console.log("");

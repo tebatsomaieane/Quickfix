@@ -16,12 +16,13 @@
 #
 # The API (Railway) and the client (Pages) are different origins, so the API
 # needs these too -- otherwise the session cookie is dropped and CORS rejects
-# the app: CLIENT_ORIGIN=https://quickfix.pages.dev, COOKIE_SAMESITE=none,
-# PUBLIC_API_URL=https://<railway-domain>, PUBLIC_APP_URL=https://quickfix.pages.dev
+# the app: CLIENT_ORIGIN=https://quickfix-85x.pages.dev, COOKIE_SAMESITE=none,
+# PUBLIC_API_URL=https://<railway-domain>, PUBLIC_APP_URL=https://quickfix-85x.pages.dev
 #
-# Every push to main (and manual runs) deploys; pull requests only run lint,
-# the deploy-config checks and a build. Do NOT also connect this repo through
-# Cloudflare's Git integration, or each push would deploy twice.
+# Every push to main (and manual runs) deploys production; pull requests run
+# lint, the deploy-config checks, a build, and deploy a PREVIEW copy to their
+# own `pr-<n>` Pages branch (fork PRs never deploy). Do NOT also connect this
+# repo through Cloudflare's Git integration, or each push would deploy twice.
 #
 # This workflow was removed once before because the Cloudflare secrets were
 # never configured, leaving a permanently red check. Configure the secrets
@@ -127,8 +128,19 @@ jobs:
           VITE_API_URL: ${{ env.api_origin }}
         run: npm run verify:pages
 
+      - name: Resolve the Pages branch
+        id: pagebranch
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            branch="pr-${{ github.event.pull_request.number }}"
+            echo "Deploying a preview (branch=$branch)"
+          else
+            branch="${{ github.ref_name }}"
+          fi
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+
       - name: Check Cloudflare credentials are configured
-        if: github.event_name != 'pull_request'
         shell: bash
         run: |
           if [ "$CF_DEPLOY_ENABLED" != "true" ]; then
@@ -146,11 +158,17 @@ jobs:
           printf '%s' "$WRANGLER_OAUTH_B64" | base64 -d > "$HOME/.config/.wrangler/config/default.toml"
 
       - name: Deploy to Cloudflare Pages
-        if: github.event_name != 'pull_request' && env.CF_DEPLOY_ENABLED == 'true'
+        if: env.CF_DEPLOY_ENABLED == 'true' && !github.event.pull_request.head.repo.fork
         uses: cloudflare/wrangler-action@v3
         with:
           workingDirectory: client
           command: >-
             pages deploy dist
             --project-name ${{ vars.CF_PAGES_PROJECT || 'quickfix' }}
-            --branch ${{ github.ref_name }}
+            --branch ${{ steps.pagebranch.outputs.branch }}
+
+      - name: Report the preview URL
+        if: env.CF_DEPLOY_ENABLED == 'true' && github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork
+        shell: bash
+        run: |
+          echo "Preview: https://pr-${{ github.event.pull_request.number }}.${{ vars.CF_PAGES_PROJECT || 'quickfix' }}.pages.dev"

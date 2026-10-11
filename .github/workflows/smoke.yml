@@ -1,0 +1,71 @@
+# ─────────────────────────────────────────────
+# Nightly production smoke check.
+#
+# Calls the live API and the deployed client, then verifies the bundle the
+# client serves still embeds the production API origin. Catches a regression
+# that looks "green" in CI but is actually broken in production (wrong API
+# baked in, API down, dead bundle link, etc.).
+#
+# Runs on a schedule and can be triggered manually:
+# Actions -> "Smoke check" -> Run workflow.
+# ─────────────────────────────────────────────
+name: Smoke check
+
+on:
+  schedule:
+    # 03:17 UTC daily; while most of the world is asleep.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  production:
+    name: Smoke-check production
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: API health endpoint responds
+        shell: bash
+        run: |
+          # --retry-all-errors tolerates a cold-start 502/503 on first hit.
+          code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 60 \
+            --retry 5 --retry-delay 5 --retry-all-errors \
+            https://quickfix-api-production-0d46.up.railway.app/api/health)
+          echo "GET /api/health -> $code"
+          test "$code" = "200"
+
+      - name: Client shell (Pages) serves the app
+        shell: bash
+        run: |
+          body=$(curl -sS -f --max-time 60 https://quickfix-85x.pages.dev)
+          printf '%s' "$body" | grep -q '<div id="root">'
+
+      - name: Deployed bundle still targets the production API
+        shell: bash
+        run: |
+          set -euo pipefail
+          api_origin="https://quickfix-api-production-0d46.up.railway.app/api"
+          base="https://quickfix-85x.pages.dev"
+          body=$(curl -sS -f --max-time 60 "$base")
+          entry=$(printf '%s' "$body" |
+            sed -n 's/.*src="\(\/assets\/index-[^"]*\.js\)".*/\1/p' | head -n1)
+          test -n "$entry" || { echo "::error::No entry asset in index.html"; exit 1; }
+          curl -sS -f --max-time 60 -o /tmp/entry.js "$base$entry"
+          # Vite lists its lazy chunks inside the entry. The axios baseURL lives
+          # in a chunk (api-*.js), never the entry, so every unique chunk name
+          # is fetched and scanned.
+          chunks=$(grep -oE '\./[A-Za-z0-9_/.-]+\.js' /tmp/entry.js |
+            sed 's/^\.\///' | sort -u || true)
+          echo "scanning entry + $(wc -l <<<"$chunks") chunks"
+          mkdir -p /tmp/assets
+          cp /tmp/entry.js /tmp/assets/entry.js
+          for chunk in $chunks; do
+            curl -sS -f --max-time 60 -o "/tmp/assets/$chunk" "$base/assets/$chunk" || true
+          done
+          cat /tmp/assets/* > /tmp/all-bundle.js
+          if grep -q "$api_origin" /tmp/all-bundle.js; then
+            echo "OK: the live bundle targets the production API"
+          else
+            echo "::error::No served JS chunk embeds the API origin $api_origin"
+            exit 1
+          fi

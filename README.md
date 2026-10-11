@@ -115,10 +115,10 @@ Because the app and the API are on **different origins**, the session cookie
 must be sent cross-site. Set these on the **API server** (e.g. in `.env`):
 
 ```bash
-CLIENT_ORIGIN=https://quickfix.pages.dev,https://your-custom-domain
+CLIENT_ORIGIN=https://quickfix-85x.pages.dev,https://your-custom-domain
 COOKIE_SAMESITE=none          # browsers require this for cross-site cookies
 PUBLIC_API_URL=https://api.your-domain    # used for uploaded-media URLs
-PUBLIC_APP_URL=https://quickfix.pages.dev # password-reset email links
+PUBLIC_APP_URL=https://quickfix-85x.pages.dev # password-reset email links
 ```
 
 Pick where the API runs:
@@ -154,10 +154,10 @@ provides the MySQL database and a free `*.up.railway.app` subdomain.
    DB_USER=${{MySQL.MYSQLUSER}}
    DB_PASSWORD=${{MySQL.MYSQLPASSWORD}}
    DB_NAME=${{MySQL.MYSQLDATABASE}}
-   CLIENT_ORIGIN=https://quickfix.pages.dev
+   CLIENT_ORIGIN=https://quickfix-85x.pages.dev
    COOKIE_SAMESITE=none
    PUBLIC_API_URL=https://<your-service>.up.railway.app
-   PUBLIC_APP_URL=https://quickfix.pages.dev
+   PUBLIC_APP_URL=https://quickfix-85x.pages.dev
    ```
    For real two-factor login codes and password-reset emails, also add SMTP
    credentials (any provider that speaks SMTP — Resend, Brevo, Mailtrap,

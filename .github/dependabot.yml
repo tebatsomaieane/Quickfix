@@ -1,0 +1,26 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: "npm"
+    directory: "/client"
+    schedule:
+      interval: weekly
+    groups:
+      vite:
+        patterns: ["vite", "@vitejs/*", "@tailwindcss/*", "esbuild"]
+      react:
+        patterns: ["react", "react-dom", "react-router-dom", "@types/react*"]
+      lint:
+        patterns: ["eslint", "@eslint/*", "eslint-plugin-*", "globals"]
+    ignore:
+      - dependency-name: "wrangler"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "npm"
+    directory: "/server"
+    schedule:
+      interval: weekly
