@@ -201,15 +201,20 @@ One-time setup:
 1. Create an API token in **Cloudflare dashboard → My Profile → API Tokens**
    with the *Cloudflare Pages: Edit* permission, and copy the **Account ID**
    from the dashboard sidebar.
-2. In GitHub → **Settings → Secrets and variables → Actions**:
-   - *Secrets*: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
+2. Give the workflow Cloudflare credentials. With no dashboard token needed,
+   base64-encode a machine's wrangler login config and save it under
+   GitHub → **Settings → Secrets and variables → Actions**:
+   - *Secret*: `WRANGLER_OAUTH_B64` = `base64 -w0 ~/.wrangler/config/default.toml`
+     (on Windows: `certutil -encode`), taken from a machine where
+     `wrangler login` succeeded. Wrangler in CI refreshes the token itself.
+     Alternative: `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`.
    - *Variables*: `VITE_API_URL` (optional — the workflow falls back to the
      standard quickfix API URL; set it here only if that ever changes),
      `CF_PAGES_PROJECT` (optional, defaults to `quickfix`)
 3. Push to `main` (or run the workflow manually). The first run creates the
-   Pages project if it does not exist. If the Cloudflare secrets are not yet
-   configured the deploy step is skipped with a warning and the check still
-   passes — deploy locally with `npm run deploy:cloudflare` until then.
+   Pages project if it does not exist. If no Cloudflare credentials are
+   configured yet the deploy step is skipped with a warning and the check
+   still passes — deploy locally with `npm run deploy:cloudflare` until then.
 4. Add your custom domain under **Pages → quickfix → Custom domains**.
 
 ### Deploy the client (Cloudflare Git integration — alternative)
