@@ -34,7 +34,8 @@ const read = (...parts) =>
     readFileSync(resolve(process.cwd(), ...parts), "utf8");
 
 // ─────────────────────────────────────────────
-// Vercel (legacy publish target - still wired to `npm run deploy`)
+// Vercel (optional secondary target - `deploy:vercel`, still validated because
+// it remains a supported publish path)
 // ─────────────────────────────────────────────
 console.log("vercel routing");
 
@@ -193,6 +194,14 @@ check(
     "the Pages deploy runs the bundle-origin check",
     /deploy:cloudflare/.test(packageJsonText) &&
         /verify:pages/.test(packageJsonText)
+);
+check(
+    "npm run deploy targets Cloudflare by default",
+    /"deploy": "npm run build && npm run verify:pages && wrangler pages deploy dist --project-name quickfix/.test(packageJsonText)
+);
+check(
+    "Vercel remains available as an optional deploy",
+    /"deploy:vercel": "npm run build && cd \.\. && vercel --prod --yes/.test(packageJsonText)
 );
 check(
     "workflow verifies the bundle targets the API origin",

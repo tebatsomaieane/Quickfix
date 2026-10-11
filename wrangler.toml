@@ -2,8 +2,12 @@
 #
 # Primary method — GitHub Actions (.github/workflows/deploy.yml):
 #   Every push to main builds client/ and deploys client/dist to the
-#   "quickfix" Pages project. Requires CLOUDFLARE_API_TOKEN and
-#   CLOUDFLARE_ACCOUNT_ID secrets plus the VITE_API_URL variable.
+#   "quickfix" Pages project. No dashboard API token needed: the runner
+#   mounts the base64-encoded wrangler login config (WRANGLER_OAUTH_B64
+#   secret) into ~/.wrangler/config/default.toml and wrangler authenticates
+#   with it. CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID are accepted as an
+#   alternative. VITE_API_URL is a variable (falls back to the standard
+#   quickfix URL when unset).
 #
 # Alternative — Cloudflare Pages Git integration:
 #   1. Dashboard → Workers & Pages → Create → Pages → Connect to Git.
