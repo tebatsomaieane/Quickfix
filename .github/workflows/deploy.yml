@@ -159,7 +159,9 @@ jobs:
 
       - name: Deploy to Cloudflare Pages
         if: env.CF_DEPLOY_ENABLED == 'true' && !github.event.pull_request.head.repo.fork
-        uses: cloudflare/wrangler-action@v4
+        # Pinned to v3: v4 demands CLOUDFLARE_API_TOKEN and refuses to load the
+        # OAuth config we mount, so the dep-bump PR is ignored in dependabot.yml.
+        uses: cloudflare/wrangler-action@v3
         with:
           workingDirectory: client
           command: >-

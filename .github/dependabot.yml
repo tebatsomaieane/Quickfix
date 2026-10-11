@@ -4,6 +4,11 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
+    ignore:
+      # wrangler-action v4 requires a dashboard API token and refuses the
+      # mounted OAuth config that deploy.yml relies on.
+      - dependency-name: "cloudflare/wrangler-action"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "npm"
     directory: "/client"
