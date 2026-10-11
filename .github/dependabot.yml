@@ -22,8 +22,13 @@ updates:
       lint:
         patterns: ["eslint", "@eslint/*", "eslint-plugin-*", "globals"]
     ignore:
+      # Wrangler >= 4.146 regressed OAuth-config auth in non-interactive CI:
+      # `pages deploy` with the mounted ~/.config/.wrangler/config/default.toml
+      # fails with "necessary to set a CLOUDFLARE_API_TOKEN". 4.145.0 is pinned
+      # and proved to deploy via the OAuth mount. Remove when a later wrangler
+      # is verified to work without a dashboard token.
       - dependency-name: "wrangler"
-        update-types: ["version-update:semver-major"]
+        versions: [">=4.146.0"]
 
   - package-ecosystem: "npm"
     directory: "/server"
