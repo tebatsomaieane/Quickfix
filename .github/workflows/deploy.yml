@@ -62,7 +62,7 @@ jobs:
       CF_DEPLOY_ENABLED: ${{ secrets.WRANGLER_OAUTH_B64 != '' || secrets.CLOUDFLARE_API_TOKEN != '' }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
