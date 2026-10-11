@@ -1,0 +1,51 @@
+# ─────────────────────────────────────────────
+# Server: lint + test gate.
+#
+# Runs on every server change and on PRs that touch server/, so a dependency
+# or code bump cannot reach production untested (the client workflow only
+# watches client/).
+# ─────────────────────────────────────────────
+name: Server tests and lint
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "server/**"
+      - ".nvmrc"
+      - ".github/workflows/server.yml"
+  pull_request:
+    paths:
+      - "server/**"
+      - ".nvmrc"
+      - ".github/workflows/server.yml"
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Lint and test the API
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install server dependencies
+        run: npm ci
+
+      - name: Lint server
+        run: npm run lint
+
+      - name: Test server
+        run: npm test
