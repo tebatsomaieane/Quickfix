@@ -1,5 +1,4 @@
 import { Suspense, lazy } from "react";
-import { Link } from "react-router-dom";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import RouteTitle from "./components/RouteTitle";
@@ -54,7 +53,6 @@ import MainLayout from "./layouts/MainLayout";
 import DashboardLayout from "./layouts/DashboardLayout";
 import ProtectedRoute from "./routes/ProtectedRoute";
 
-import Button from "./components/ui/Button";
 import Icon from "./components/ui/Icon";
 import ErrorBoundary from "./components/ui/ErrorBoundary";
 import CookieConsent from "./components/ui/CookieConsent";
@@ -78,24 +76,6 @@ function PageLoader() {
             <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
                 Loading QuickFix
             </p>
-        </div>
-    );
-}
-
-function FeaturePlaceholder() {
-    return (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-            <Icon name="wrench" className="h-10 w-10 text-slate-300" />
-            <h1 className="mt-4 text-xl font-semibold text-slate-900">
-                This section is being built
-            </h1>
-            <p className="mt-1 max-w-sm text-sm text-slate-500">
-                This feature will be added in the next phase of the
-                QuickFix development roadmap.
-            </p>
-            <Link to="/" className="mt-5">
-                <Button variant="outline">Back to marketplace</Button>
-            </Link>
         </div>
     );
 }
@@ -226,7 +206,7 @@ function App() {
                             />
                             <Route
                                 path="/customer/*"
-                                element={<FeaturePlaceholder />}
+                                element={<Navigate to="/customer/dashboard" replace />}
                             />
                         </Route>
                     </Route>
@@ -300,7 +280,7 @@ function App() {
                             />
                             <Route
                                 path="/provider/*"
-                                element={<FeaturePlaceholder />}
+                                element={<Navigate to="/provider/dashboard" replace />}
                             />
                         </Route>
                     </Route>
@@ -402,7 +382,7 @@ function App() {
                             />
                             <Route
                                 path="/admin/*"
-                                element={<FeaturePlaceholder />}
+                                element={<Navigate to="/admin/dashboard" replace />}
                             />
                         </Route>
                     </Route>
