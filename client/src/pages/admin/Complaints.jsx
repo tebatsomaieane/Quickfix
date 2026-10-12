@@ -6,6 +6,8 @@ import Badge from "../../components/ui/Badge";
 import Spinner from "../../components/ui/Spinner";
 import EmptyState from "../../components/ui/EmptyState";
 import { formatDate } from "../../lib/format";
+import { describeError } from "../../lib/errorMessages";
+import { useToast } from "../../components/ui/ToastProvider";
 
 const STATUS_COLORS = {
     OPEN: "amber",
@@ -24,6 +26,8 @@ function AdminComplaints() {
     const [filter, setFilter] = useState("OPEN");
     const [edits, setEdits] = useState({});
     const [savingId, setSavingId] = useState(null);
+
+    const { showToast } = useToast();
 
     const load = () => {
         setLoading(true);
@@ -74,8 +78,12 @@ function AdminComplaints() {
                 return next;
             });
             load();
-        } catch {
-            // ignore - user will retry
+        } catch (error) {
+            const e = describeError(error);
+
+            showToast(e.title || "Failed to update complaint", "error", {
+                detail: e.detail
+            });
         } finally {
             setSavingId(null);
         }

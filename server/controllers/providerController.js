@@ -427,16 +427,25 @@ const updateMyServices = async (req, res) => {
             normalized.push({ service_id: serviceId, price });
         }
 
-        // Verify all service ids exist and are active
-        for (const entry of normalized) {
+        // Verify every service id exists and is active in ONE query instead of
+        // one round-trip per entry (the old loop was an N+1 for every service a
+        // provider offered).
+        if (normalized.length > 0) {
+            const serviceIds = normalized.map((entry) => entry.service_id);
+
             const [rows] = await db.query(
-                "SELECT id FROM services WHERE id = ? AND status = 'ACTIVE'",
-                [entry.service_id]
+                "SELECT id FROM services WHERE status = 'ACTIVE' AND id IN (?)",
+                [serviceIds]
             );
-            if (rows.length === 0) {
+
+            const activeIds = new Set(rows.map((row) => row.id));
+
+            const missing = serviceIds.find((serviceId) => !activeIds.has(serviceId));
+
+            if (missing !== undefined) {
                 return res.status(400).json({
                     success: false,
-                    message: `Service ${entry.service_id} does not exist or is inactive`
+                    message: `Service ${missing} does not exist or is inactive`
                 });
             }
         }

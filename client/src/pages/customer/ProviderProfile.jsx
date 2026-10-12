@@ -175,7 +175,7 @@ function ProviderProfile() {
                         </div>
 
                         <div className="mt-4 flex flex-wrap gap-1.5">
-                            {provider.services.slice(0, 4).map((service) => (
+                            {(provider.services || []).slice(0, 4).map((service) => (
                                 <span
                                     key={service.id}
                                     className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700"
@@ -214,7 +214,7 @@ function ProviderProfile() {
                     </h2>
 
                     <ul className="mt-4 divide-y divide-slate-100">
-                        {provider.services.map((service) => (
+                        {(provider.services || []).map((service) => (
                             <li
                                 key={service.id}
                                 className="flex items-center justify-between py-3"
@@ -242,7 +242,7 @@ function ProviderProfile() {
                     </h2>
 
                     <ul className="mt-4 space-y-2">
-                        {provider.availability.length === 0 ? (
+                        {(provider.availability?.length ?? 0) === 0 ? (
                             <li className="text-sm text-slate-500">
                                 Availability not shared yet.
                             </li>
@@ -268,10 +268,10 @@ function ProviderProfile() {
             {/* Reviews */}
             <div className="mt-6">
                 <h2 className="font-semibold text-slate-900">
-                    Reviews ({provider.reviews.length})
+                    Reviews ({provider.reviews?.length ?? 0})
                 </h2>
 
-                {provider.reviews.length === 0 ? (
+                {(provider.reviews?.length ?? 0) === 0 ? (
                     <Card className="mt-4 p-6 text-sm text-slate-500">
                         No reviews yet. Jobs will show up here once completed.
                     </Card>

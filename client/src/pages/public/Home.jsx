@@ -302,7 +302,7 @@ function Home() {
                     sizes="100vw"
                     alt="Maletsunyane Falls near Semonkong, Lesotho"
                     loading="eager"
-                    fetchpriority="high"
+                    fetchPriority="high"
                     decoding="async"
                     className="animate-ken-burns absolute inset-0 h-full w-full object-cover"
                 />

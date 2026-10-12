@@ -225,41 +225,41 @@ const getById = async (req, res) => {
 
         const request = requests[0];
 
-        const [offers] = await db.query(
-            `SELECT o.id, o.price, o.message, o.estimated_hours,
-                    o.valid_until, o.status, o.created_at,
-                    pp.id AS provider_id,
-                    u.first_name, u.last_name, u.phone,
-                    pp.location, pp.verification_status,
-                    pp.profile_image, pp.experience_years
-             FROM offers o
-             JOIN provider_profiles pp ON pp.id = o.provider_id
-             JOIN users u ON u.id = pp.user_id
-             WHERE o.request_id = ?
-             ORDER BY
-               CASE o.status
-                 WHEN 'ACCEPTED' THEN 0
-                 WHEN 'PENDING' THEN 1
-                 ELSE 2
-               END,
-               o.price ASC`,
-            [id]
-        );
-
-        const [jobs] = await db.query(
-            `SELECT id, status, started_at, completed_at
-             FROM jobs
-             WHERE request_id = ?`,
-            [id]
-        );
-
-        const [attachments] = await db.query(
-            `SELECT id, file_name, file_url, file_type, created_at
-             FROM request_attachments
-             WHERE request_id = ?
-             ORDER BY id ASC`,
-            [id]
-        );
+        const [[offers], [jobs], [attachments]] = await Promise.all([
+            db.query(
+                `SELECT o.id, o.price, o.message, o.estimated_hours,
+                        o.valid_until, o.status, o.created_at,
+                        pp.id AS provider_id,
+                        u.first_name, u.last_name, u.phone,
+                        pp.location, pp.verification_status,
+                        pp.profile_image, pp.experience_years
+                 FROM offers o
+                 JOIN provider_profiles pp ON pp.id = o.provider_id
+                 JOIN users u ON u.id = pp.user_id
+                 WHERE o.request_id = ?
+                 ORDER BY
+                   CASE o.status
+                     WHEN 'ACCEPTED' THEN 0
+                     WHEN 'PENDING' THEN 1
+                     ELSE 2
+                   END,
+                   o.price ASC`,
+                [id]
+            ),
+            db.query(
+                `SELECT id, status, started_at, completed_at
+                 FROM jobs
+                 WHERE request_id = ?`,
+                [id]
+            ),
+            db.query(
+                `SELECT id, file_name, file_url, file_type, created_at
+                 FROM request_attachments
+                 WHERE request_id = ?
+                 ORDER BY id ASC`,
+                [id]
+            )
+        ]);
 
         request.offers = offers;
         request.jobs = jobs;

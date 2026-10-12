@@ -85,12 +85,28 @@ const listMine = async (req, res) => {
             });
         }
 
+        // `? IS NULL OR ...` cannot use idx_conversations_customer/provider, so
+        // build the predicate from the ids this account actually has. The first
+        // parameter is the viewer's id, which the unread-count subquery in the
+        // join reads.
+        const conditions = [];
+        const params = [req.user.id];
+
+        if (customerId) {
+            conditions.push("v.customer_id = ?");
+            params.push(customerId);
+        }
+
+        if (providerId) {
+            conditions.push("v.provider_id = ?");
+            params.push(providerId);
+        }
+
         const [conversations] = await db.query(
             `${CONVERSATION_LIST_JOIN}
-             WHERE (? IS NULL OR v.customer_id = ?)
-                AND (? IS NULL OR v.provider_id = ?)
+             WHERE ${conditions.join(" OR ")}
              ORDER BY COALESCE(vs.last_message_at, v.created_at) DESC`,
-            [req.user.id, customerId, customerId, providerId, providerId]
+            params
         );
 
         const totalUnread = conversations.reduce(

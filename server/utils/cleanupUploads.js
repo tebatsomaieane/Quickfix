@@ -71,7 +71,16 @@ const cleanupOrphanUploads = async () => {
                 .filter(Boolean)
         );
     } catch (error) {
-        console.warn("[cleanup] Could not read media references from DB:", error.message);
+        // If the reference set could not be read, every stale file would look
+        // unreferenced and the loop below would delete media still in use.
+        // Deleting a user's photo is unrecoverable, so abort the whole pass and
+        // try again next interval instead of guessing.
+        console.warn(
+            "[cleanup] Could not read media references from DB; skipping this pass:",
+            error.message
+        );
+
+        return 0;
     }
 
     let deleted = 0;

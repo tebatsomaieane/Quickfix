@@ -4,6 +4,7 @@ const COLOR_STYLES = {
     amber: "bg-amber-50 text-amber-700 ring-amber-600/20",
     red: "bg-rose-50 text-rose-700 ring-rose-600/20",
     gray: "bg-slate-100 text-slate-600 ring-slate-500/20",
+    slate: "bg-slate-100 text-slate-700 ring-slate-500/20",
     indigo: "bg-indigo-50 text-indigo-700 ring-indigo-600/20"
 };
 

@@ -52,12 +52,27 @@ const listMine = async (req, res) => {
             });
         }
 
+        // Build the predicate from the ids the user actually has. The previous
+        // `(? IS NULL OR j.customer_id = ?)` form is never sargable: MySQL could
+        // not use idx_jobs_customer/idx_jobs_provider and scanned the table.
+        const conditions = [];
+        const params = [];
+
+        if (customerId) {
+            conditions.push("j.customer_id = ?");
+            params.push(customerId);
+        }
+
+        if (providerId) {
+            conditions.push("j.provider_id = ?");
+            params.push(providerId);
+        }
+
         const [jobs] = await db.query(
             `${JOB_JOIN}
-             WHERE (? IS NULL OR j.customer_id = ?)
-                AND (? IS NULL OR j.provider_id = ?)
+             WHERE ${conditions.join(" OR ")}
              ORDER BY j.created_at DESC`,
-            [customerId, customerId, providerId, providerId]
+            params
         );
 
         return res.json({ success: true, data: jobs });
@@ -180,40 +195,61 @@ const start = async (req, res) => {
             });
         }
 
-        const [result] = await db.query(
-            `UPDATE jobs
-             SET status = 'IN_PROGRESS', started_at = NOW()
-             WHERE id = ? AND status = 'ASSIGNED'`,
-            [id]
-        );
+        // The job's own status, the parent request and the customer's
+        // notification are one state transition: commit them together so a
+        // failure cannot leave a job started while its request still reads
+        // ASSIGNED (or a customer never told).
+        const connection = await db.getConnection();
 
-        if (result.affectedRows === 0) {
-            return res.status(400).json({
-                success: false,
-                message: "Job could not be started"
-            });
-        }
+        try {
+            await connection.beginTransaction();
 
-        await db.query(
-            `UPDATE service_requests
-             SET status = 'IN_PROGRESS'
-             WHERE id = ?`,
-            [job.request_id]
-        );
-
-        // Notify the customer
-        const [customerUser] = await db.query(
-            `SELECT user_id FROM customer_profiles WHERE id = ?`,
-            [job.customer_id]
-        );
-
-        if (customerUser.length > 0) {
-            await createNotification(
-                customerUser[0].user_id,
-                "Job started",
-                "Your provider has started the job.",
-                "JOB_STARTED"
+            const [result] = await connection.query(
+                `UPDATE jobs
+                 SET status = 'IN_PROGRESS', started_at = NOW()
+                 WHERE id = ? AND status = 'ASSIGNED'`,
+                [id]
             );
+
+            if (result.affectedRows === 0) {
+                await connection.rollback();
+
+                return res.status(400).json({
+                    success: false,
+                    message: "Job could not be started"
+                });
+            }
+
+            await connection.query(
+                `UPDATE service_requests
+                 SET status = 'IN_PROGRESS'
+                 WHERE id = ?`,
+                [job.request_id]
+            );
+
+            // Notify the customer
+            const [customerUser] = await connection.query(
+                `SELECT user_id FROM customer_profiles WHERE id = ?`,
+                [job.customer_id]
+            );
+
+            if (customerUser.length > 0) {
+                await createNotification(
+                    customerUser[0].user_id,
+                    "Job started",
+                    "Your provider has started the job.",
+                    "JOB_STARTED",
+                    connection
+                );
+            }
+
+            await connection.commit();
+        } catch (error) {
+            await connection.rollback();
+
+            throw error;
+        } finally {
+            connection.release();
         }
 
         return res.json({
@@ -281,40 +317,59 @@ const complete = async (req, res) => {
             });
         }
 
-        const [result] = await db.query(
-            `UPDATE jobs
-             SET status = 'COMPLETED', completed_at = NOW()
-             WHERE id = ? AND status = 'IN_PROGRESS'`,
-            [id]
-        );
+        // Same reasoning as `start`: keep the job, the request and the
+        // customer notification consistent as a single transition.
+        const connection = await db.getConnection();
 
-        if (result.affectedRows === 0) {
-            return res.status(400).json({
-                success: false,
-                message: "Job could not be completed"
-            });
-        }
+        try {
+            await connection.beginTransaction();
 
-        await db.query(
-            `UPDATE service_requests
-             SET status = 'COMPLETED'
-             WHERE id = ?`,
-            [job.request_id]
-        );
-
-        // Notify the customer
-        const [customerUser] = await db.query(
-            `SELECT user_id FROM customer_profiles WHERE id = ?`,
-            [job.customer_id]
-        );
-
-        if (customerUser.length > 0) {
-            await createNotification(
-                customerUser[0].user_id,
-                "Job completed",
-                "Your provider has completed the job. Please leave a review.",
-                "JOB_COMPLETED"
+            const [result] = await connection.query(
+                `UPDATE jobs
+                 SET status = 'COMPLETED', completed_at = NOW()
+                 WHERE id = ? AND status = 'IN_PROGRESS'`,
+                [id]
             );
+
+            if (result.affectedRows === 0) {
+                await connection.rollback();
+
+                return res.status(400).json({
+                    success: false,
+                    message: "Job could not be completed"
+                });
+            }
+
+            await connection.query(
+                `UPDATE service_requests
+                 SET status = 'COMPLETED'
+                 WHERE id = ?`,
+                [job.request_id]
+            );
+
+            // Notify the customer
+            const [customerUser] = await connection.query(
+                `SELECT user_id FROM customer_profiles WHERE id = ?`,
+                [job.customer_id]
+            );
+
+            if (customerUser.length > 0) {
+                await createNotification(
+                    customerUser[0].user_id,
+                    "Job completed",
+                    "Your provider has completed the job. Please leave a review.",
+                    "JOB_COMPLETED",
+                    connection
+                );
+            }
+
+            await connection.commit();
+        } catch (error) {
+            await connection.rollback();
+
+            throw error;
+        } finally {
+            connection.release();
         }
 
         return res.json({

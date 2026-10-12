@@ -106,52 +106,76 @@ const create = async (req, res) => {
             });
         }
 
-        const [result] = await db.query(
-            `INSERT INTO offers
-             (request_id, provider_id, price, message, estimated_hours, valid_until)
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [
-                request_id,
-                providerId,
-                priceNum,
-                message || null,
-                estimated_hours || null,
-                valid_until || null
-            ]
-        );
+        // Insert the offer, flip the request to OFFERS_RECEIVED and notify the
+        // owner as one unit. Without a transaction, a failure between the insert
+        // and the status flip left an offer sitting on a request still shown as
+        // OPEN, and the customer's notification could be lost after the offer
+        // was already committed.
+        const connection = await db.getConnection();
 
-        // Request now has offers
-        if (requests[0].status === "OPEN") {
-            await db.query(
-                `UPDATE service_requests
-                 SET status = 'OFFERS_RECEIVED'
-                 WHERE id = ?`,
+        let offerId;
+
+        try {
+            await connection.beginTransaction();
+
+            const [result] = await connection.query(
+                `INSERT INTO offers
+                 (request_id, provider_id, price, message, estimated_hours, valid_until)
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [
+                    request_id,
+                    providerId,
+                    priceNum,
+                    message || null,
+                    estimated_hours || null,
+                    valid_until || null
+                ]
+            );
+
+            offerId = result.insertId;
+
+            // Request now has offers
+            if (requests[0].status === "OPEN") {
+                await connection.query(
+                    `UPDATE service_requests
+                     SET status = 'OFFERS_RECEIVED'
+                     WHERE id = ?`,
+                    [request_id]
+                );
+            }
+
+            // Notify the request owner (within the transaction)
+            const [owner] = await connection.query(
+                `SELECT cp.user_id
+                 FROM service_requests r
+                 JOIN customer_profiles cp ON cp.id = r.customer_id
+                 WHERE r.id = ?`,
                 [request_id]
             );
-        }
 
-        // Notify the request owner
-        const [owner] = await db.query(
-            `SELECT cp.user_id
-             FROM service_requests r
-             JOIN customer_profiles cp ON cp.id = r.customer_id
-             WHERE r.id = ?`,
-            [request_id]
-        );
+            if (owner.length > 0) {
+                await createNotification(
+                    owner[0].user_id,
+                    "New offer received",
+                    "A provider sent you an offer for your request.",
+                    "OFFER_RECEIVED",
+                    connection
+                );
+            }
 
-        if (owner.length > 0) {
-            await createNotification(
-                owner[0].user_id,
-                "New offer received",
-                "A provider sent you an offer for your request.",
-                "OFFER_RECEIVED"
-            );
+            await connection.commit();
+        } catch (error) {
+            await connection.rollback();
+
+            throw error;
+        } finally {
+            connection.release();
         }
 
         res.status(201).json({
             success: true,
             message: "Offer submitted successfully",
-            data: { id: result.insertId }
+            data: { id: offerId }
         });
     } catch (error) {
         console.error("Error creating offer:", error);
@@ -194,6 +218,10 @@ const update = async (req, res) => {
         valid_until
     } = req.body;
 
+    // Everything below talks to the database, so the whole block is guarded --
+    // including the offer lookup, which previously sat outside any try and
+    // relied on Express to turn a query failure into a generic 500.
+    try {
     // Load the offer
     const [offers] = await db.query(
         `SELECT o.id, o.request_id, o.status, r.status AS request_status
@@ -275,9 +303,8 @@ const update = async (req, res) => {
         });
     }
 
-    try {
-        await db.query(
-            `UPDATE offers
+    await db.query(
+        `UPDATE offers
              SET price = COALESCE(?, price),
                  message = COALESCE(?, message),
                  estimated_hours = COALESCE(?, estimated_hours),

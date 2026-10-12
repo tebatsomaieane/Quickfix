@@ -7,6 +7,8 @@ import Spinner from "../../components/ui/Spinner";
 import EmptyState from "../../components/ui/EmptyState";
 import Input from "../../components/ui/Input";
 import { formatDate } from "../../lib/format";
+import { describeError } from "../../lib/errorMessages";
+import { useToast } from "../../components/ui/ToastProvider";
 
 const ROLE_COLORS = {
     CUSTOMER: "indigo",
@@ -23,11 +25,15 @@ function AdminUsers() {
     const [role, setRole] = useState("");
     const [savingId, setSavingId] = useState(null);
 
+    const { showToast } = useToast();
+
     const load = (params = {}) => {
         setLoading(true);
         fetchUsers(params)
             .then((data) => setUsers(data.data))
-            .catch(() => {})
+            .catch(() => {
+                showToast("Unable to load users. Please try again.", "error");
+            })
             .finally(() => setLoading(false));
     };
 
@@ -43,7 +49,15 @@ function AdminUsers() {
         try {
             await updateUser(user.id, { is_active: !user.is_active });
             load({ q: q || undefined, role: role || undefined });
-        } catch {} finally {
+        } catch (error) {
+            const e = describeError(error);
+
+            showToast(
+                e.title || "Failed to update user",
+                "error",
+                { detail: e.detail }
+            );
+        } finally {
             setSavingId(null);
         }
     };

@@ -288,10 +288,10 @@ function RequestDetail() {
             {/* Offers */}
             <div className="mt-6">
                 <h2 className="mb-4 font-semibold text-slate-900">
-                    Offers ({request.offers.length})
+                    Offers ({request.offers?.length ?? 0})
                 </h2>
 
-                {request.offers.length === 0 ? (
+                {(request.offers?.length ?? 0) === 0 ? (
                     <EmptyState
                         title="No offers yet"
                         description="Once providers send offers, they will appear here for you to compare."

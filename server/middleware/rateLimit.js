@@ -3,6 +3,13 @@
 
 const windowEntries = new Map();
 
+// Every limiter gets its own bucket namespace. Without this, all limiters
+// around the app shared one map keyed only by IP, so a single client's uploads,
+// logins, offer edits and CSRF fetches all drew from the same counters -- the
+// lowest applicable `max` silently throttled every other route. A stable scope
+// per limiter keeps each budget independent and honest.
+let limiterSeq = 0;
+
 const DEFAULT_OPTIONS = {
     windowMs: 15 * 60 * 1000,
     max: 20,
@@ -26,6 +33,10 @@ const getClientKey = (req) => {
 const rateLimit = (options = {}) => {
     const config = { ...DEFAULT_OPTIONS, ...options };
 
+    // `scope` may be supplied to name a limiter explicitly (useful in tests);
+    // otherwise a unique suffix is minted once per limiter instance.
+    const scope = config.scope || `limiter-${++limiterSeq}`;
+
     return (req, res, next) => {
         const ip = getClientKey(req);
 
@@ -33,7 +44,7 @@ const rateLimit = (options = {}) => {
             return next();
         }
 
-        const key = ip;
+        const key = `${scope}:${ip}`;
         const now = Date.now();
 
         const entries = windowEntries.get(key) || [];

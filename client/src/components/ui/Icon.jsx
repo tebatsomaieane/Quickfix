@@ -42,6 +42,12 @@ const ICON_PATHS = {
     wrench: (
         <path d="M14.7 6.3a4.5 4.5 0 0 0-6 5.6L3 17.6V21h3.4l5.7-5.7a4.5 4.5 0 0 0 5.6-6L14.7 12l-2.3-2.3 2.3-3.4z" />
     ),
+    tools: (
+        <>
+            <path d="M14.7 6.3a4.5 4.5 0 0 0-5.4 5.9L4 17.5V21h3.5l5.3-5.3a4.5 4.5 0 0 0 5.9-5.4L14.7 13l-3-3 3-3.7z" />
+            <path d="M14 5l5-2 2 2-2 5-3-3z" />
+        </>
+    ),
     bolt: <path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" />,
     broom: (
         <>
@@ -278,7 +284,7 @@ const ICON_PATHS = {
 };
 
 const STROKE_ICONS = new Set([
-    "home", "grid", "users", "user", "wrench", "bolt", "broom", "car",
+    "home", "grid", "users", "user", "wrench", "tools", "bolt", "broom", "car",
     "monitor", "scissors", "star", "location", "clock", "calendar",
     "check", "checkCircle", "plus", "menu", "chevronRight", "arrowRight",
     "bell", "mail", "chat", "file", "chart", "settings", "logout",

@@ -919,3 +919,20 @@ CREATE INDEX idx_provider_availability_provider
 
 CREATE INDEX idx_requests_status_created
     ON service_requests(status, created_at);
+
+-- Filters that appear on hot read paths but had no supporting index.
+CREATE INDEX idx_provider_verification
+    ON provider_profiles(verification_status);
+
+CREATE INDEX idx_offers_valid_until
+    ON offers(valid_until);
+
+CREATE INDEX idx_requests_preferred_date
+    ON service_requests(preferred_date);
+
+CREATE INDEX idx_users_created
+    ON users(created_at);
+
+-- Covers both the unread-count subquery and the per-thread message reads.
+CREATE INDEX idx_messages_conversation_read_sender
+    ON messages(conversation_id, is_read, sender_id);

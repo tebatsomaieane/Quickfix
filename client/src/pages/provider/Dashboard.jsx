@@ -353,7 +353,7 @@ function ProviderDashboard() {
                         <StatCard
                             icon="wrench"
                             label="Active services"
-                            value={profile.services.length}
+                            value={profile.services?.length ?? 0}
                             tone="emerald"
                         />
                         <StatCard
@@ -371,7 +371,7 @@ function ProviderDashboard() {
                         <StatCard
                             icon="clock"
                             label="Availability days"
-                            value={profile.availability.length}
+                            value={profile.availability?.length ?? 0}
                             tone="violet"
                         />
                     </div>
@@ -397,7 +397,7 @@ function ProviderDashboard() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {profile.services.map((service) => (
+                                    {(profile.services || []).map((service) => (
                                         <tr key={service.id}>
                                             <td className="px-4 py-3 font-medium text-slate-900">
                                                 {service.name}
@@ -410,7 +410,7 @@ function ProviderDashboard() {
                                             </td>
                                         </tr>
                                     ))}
-                                    {profile.services.length === 0 && (
+                                    {(profile.services?.length ?? 0) === 0 && (
                                         <tr>
                                             <td
                                                 colSpan="3"

@@ -289,11 +289,7 @@ function ProviderRequestDetail() {
             <Card className="mt-6 p-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <h2 className="font-semibold text-slate-900">
-                        {request.my_offer
-                            ? isPending
-                                ? "Your offer"
-                                : "Your offer"
-                            : "Submit an offer"}
+                        {request.my_offer ? "Your offer" : "Submit an offer"}
                     </h2>
                     {request.my_offer && (
                         <Badge color={isPending ? "amber" : "gray"}>

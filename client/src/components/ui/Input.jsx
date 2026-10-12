@@ -11,7 +11,7 @@ const FIELD_CLASSES = [
 const FIELD_TONE = (error) =>
     error
         ? "border-red-400 focus:border-red-500 focus:ring-red-100/70"
-        : "border-slate-300 focus:indigo-500 focus:ring-indigo-100 focus:border-indigo-500";
+        : "border-slate-300 focus:ring-indigo-100 focus:border-indigo-500";
 
 export function fieldClasses(error, extra = "") {
     return [FIELD_CLASSES, FIELD_TONE(error), extra].join(" ");

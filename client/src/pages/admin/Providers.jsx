@@ -7,6 +7,7 @@ import Button from "../../components/ui/Button";
 import Spinner from "../../components/ui/Spinner";
 import EmptyState from "../../components/ui/EmptyState";
 import { formatDate } from "../../lib/format";
+import { useToast } from "../../components/ui/ToastProvider";
 
 const VERIFICATION_COLORS = {
     APPROVED: "green",
@@ -19,11 +20,15 @@ function AdminProviders() {
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState("ALL");
 
+    const { showToast } = useToast();
+
     const load = (params = {}) => {
         setLoading(true);
         fetchAdminProviders(params)
             .then((data) => setProviders(data.data))
-            .catch(() => {})
+            .catch(() => {
+                showToast("Unable to load providers. Please try again.", "error");
+            })
             .finally(() => setLoading(false));
     };
 

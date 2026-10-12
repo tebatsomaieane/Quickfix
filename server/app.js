@@ -227,8 +227,10 @@ app.use((req, res, next) => {
         credentials: true
     })(req, res, next);
 });
-app.use(express.json({ limit: "100kb" }));
-app.use(express.urlencoded({ extended: true, limit: "100kb" }));
+// 256 kB comfortably fits a request with its maximum attachments plus a full
+// description, while still bounding what an unauthenticated caller can push.
+app.use(express.json({ limit: "256kb" }));
+app.use(express.urlencoded({ extended: true, limit: "256kb" }));
 app.use(cookieParser());
 
 // CSRF defence (mutating requests must echo the csrfToken cookie).

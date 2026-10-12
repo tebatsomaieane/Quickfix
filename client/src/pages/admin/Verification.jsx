@@ -10,6 +10,8 @@ import Spinner from "../../components/ui/Spinner";
 import EmptyState from "../../components/ui/EmptyState";
 import SmartImage from "../../components/ui/SmartImage";
 import { formatDate } from "../../lib/format";
+import { describeError } from "../../lib/errorMessages";
+import { useToast } from "../../components/ui/ToastProvider";
 
 const STATUS_COLORS = {
     PENDING: "amber",
@@ -26,6 +28,8 @@ function AdminVerification() {
     const [filter, setFilter] = useState("PENDING");
     const [notes, setNotes] = useState({});
     const [saving, setSaving] = useState({});
+
+    const { showToast } = useToast();
 
     const load = () => {
         setLoading(true);
@@ -62,8 +66,14 @@ function AdminVerification() {
                 return next;
             });
             load();
-        } catch {
-            // ignore - user will retry
+        } catch (error) {
+            const e = describeError(error);
+
+            showToast(
+                e.title || "Failed to update verification request",
+                "error",
+                { detail: e.detail }
+            );
         } finally {
             setSaving((prev) => {
                 const next = { ...prev };

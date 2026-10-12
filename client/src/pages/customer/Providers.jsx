@@ -166,7 +166,7 @@ function Providers() {
                                 </p>
 
                                 <div className="mt-3 flex flex-wrap gap-1.5">
-                                    {provider.services
+                                    {(provider.services || [])
                                         .slice(0, 3)
                                         .map((service) => (
                                             <Badge key={service.id} color="indigo">

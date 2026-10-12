@@ -9,6 +9,8 @@ import Badge from "../../components/ui/Badge";
 import Spinner from "../../components/ui/Spinner";
 import EmptyState from "../../components/ui/EmptyState";
 import { formatDate } from "../../lib/format";
+import { describeError } from "../../lib/errorMessages";
+import { useToast } from "../../components/ui/ToastProvider";
 
 const STATUS_COLORS = {
     PENDING: "amber",
@@ -21,6 +23,8 @@ function AdminBusinesses() {
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState("ALL");
     const [savingId, setSavingId] = useState(null);
+
+    const { showToast } = useToast();
 
     const load = () => {
         setLoading(true);
@@ -41,7 +45,15 @@ function AdminBusinesses() {
         try {
             await reviewBusinessVerification(business.id, { verification_status: status });
             load();
-        } catch {} finally {
+        } catch (error) {
+            const e = describeError(error);
+
+            showToast(
+                e.title || "Failed to update business verification status",
+                "error",
+                { detail: e.detail }
+            );
+        } finally {
             setSavingId(null);
         }
     };
