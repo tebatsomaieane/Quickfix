@@ -1,5 +1,8 @@
 const mysql = require("mysql2/promise");
+const { applyQueryTimeout } = require("../utils/queryTimeout");
 require("dotenv").config();
+
+const QUERY_TIMEOUT_MS = Number(process.env.DB_QUERY_TIMEOUT_MS) || 15000;
 
 const pool = mysql.createPool({
     host: process.env.DB_HOST || "localhost",
@@ -15,13 +18,21 @@ const pool = mysql.createPool({
     // retry, instead of a slow site nobody can explain.
     queueLimit: Number(process.env.DB_QUEUE_LIMIT) || 200,
     connectTimeout: Number(process.env.DB_CONNECT_TIMEOUT_MS) || 10000,
-    // A query that has not answered in this long is almost certainly a lock
-    // wait rather than a slow query, and holding the connection open only makes
-    // the backlog worse.
-    timeout: Number(process.env.DB_QUERY_TIMEOUT_MS) || 15000,
     enableKeepAlive: true,
     keepAliveInitialDelay: 0
 });
+
+// A query that has not answered in this long is almost certainly a lock wait
+// rather than a slow query, and holding the connection open only makes the
+// backlog worse. mysql2 only honours `timeout` per query, so it is applied here
+// to every query/execute on the pool and on the connections getConnection hands
+// out -- a pool-level `timeout` would be silently ignored.
+applyQueryTimeout(pool, QUERY_TIMEOUT_MS);
+
+const acquireConnection = pool.getConnection.bind(pool);
+
+pool.getConnection = async (...args) =>
+    applyQueryTimeout(await acquireConnection(...args), QUERY_TIMEOUT_MS);
 
 pool.on("connection", (connection) => {
     connection.on("error", (err) => {
