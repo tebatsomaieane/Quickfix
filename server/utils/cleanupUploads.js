@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const db = require("../config/db");
+const { envNumber } = require("./helpers");
 
 const uploadsDir = path.join(__dirname, "..", "uploads");
 
@@ -104,7 +105,7 @@ const cleanupOrphanUploads = async () => {
 // Scheduler. Interval in minutes comes from UPLOAD_CLEANUP_MINUTES
 // (defaults to 6 hours, 0 disables the job).
 const startUploadCleanup = () => {
-    const intervalMinutes = Number(process.env.UPLOAD_CLEANUP_MINUTES) || 360;
+    const intervalMinutes = envNumber("UPLOAD_CLEANUP_MINUTES", 360);
 
     if (intervalMinutes <= 0) return;
 

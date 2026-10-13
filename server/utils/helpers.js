@@ -2,6 +2,24 @@ const db = require("../config/db");
 const { pushToUser } = require("./realtime");
 
 
+// Read a numeric environment variable.
+// Unlike `Number(process.env.X) || fallback`, a value of 0 is honoured rather
+// than replaced by the default, so settings where 0 means "disable" (the
+// scheduler and upload-cleanup intervals) actually take effect. An unset,
+// blank, or non-numeric value falls back instead of producing NaN.
+const envNumber = (name, fallback) => {
+    const raw = process.env[name];
+
+    if (raw === undefined || raw === "") {
+        return fallback;
+    }
+
+    const value = Number(raw);
+
+    return Number.isFinite(value) ? value : fallback;
+};
+
+
 // Insert a notification for a user.
 // When an active transaction connection is provided, the write uses it so the
 // notification commits/rolls back with the surrounding transaction.
@@ -56,5 +74,6 @@ const getCustomerId = async (userId, connection) => {
 module.exports = {
     createNotification,
     getProviderId,
-    getCustomerId
+    getCustomerId,
+    envNumber
 };

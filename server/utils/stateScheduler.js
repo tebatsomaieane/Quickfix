@@ -46,9 +46,9 @@ const runExpiryPass = async () => {
 };
 
 
-// Re-open requests that were stuck in 'OPEN'/'OFFERS_RECEIVED' long past
-// their preferred date with no hired provider. Keeps the marketplace from
-// accumulating dead requests.
+// Close requests stuck in 'OPEN'/'OFFERS_RECEIVED' long past their preferred
+// date with no hired provider. Keeps the marketplace from accumulating dead
+// requests.
 const closeStaleRequests = async (maxDays = 14) => {
     const [result] = await db.query(
         `UPDATE service_requests

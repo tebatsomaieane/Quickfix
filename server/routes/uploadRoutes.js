@@ -77,6 +77,24 @@ const sniffFile = (buffer) => {
     return null;
 };
 
+// Every signature above lives within the first 12 bytes, so only that much is
+// read. Loading the whole file (up to 50 MB per video) into memory just to
+// inspect its header would spike memory under concurrent uploads.
+const HEADER_BYTES = 16;
+
+const readHeader = (filePath) => {
+    const fd = fs.openSync(filePath, "r");
+
+    try {
+        const header = Buffer.alloc(HEADER_BYTES);
+        const bytesRead = fs.readSync(fd, header, 0, HEADER_BYTES, 0);
+
+        return header.subarray(0, bytesRead);
+    } finally {
+        fs.closeSync(fd);
+    }
+};
+
 // Tracking uploaded allocation for the quota. In-memory and per-instance;
 // acceptable for single-process deployments (like the rate limiter).
 const dailyTotals = new Map();
@@ -154,7 +172,7 @@ router.post("/", (req, res) => {
                 });
             }
 
-            const buffer = fs.readFileSync(req.file.path);
+            const buffer = readHeader(req.file.path);
             const detected = sniffFile(buffer);
 
             if (!detected) {

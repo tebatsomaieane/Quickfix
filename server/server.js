@@ -5,6 +5,7 @@ const db = require("./config/db");
 const ensureSchema = require("./utils/ensureSchema");
 const { startScheduler } = require("./utils/stateScheduler");
 const { startUploadCleanup } = require("./utils/cleanupUploads");
+const { envNumber } = require("./utils/helpers");
 
 const PORT = process.env.PORT || 5000;
 
@@ -46,8 +47,9 @@ async function startServer() {
         startUploadCleanup();
 
         // Expire stale offers/ads/promotions and close abandoned requests.
+        // 0 disables the job.
         startScheduler(
-            Number(process.env.SCHEDULER_INTERVAL_MINUTES) || 15
+            envNumber("SCHEDULER_INTERVAL_MINUTES", 15)
         );
 
         const server = app.listen(PORT, () => {
