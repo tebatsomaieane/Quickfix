@@ -15,6 +15,37 @@ async function columnExists(connection, table, column) {
 }
 
 
+async function indexExists(connection, table, indexName) {
+    const [rows] = await connection.query(
+        `SELECT COUNT(*) AS n
+         FROM information_schema.STATISTICS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = ?
+           AND INDEX_NAME = ?`,
+        [table, indexName]
+    );
+
+    return Number(rows[0].n) > 0;
+}
+
+
+// Indexes for hot read paths. These mirror database/schema.sql and are created
+// here so an already-running database picks them up without a manual migration.
+// Table, index and column names are fixed constants, so the interpolation below
+// cannot carry user input.
+const REQUIRED_INDEXES = [
+    ["provider_profiles", "idx_provider_verification", "(verification_status)"],
+    ["offers", "idx_offers_valid_until", "(valid_until)"],
+    ["service_requests", "idx_requests_preferred_date", "(preferred_date)"],
+    ["users", "idx_users_created", "(created_at)"],
+    [
+        "messages",
+        "idx_messages_conversation_read_sender",
+        "(conversation_id, is_read, sender_id)"
+    ]
+];
+
+
 async function ensureSchema() {
     const connection = await db.getConnection();
 
@@ -50,6 +81,14 @@ async function ensureSchema() {
                 `ALTER TABLE service_requests
                  ADD COLUMN preferred_provider_id INT NULL AFTER service_id`
             );
+        }
+
+        for (const [table, indexName, columns] of REQUIRED_INDEXES) {
+            if (!(await indexExists(connection, table, indexName))) {
+                await connection.query(
+                    `CREATE INDEX ${indexName} ON ${table} ${columns}`
+                );
+            }
         }
     } finally {
         connection.release();
