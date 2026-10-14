@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
     fetchBusinesses,
     reviewBusinessVerification
@@ -26,15 +26,23 @@ function AdminBusinesses() {
 
     const { showToast } = useToast();
 
-    const load = () => {
+    const load = useCallback(() => {
         setLoading(true);
         fetchBusinesses()
-            .then((data) => setBusinesses(data.data))
-            .catch(() => {})
-            .finally(() => setLoading(false));
-    };
+            .then((data) => setBusinesses(data?.data || []))
+            .catch((error) => {
+                const e = describeError(error, {
+                    fallback: "Failed to load businesses"
+                });
 
-    useEffect(() => { load(); }, []);
+                showToast(e.title || "Failed to load businesses", "error", {
+                    detail: e.detail
+                });
+            })
+            .finally(() => setLoading(false));
+    }, [showToast]);
+
+    useEffect(() => { load(); }, [load]);
 
     const filtered = businesses.filter(
         (b) => filter === "ALL" || b.verification_status === filter

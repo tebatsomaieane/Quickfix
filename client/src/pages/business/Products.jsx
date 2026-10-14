@@ -80,7 +80,7 @@ function Products() {
     const load = useCallback(() => {
         setLoading(true);
         fetchMyProducts()
-            .then((data) => setProducts(data.data))
+            .then((data) => setProducts(data?.data || []))
             .catch(() => {})
             .finally(() => setLoading(false));
     }, []);

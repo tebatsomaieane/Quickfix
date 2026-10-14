@@ -3,6 +3,7 @@ import { fetchAnalytics } from "../../services/businessService";
 import Card from "../../components/ui/Card";
 import Spinner from "../../components/ui/Spinner";
 import Icon from "../../components/ui/Icon";
+import { normalizeAnalytics } from "../../lib/analytics";
 
 function StatCard({ icon, label, value, sub, color = "indigo" }) {
     const colors = {
@@ -34,7 +35,7 @@ function Analytics() {
 
     useEffect(() => {
         fetchAnalytics()
-            .then((d) => setData(d.data))
+            .then((d) => setData(normalizeAnalytics(d?.data)))
             .catch(() => {})
             .finally(() => setLoading(false));
     }, []);

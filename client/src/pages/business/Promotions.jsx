@@ -76,7 +76,7 @@ function Promotions() {
     const load = useCallback(() => {
         setLoading(true);
         fetchMyPromotions()
-            .then((data) => setPromotions(data.data))
+            .then((data) => setPromotions(data?.data || []))
             .catch(() => {})
             .finally(() => setLoading(false));
     }, []);

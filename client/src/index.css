@@ -923,7 +923,8 @@ body {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-    .qf-fade-in {
+    .qf-fade-in,
+    .qf-rise {
         animation: fade-in-up var(--qf-dur-slower) var(--qf-ease-emphasized) both;
     }
 }

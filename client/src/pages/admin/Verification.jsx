@@ -212,6 +212,7 @@ function AdminVerification() {
                             <div className="mt-4 flex flex-wrap items-center gap-3">
                                 <textarea
                                     rows="2"
+                                    aria-label="Notes for the provider (shown on rejection)"
                                     className="min-w-[220px] flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                                     placeholder="Notes for the provider (shown on rejection)..."
                                     value={notes[request.id] ?? ""}

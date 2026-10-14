@@ -15,6 +15,7 @@ import Textarea from "../../components/ui/Textarea";
 import Spinner from "../../components/ui/Spinner";
 import FileUpload from "../../components/ui/FileUpload";
 import { useActionFeedback } from "../../hooks/useActionFeedback";
+import { describeError } from "../../lib/errorMessages";
 import { rules } from "../../lib/validation";
 
 const DAYS = [
@@ -150,7 +151,18 @@ function ProviderProfile() {
                     );
                 }
             })
-            .catch(() => {})
+            .catch((err) => {
+                // The form below would otherwise render blank defaults; saving
+                // those would wipe real profile data. Surface the failure and
+                // keep the save buttons disabled until a reload succeeds.
+                const { title, detail } = describeError(err, {
+                    fallback: "We couldn't load your profile."
+                });
+
+                setError(
+                    detail ? `${title || "Couldn't load your profile"}. ${detail}` : (title || "Couldn't load your profile. Please refresh the page and try again.")
+                );
+            })
             .finally(() => setLoading(false));
     }, [reset]);
 
@@ -165,6 +177,13 @@ function ProviderProfile() {
     const handleSaveProfile = async (e) => {
         e.preventDefault();
         setError("");
+
+        // If the profile never loaded, the form holds blank defaults and saving
+        // would overwrite the real record. Block it and point at the reason.
+        if (!profile) {
+            setError("Your profile hasn't loaded yet, so it can't be saved. Please refresh the page and try again.");
+            return;
+        }
 
         if (!validateAll(form)) {
             return;
@@ -193,6 +212,11 @@ function ProviderProfile() {
 
     const handleSaveAvailability = async () => {
         setError("");
+
+        if (!profile) {
+            setError("Your availability hasn't loaded yet, so it can't be saved. Please refresh the page and try again.");
+            return;
+        }
 
         const inverted = availability.filter(
             (day) =>
@@ -334,7 +358,7 @@ function ProviderProfile() {
                         </div>
 
                         <div className="mt-5">
-                            <Button type="submit" loading={saving}>
+                            <Button type="submit" loading={saving} disabled={!profile}>
                                 Save profile
                             </Button>
                         </div>
@@ -423,7 +447,7 @@ function ProviderProfile() {
                             );
                         })}
 
-                        <Button variant="secondary" loading={savingAvailability} onClick={handleSaveAvailability}>
+                        <Button variant="secondary" loading={savingAvailability} onClick={handleSaveAvailability} disabled={!profile}>
                             Save availability
                         </Button>
                     </div>

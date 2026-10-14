@@ -75,7 +75,7 @@ function Advertisements() {
     const load = useCallback(() => {
         setLoading(true);
         fetchMyAdvertisements()
-            .then((data) => setAds(data.data))
+            .then((data) => setAds(data?.data || []))
             .catch(() => {})
             .finally(() => setLoading(false));
     }, []);

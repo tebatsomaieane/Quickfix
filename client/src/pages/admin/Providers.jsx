@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { fetchAdminProviders } from "../../services/adminService";
 import { Link } from "react-router-dom";
 import Card from "../../components/ui/Card";
@@ -22,17 +22,17 @@ function AdminProviders() {
 
     const { showToast } = useToast();
 
-    const load = (params = {}) => {
+    const load = useCallback((params = {}) => {
         setLoading(true);
         fetchAdminProviders(params)
-            .then((data) => setProviders(data.data))
+            .then((data) => setProviders(data?.data || []))
             .catch(() => {
                 showToast("Unable to load providers. Please try again.", "error");
             })
             .finally(() => setLoading(false));
-    };
+    }, [showToast]);
 
-    useEffect(() => { load(); }, []);
+    useEffect(() => { load(); }, [load]);
 
     const filtered = providers.filter(
         (p) => filter === "ALL" || p.verification_status === filter

@@ -14,6 +14,7 @@ import Spinner from "../../components/ui/Spinner";
 import EmptyState from "../../components/ui/EmptyState";
 import Icon from "../../components/ui/Icon";
 import { formatDateTime } from "../../lib/format";
+import { describeError } from "../../lib/errorMessages";
 
 const ROLE_DASHBOARD = {
     CUSTOMER: "/customer/dashboard",
@@ -27,13 +28,25 @@ function Notifications() {
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
     const [marking, setMarking] = useState(false);
+    const [error, setError] = useState("");
 
     const load = () => {
         setLoading(true);
+        setError("");
 
         fetchMyNotifications()
-            .then((data) => setNotifications(data.data.notifications))
-            .catch(() => setNotifications([]))
+            .then((data) => setNotifications(data?.data?.notifications || []))
+            .catch((err) => {
+                // Otherwise a failed load is indistinguishable from an empty
+                // inbox, and the user is told "no notifications" when the
+                // request never succeeded.
+                const { title, detail } = describeError(err, {
+                    fallback: "We couldn't load your notifications."
+                });
+
+                setError(detail ? `${title}. ${detail}` : title);
+                setNotifications([]);
+            })
             .finally(() => setLoading(false));
     };
 
@@ -113,6 +126,19 @@ function Notifications() {
                 <div className="flex justify-center py-16">
                     <Spinner />
                 </div>
+            ) : error ? (
+                <Card className="p-6 text-center">
+                    <p role="alert" className="text-sm text-red-600">
+                        {error}
+                    </p>
+                    <Button
+                        variant="outline"
+                        className="mt-4"
+                        onClick={load}
+                    >
+                        Try again
+                    </Button>
+                </Card>
             ) : notifications.length === 0 ? (
                 <EmptyState
                     title="No notifications"

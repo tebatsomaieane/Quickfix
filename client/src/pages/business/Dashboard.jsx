@@ -7,6 +7,7 @@ import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import DashboardSkeleton from "../../components/ui/DashboardSkeleton";
 import Icon from "../../components/ui/Icon";
+import { normalizeAnalytics } from "../../lib/analytics";
 
 const VERIFICATION_COLORS = {
     PENDING: "amber",
@@ -22,7 +23,7 @@ function BusinessDashboard() {
 
     useEffect(() => {
         Promise.all([fetchProfile(), fetchAnalytics()])
-            .then(([p, a]) => { setProfile(p.data); setAnalytics(a.data); })
+            .then(([p, a]) => { setProfile(p.data); setAnalytics(normalizeAnalytics(a?.data)); })
             .catch(() => {})
             .finally(() => setLoading(false));
     }, []);
@@ -56,7 +57,7 @@ function BusinessDashboard() {
                         </div>
                         <div className="flex w-full items-center gap-2 sm:w-auto">
                             <Badge color={VERIFICATION_COLORS[profile.verification_status] || "gray"}>
-                                {profile.verification_status.toLowerCase().replace("_", " ")}
+                                {(profile.verification_status || "pending").toLowerCase().replace("_", " ")}
                             </Badge>
                             <Link to="/business/profile" className="ml-auto sm:ml-0">
                                 <Button size="sm" variant="secondary">Edit profile</Button>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { fetchUsers, updateUser } from "../../services/adminService";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
@@ -27,17 +27,17 @@ function AdminUsers() {
 
     const { showToast } = useToast();
 
-    const load = (params = {}) => {
+    const load = useCallback((params = {}) => {
         setLoading(true);
         fetchUsers(params)
-            .then((data) => setUsers(data.data))
+            .then((data) => setUsers(data?.data || []))
             .catch(() => {
                 showToast("Unable to load users. Please try again.", "error");
             })
             .finally(() => setLoading(false));
-    };
+    }, [showToast]);
 
-    useEffect(() => { load(); }, []);
+    useEffect(() => { load(); }, [load]);
 
     const handleSearch = (e) => {
         e.preventDefault();
