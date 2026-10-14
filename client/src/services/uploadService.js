@@ -18,5 +18,11 @@ export async function uploadMedia(file, onProgress) {
         }
     });
 
-    return response.data.data;
+    const uploaded = response?.data?.data;
+
+    if (!uploaded) {
+        throw new Error("The upload response was empty.");
+    }
+
+    return uploaded;
 }

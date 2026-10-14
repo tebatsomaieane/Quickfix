@@ -19,6 +19,7 @@ const SIZE_STYLES = {
 
 function Button({
     children,
+    as: Component = "button",
     variant = "primary",
     size = "md",
     type = "button",
@@ -28,11 +29,17 @@ function Button({
     className = "",
     ...props
 }) {
+    const isNativeButton = Component === "button";
+
     return (
-        <button
-            type={type}
-            disabled={disabled || loading}
-            aria-busy={loading || undefined}
+        <Component
+            {...(isNativeButton
+                ? {
+                      type,
+                      disabled: disabled || loading,
+                      "aria-busy": loading || undefined
+                  }
+                : {})}
             className={[
                 "group inline-flex items-center justify-center gap-2 rounded-xl font-semibold",
                 "transition-all duration-300 ease-out",
@@ -53,7 +60,7 @@ function Button({
                 />
             )}
             {children}
-        </button>
+        </Component>
     );
 }
 

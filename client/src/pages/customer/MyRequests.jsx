@@ -74,12 +74,10 @@ function MyRequests() {
                         Track your service requests and the offers you receive.
                     </p>
                 </div>
-                <Link to="/customer/requests/new">
-                    <Button>
-                        <Icon name="plus" className="h-4 w-4" />
-                        New request
-                    </Button>
-                </Link>
+                <Button as={Link} to="/customer/requests/new">
+                    <Icon name="plus" className="h-4 w-4" />
+                    New request
+                </Button>
             </div>
 
             {/* Status filters */}
@@ -117,9 +115,9 @@ function MyRequests() {
                     icon="briefcase"
                     tone="indigo"
                     action={
-                        <Link to="/customer/requests/new">
-                            <Button>Create a request</Button>
-                        </Link>
+                        <Button as={Link} to="/customer/requests/new">
+                            Create a request
+                        </Button>
                     }
                 />
             ) : (

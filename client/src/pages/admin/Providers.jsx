@@ -118,9 +118,16 @@ function AdminProviders() {
                                     </span>
                                     <span className="text-xs text-slate-400"> ({provider.review_count || 0} reviews)</span>
                                 </div>
-                                <Link to={`/admin/providers/${provider.id}`} target="_blank" rel="noreferrer">
-                                    <Button size="sm" variant="secondary">View profile</Button>
-                                </Link>
+                                <Button
+                                    as={Link}
+                                    to={`/admin/providers/${provider.id}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    size="sm"
+                                    variant="secondary"
+                                >
+                                    View profile
+                                </Button>
                             </div>
 
                             <p className="mt-2 text-xs text-slate-400">Joined {formatDate(provider.created_at)}</p>

@@ -123,9 +123,9 @@ function RequestDetail() {
                 title="Request not found"
                 description={error}
                 action={
-                    <Link to="/customer/requests">
-                        <Button variant="outline">Back to my requests</Button>
-                    </Link>
+                    <Button as={Link} variant="outline" to="/customer/requests">
+                        Back to my requests
+                    </Button>
                 }
             />
         );

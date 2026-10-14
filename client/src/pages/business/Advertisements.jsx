@@ -16,6 +16,7 @@ import SmartImage from "../../components/ui/SmartImage";
 import useActionFeedback from "../../hooks/useActionFeedback";
 import { rules } from "../../lib/validation";
 import { formatDate } from "../../lib/format";
+import { describeError } from "../../lib/errorMessages";
 
 const EMPTY_FORM = {
     title: "",
@@ -56,6 +57,7 @@ function Advertisements() {
     const [showForm, setShowForm] = useState(false);
     const [editId, setEditId] = useState(null);
     const [deleting, setDeleting] = useState(null);
+    const [error, setError] = useState("");
 
     const {
         values: form,
@@ -74,9 +76,16 @@ function Advertisements() {
 
     const load = useCallback(() => {
         setLoading(true);
+        setError("");
         fetchMyAdvertisements()
             .then((data) => setAds(data?.data || []))
-            .catch(() => {})
+            .catch((err) => {
+                const e = describeError(err, {
+                    fallback: "Couldn't load advertisements."
+                });
+
+                setError(e.title || "Couldn't load advertisements.");
+            })
             .finally(() => setLoading(false));
     }, []);
 
@@ -258,6 +267,12 @@ function Advertisements() {
 
             {loading ? (
                 <div className="flex justify-center py-20"><Spinner /></div>
+            ) : error ? (
+                <EmptyState
+                    title="Couldn't load advertisements"
+                    description={error}
+                    action={<Button onClick={load}>Try again</Button>}
+                />
             ) : ads.length === 0 ? (
                 <EmptyState title="No advertisements yet" description="Create your first advertisement to reach more customers." />
             ) : (

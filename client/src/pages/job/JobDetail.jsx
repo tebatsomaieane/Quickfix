@@ -92,7 +92,13 @@ function JobDetail() {
                 ? "/provider/messages"
                 : "/customer/messages";
 
-            navigate(`${threadBase}/${data.data.conversation.id}`);
+            const conversationId = data?.data?.conversation?.id;
+
+            if (!conversationId) {
+                throw new Error("The conversation could not be opened.");
+            }
+
+            navigate(`${threadBase}/${conversationId}`);
         } catch (err) {
             setError(
                 err.response?.data?.message ||
@@ -117,16 +123,14 @@ function JobDetail() {
                 title="Job not found"
                 description={error}
                 action={
-                    <Button variant="outline">
-                        <Link
-                            to={
-                                isProvider
-                                    ? "/provider/jobs"
-                                    : "/customer/jobs"
-                            }
-                        >
-                            Back to jobs
-                        </Link>
+                    <Button
+                        as={Link}
+                        variant="outline"
+                        to={
+                            isProvider ? "/provider/jobs" : "/customer/jobs"
+                        }
+                    >
+                        Back to jobs
                     </Button>
                 }
             />
@@ -176,12 +180,10 @@ function JobDetail() {
                         </Button>
                     )}
                     {canReview && (
-                        <Link to={`/customer/review/${job.id}`}>
-                            <Button>
-                                <Icon name="star" className="h-4 w-4" />
-                                Leave a review
-                            </Button>
-                        </Link>
+                        <Button as={Link} to={`/customer/review/${job.id}`}>
+                            <Icon name="star" className="h-4 w-4" />
+                            Leave a review
+                        </Button>
                     )}
                     {canMessage && (
                         <Button

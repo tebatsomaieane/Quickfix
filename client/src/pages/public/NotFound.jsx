@@ -28,18 +28,18 @@ function NotFound() {
                     get you back to something useful.
                 </p>
                 <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                    <Link to="/">
-                        <Button size="lg">Back to home</Button>
-                    </Link>
-                    <Link to="/login">
-                        <Button
-                            size="lg"
-                            variant="outline"
-                            className="border-white/30 bg-white/10 text-white hover:border-white/50 hover:bg-white/15"
-                        >
-                            Log in
-                        </Button>
-                    </Link>
+                    <Button as={Link} to="/" size="lg">
+                        Back to home
+                    </Button>
+                    <Button
+                        as={Link}
+                        to="/login"
+                        size="lg"
+                        variant="outline"
+                        className="border-white/30 bg-white/10 text-white hover:border-white/50 hover:bg-white/15"
+                    >
+                        Log in
+                    </Button>
                 </div>
             </div>
         </div>

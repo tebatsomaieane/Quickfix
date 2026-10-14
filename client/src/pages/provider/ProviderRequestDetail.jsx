@@ -84,16 +84,25 @@ function ProviderRequestDetail() {
 
         fetchAvailableRequest(id)
             .then((data) => {
-                setRequest(data.data);
+                const request = data?.data ?? null;
+
+                setRequest(request);
+
+                if (!request) {
+                    setError("Unable to load this request.");
+
+                    return;
+                }
+
                 // Seed the form from the loaded offer through the hook, so the
                 // values being validated are the ones actually on screen.
                 reset({
-                    price: data.data.my_offer?.price ?? "",
+                    price: request.my_offer?.price ?? "",
                     estimated_hours:
-                        data.data.my_offer?.estimated_hours ?? "",
-                    message: data.data.my_offer?.message ?? "",
+                        request.my_offer?.estimated_hours ?? "",
+                    message: request.my_offer?.message ?? "",
                     valid_until: toDateInput(
-                        data.data.my_offer?.valid_until
+                        request.my_offer?.valid_until
                     )
                 });
             })

@@ -39,7 +39,7 @@ function Messages() {
 
     const loadList = () => {
         fetchMyConversations()
-            .then((data) => setConversations(data.data.conversations))
+            .then((data) => setConversations(data?.data?.conversations || []))
             .catch(() => setError("Unable to load conversations."));
     };
 
@@ -50,7 +50,7 @@ function Messages() {
             .then((data) => {
                 if (cancelled) return;
 
-                setConversations(data.data.conversations);
+                setConversations(data?.data?.conversations || []);
             })
             .catch(() => {
                 if (!cancelled) {
@@ -83,9 +83,11 @@ function Messages() {
             .then(async (data) => {
                 if (cancelled) return;
 
-                setActive(data.data);
+                const conversation = data?.data ?? null;
 
-                if (data.data.unread_count > 0) {
+                setActive(conversation);
+
+                if (conversation?.unread_count > 0) {
                     await markConversationRead(conversationId);
                     loadList();
                 }
@@ -120,9 +122,11 @@ function Messages() {
 
                 if (stopped) return;
 
-                setActive(data.data);
+                const conversation = data?.data ?? null;
 
-                if (data.data.unread_count > 0) {
+                setActive(conversation);
+
+                if (conversation?.unread_count > 0) {
                     await markConversationRead(conversationId);
                 }
 
@@ -151,9 +155,11 @@ function Messages() {
             try {
                 const data = await fetchConversation(conversationId);
 
-                setActive(data.data);
+                const conversation = data?.data ?? null;
 
-                if (data.data.unread_count > 0) {
+                setActive(conversation);
+
+                if (conversation?.unread_count > 0) {
                     await markConversationRead(conversationId);
                     loadList();
                 }
@@ -221,7 +227,10 @@ function Messages() {
         try {
             const data = await fetchConversation(active.id);
 
-            setActive(data.data);
+            if (data?.data) {
+                setActive(data.data);
+            }
+
             loadList();
         } catch {
             setError(

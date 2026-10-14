@@ -110,7 +110,12 @@ function ProviderProfile() {
         setLoading(true);
         fetchMyProviderProfile()
             .then((data) => {
-                const p = data.data;
+                const p = data?.data;
+
+                if (!p) {
+                    throw new Error("Empty profile response.");
+                }
+
                 setProfile(p);
                 setError("");
 

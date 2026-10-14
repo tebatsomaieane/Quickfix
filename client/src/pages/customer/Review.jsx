@@ -81,17 +81,17 @@ function ReviewJob() {
         async function load() {
             try {
                 const data = await fetchJob(jobId);
+                const d = data?.data;
 
                 if (!cancelled) {
-                    if (
-                        data.data.status !== "COMPLETED" ||
-                        data.data.review
-                    ) {
+                    if (!d) {
+                        setError("Unable to load this job.");
+                    } else if (d.status !== "COMPLETED" || d.review) {
                         setError(
                             "This job cannot be reviewed."
                         );
                     } else {
-                        setJob(data.data);
+                        setJob(d);
                     }
                 }
             } catch {
@@ -148,8 +148,8 @@ function ReviewJob() {
                 title="Not reviewable"
                 description={error}
                 action={
-                    <Button variant="outline">
-                        <Link to="/customer/jobs">Back to my jobs</Link>
+                    <Button as={Link} variant="outline" to="/customer/jobs">
+                        Back to my jobs
                     </Button>
                 }
             />
@@ -298,9 +298,13 @@ function ReviewJob() {
                         <Button type="submit" loading={pending}>
                             Submit review
                         </Button>
-                        <Link to={`/customer/jobs/${job.id}`}>
-                            <Button variant="outline">Cancel</Button>
-                        </Link>
+                        <Button
+                            as={Link}
+                            variant="outline"
+                            to={`/customer/jobs/${job.id}`}
+                        >
+                            Cancel
+                        </Button>
                     </div>
 
                     <p aria-live="polite" className="sr-only">

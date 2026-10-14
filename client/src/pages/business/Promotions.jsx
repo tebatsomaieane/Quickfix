@@ -14,6 +14,7 @@ import Spinner from "../../components/ui/Spinner";
 import EmptyState from "../../components/ui/EmptyState";
 import useActionFeedback from "../../hooks/useActionFeedback";
 import { rules } from "../../lib/validation";
+import { describeError } from "../../lib/errorMessages";
 
 const EMPTY_FORM = {
     title: "",
@@ -57,6 +58,7 @@ function Promotions() {
     const [showForm, setShowForm] = useState(false);
     const [editId, setEditId] = useState(null);
     const [deleting, setDeleting] = useState(null);
+    const [error, setError] = useState("");
 
     const {
         values: form,
@@ -75,9 +77,16 @@ function Promotions() {
 
     const load = useCallback(() => {
         setLoading(true);
+        setError("");
         fetchMyPromotions()
             .then((data) => setPromotions(data?.data || []))
-            .catch(() => {})
+            .catch((err) => {
+                const e = describeError(err, {
+                    fallback: "Couldn't load promotions."
+                });
+
+                setError(e.title || "Couldn't load promotions.");
+            })
             .finally(() => setLoading(false));
     }, []);
 
@@ -257,6 +266,12 @@ function Promotions() {
 
             {loading ? (
                 <div className="flex justify-center py-20"><Spinner /></div>
+            ) : error ? (
+                <EmptyState
+                    title="Couldn't load promotions"
+                    description={error}
+                    action={<Button onClick={load}>Try again</Button>}
+                />
             ) : promotions.length === 0 ? (
                 <EmptyState title="No promotions yet" description="Create a promotion to offer a time-limited discount to customers." />
             ) : (

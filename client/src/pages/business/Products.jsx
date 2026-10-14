@@ -18,6 +18,7 @@ import useActionFeedback from "../../hooks/useActionFeedback";
 import { rules } from "../../lib/validation";
 import { formatCurrency, formatDate } from "../../lib/format";
 import { getProductImage } from "../../lib/visuals";
+import { describeError } from "../../lib/errorMessages";
 
 const EMPTY_FORM = {
     name: "",
@@ -57,6 +58,7 @@ function Products() {
     const [showForm, setShowForm] = useState(false);
     const [editId, setEditId] = useState(null);
     const [deleting, setDeleting] = useState(null);
+    const [error, setError] = useState("");
 
     const {
         values: form,
@@ -79,9 +81,16 @@ function Products() {
 
     const load = useCallback(() => {
         setLoading(true);
+        setError("");
         fetchMyProducts()
             .then((data) => setProducts(data?.data || []))
-            .catch(() => {})
+            .catch((err) => {
+                const e = describeError(err, {
+                    fallback: "Couldn't load products."
+                });
+
+                setError(e.title || "Couldn't load products.");
+            })
             .finally(() => setLoading(false));
     }, []);
 
@@ -252,6 +261,12 @@ function Products() {
 
             {loading ? (
                 <div className="flex justify-center py-20"><Spinner /></div>
+            ) : error ? (
+                <EmptyState
+                    title="Couldn't load products"
+                    description={error}
+                    action={<Button onClick={load}>Try again</Button>}
+                />
             ) : products.length === 0 ? (
                 <EmptyState title="No products yet" description="Create your first product to advertise it on the marketplace." />
             ) : (

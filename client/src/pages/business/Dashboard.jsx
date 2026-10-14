@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Link } from "react-router-dom";
 import { fetchProfile, fetchAnalytics } from "../../services/businessService";
@@ -8,6 +8,7 @@ import Button from "../../components/ui/Button";
 import DashboardSkeleton from "../../components/ui/DashboardSkeleton";
 import Icon from "../../components/ui/Icon";
 import { normalizeAnalytics } from "../../lib/analytics";
+import { describeError } from "../../lib/errorMessages";
 
 const VERIFICATION_COLORS = {
     PENDING: "amber",
@@ -20,13 +21,28 @@ function BusinessDashboard() {
     const [profile, setProfile] = useState(null);
     const [analytics, setAnalytics] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
 
-    useEffect(() => {
+    const load = useCallback(() => {
+        setLoading(true);
+        setError("");
+
         Promise.all([fetchProfile(), fetchAnalytics()])
-            .then(([p, a]) => { setProfile(p.data); setAnalytics(normalizeAnalytics(a?.data)); })
-            .catch(() => {})
+            .then(([p, a]) => {
+                setProfile(p?.data ?? null);
+                setAnalytics(normalizeAnalytics(a?.data));
+            })
+            .catch((err) => {
+                const e = describeError(err, {
+                    fallback: "Unable to load your dashboard."
+                });
+
+                setError(e.title || "Unable to load your dashboard.");
+            })
             .finally(() => setLoading(false));
     }, []);
+
+    useEffect(() => { load(); }, [load]);
 
     if (loading) {
         return <DashboardSkeleton />;
@@ -42,6 +58,20 @@ function BusinessDashboard() {
                     {profile ? profile.name : "Manage your business profile, promotions, advertisements and products."}
                 </p>
             </div>
+
+            {error && (
+                <Card className="mb-5 border-rose-200 p-4 sm:mb-6">
+                    <p className="text-sm text-rose-700">{error}</p>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-3"
+                        onClick={load}
+                    >
+                        Try again
+                    </Button>
+                </Card>
+            )}
 
             {profile && (
                 <Card className="mb-5 p-4 sm:mb-6 sm:p-5">
@@ -59,9 +89,15 @@ function BusinessDashboard() {
                             <Badge color={VERIFICATION_COLORS[profile.verification_status] || "gray"}>
                                 {(profile.verification_status || "pending").toLowerCase().replace("_", " ")}
                             </Badge>
-                            <Link to="/business/profile" className="ml-auto sm:ml-0">
-                                <Button size="sm" variant="secondary">Edit profile</Button>
-                            </Link>
+                            <Button
+                                as={Link}
+                                to="/business/profile"
+                                size="sm"
+                                variant="secondary"
+                                className="ml-auto sm:ml-0"
+                            >
+                                Edit profile
+                            </Button>
                         </div>
                     </div>
                 </Card>

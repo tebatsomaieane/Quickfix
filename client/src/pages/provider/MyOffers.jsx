@@ -78,11 +78,9 @@ function MyOffers() {
                     title="No offers yet"
                     description="Browse open requests and submit an offer to get started."
                     action={
-                        <Link to="/provider/requests">
-                            <button className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-                                Browse requests
-                            </button>
-                        </Link>
+                        <Button as={Link} to="/provider/requests">
+                            Browse requests
+                        </Button>
                     }
                 />
             ) : (

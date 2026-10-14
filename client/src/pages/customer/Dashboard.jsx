@@ -209,23 +209,22 @@ function CustomerDashboard() {
                             browse the marketplace for ideas.
                         </p>
                         <div className="mt-6 flex flex-wrap gap-2.5">
-                            <Link to="/customer/requests/new" className="min-w-0">
-                                <Button className="w-full bg-white text-indigo-700 shadow-lg hover:bg-indigo-50 sm:w-auto">
-                                    <Icon name="plus" className="h-4 w-4" />
-                                    Post a request
-                                </Button>
-                            </Link>
-                            <Link
-                                to="/customer/services"
-                                className="min-w-0"
+                            <Button
+                                as={Link}
+                                to="/customer/requests/new"
+                                className="min-w-0 w-full bg-white text-indigo-700 shadow-lg hover:bg-indigo-50 sm:w-auto"
                             >
-                                <Button
-                                    variant="ghost"
-                                    className="w-full text-white hover:bg-white/10 sm:w-auto"
-                                >
-                                    Browse services
-                                </Button>
-                            </Link>
+                                <Icon name="plus" className="h-4 w-4" />
+                                Post a request
+                            </Button>
+                            <Button
+                                as={Link}
+                                to="/customer/services"
+                                variant="ghost"
+                                className="min-w-0 w-full text-white hover:bg-white/10 sm:w-auto"
+                            >
+                                Browse services
+                            </Button>
                         </div>
                     </div>
                     <div className="relative hidden lg:block">
@@ -285,21 +284,33 @@ function CustomerDashboard() {
                     </div>
                     {/* Scrolls rather than squashing on narrow phones */}
                     <div className="qf-scroll-x -mx-3.5 flex w-full gap-2 overflow-x-auto px-3.5 pb-1 sm:mx-0 sm:w-auto sm:px-0 sm:pb-0">
-                        <Link to="/customer/services" className="shrink-0">
-                            <Button variant="outline" size="sm">
-                                Services
-                            </Button>
-                        </Link>
-                        <Link to="/customer/products" className="shrink-0">
-                            <Button variant="outline" size="sm">
-                                Products
-                            </Button>
-                        </Link>
-                        <Link to="/customer/providers" className="shrink-0">
-                            <Button variant="outline" size="sm">
-                                Providers
-                            </Button>
-                        </Link>
+                        <Button
+                            as={Link}
+                            to="/customer/services"
+                            variant="outline"
+                            size="sm"
+                            className="shrink-0"
+                        >
+                            Services
+                        </Button>
+                        <Button
+                            as={Link}
+                            to="/customer/products"
+                            variant="outline"
+                            size="sm"
+                            className="shrink-0"
+                        >
+                            Products
+                        </Button>
+                        <Button
+                            as={Link}
+                            to="/customer/providers"
+                            variant="outline"
+                            size="sm"
+                            className="shrink-0"
+                        >
+                            Providers
+                        </Button>
                     </div>
                 </div>
 
@@ -450,9 +461,9 @@ function CustomerDashboard() {
                             title="No requests yet"
                             description="Post your first service request and receive offers from registered providers."
                             action={
-                                <Link to="/customer/requests/new">
-                                    <Button>Create a request</Button>
-                                </Link>
+                                <Button as={Link} to="/customer/requests/new">
+                                    Create a request
+                                </Button>
                             }
                         />
                     </Card>

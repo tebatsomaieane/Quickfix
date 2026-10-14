@@ -84,10 +84,8 @@ function ProviderProfile() {
                 title="Provider not found"
                 description={error}
                 action={
-                    <Button variant="outline">
-                        <Link to={providersListPath}>
-                            Back to providers
-                        </Link>
+                    <Button as={Link} variant="outline" to={providersListPath}>
+                        Back to providers
                     </Button>
                 }
             />

@@ -88,16 +88,24 @@ function Profile() {
         setLoading(true);
         fetchProfile()
             .then((data) => {
-                setProfile(data.data);
+                const profileData = data?.data;
+
+                if (!profileData) {
+                    setProfile(null);
+
+                    return;
+                }
+
+                setProfile(profileData);
                 reset({
-                    name: data.data.name || "",
-                    description: data.data.description || "",
-                    phone: data.data.phone || "",
-                    email: data.data.email || "",
-                    location: data.data.location || "",
-                    operating_hours: data.data.operating_hours || "",
-                    logo: data.data.logo || "",
-                    cover_image: data.data.cover_image || ""
+                    name: profileData.name || "",
+                    description: profileData.description || "",
+                    phone: profileData.phone || "",
+                    email: profileData.email || "",
+                    location: profileData.location || "",
+                    operating_hours: profileData.operating_hours || "",
+                    logo: profileData.logo || "",
+                    cover_image: profileData.cover_image || ""
                 });
             })
             .catch(() => {})
