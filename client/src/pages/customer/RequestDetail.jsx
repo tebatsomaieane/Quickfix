@@ -10,6 +10,7 @@ import EmptyState from "../../components/ui/EmptyState";
 import Icon from "../../components/ui/Icon";
 import ProviderAvatar from "../../components/ui/ProviderAvatar";
 import VerificationBadge from "../../components/ui/VerificationBadge";
+import { useConfirm } from "../../components/ui/ConfirmProvider";
 import {
     formatCurrency,
     formatDate,
@@ -19,6 +20,7 @@ import {
 
 function RequestDetail() {
     const { id } = useParams();
+    const confirm = useConfirm();
 
     const [request, setRequest] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -85,7 +87,15 @@ function RequestDetail() {
     };
 
     const handleCancel = async () => {
-        if (!window.confirm("Cancel this request? Providers will be notified.")) {
+        const confirmed = await confirm({
+            title: "Cancel this request?",
+            description: "Providers who have already sent offers will be notified.",
+            confirmLabel: "Cancel request",
+            cancelLabel: "Keep request",
+            danger: true
+        });
+
+        if (!confirmed) {
             return;
         }
 

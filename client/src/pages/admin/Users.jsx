@@ -9,6 +9,7 @@ import Input from "../../components/ui/Input";
 import { formatDate } from "../../lib/format";
 import { describeError } from "../../lib/errorMessages";
 import { useToast } from "../../components/ui/ToastProvider";
+import { useConfirm } from "../../components/ui/ConfirmProvider";
 
 const ROLE_COLORS = {
     CUSTOMER: "indigo",
@@ -26,6 +27,7 @@ function AdminUsers() {
     const [savingId, setSavingId] = useState(null);
 
     const { showToast } = useToast();
+    const confirm = useConfirm();
 
     const load = useCallback((params = {}) => {
         setLoading(true);
@@ -45,6 +47,19 @@ function AdminUsers() {
     };
 
     const handleToggleActive = async (user) => {
+        if (user.is_active) {
+            const confirmed = await confirm({
+                title: "Deactivate this account?",
+                description: `${[user.first_name, user.last_name].filter(Boolean).join(" ") || user.email || "This user"} will be signed out and blocked from logging in until reactivated.`,
+                confirmLabel: "Deactivate",
+                danger: true
+            });
+
+            if (!confirmed) {
+                return;
+            }
+        }
+
         setSavingId(user.id);
         try {
             await updateUser(user.id, { is_active: !user.is_active });

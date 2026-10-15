@@ -13,6 +13,7 @@ import Textarea from "../../components/ui/Textarea";
 import Spinner from "../../components/ui/Spinner";
 import EmptyState from "../../components/ui/EmptyState";
 import SmartImage from "../../components/ui/SmartImage";
+import { useConfirm } from "../../components/ui/ConfirmProvider";
 import useActionFeedback from "../../hooks/useActionFeedback";
 import { rules } from "../../lib/validation";
 import { formatDate } from "../../lib/format";
@@ -52,6 +53,8 @@ const SCHEMA = {
 };
 
 function Advertisements() {
+    const confirm = useConfirm();
+
     const [ads, setAds] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
@@ -155,10 +158,23 @@ function Advertisements() {
         }
     };
 
-    const handleDelete = async (id) => {
-        setDeleting(id);
+    const handleDelete = async (ad) => {
+        const confirmed = await confirm({
+            title: "Delete this advertisement?",
+            description: ad.title
+                ? `"${ad.title}" will be removed permanently.`
+                : "This advertisement will be removed permanently.",
+            confirmLabel: "Delete",
+            danger: true
+        });
 
-        const { ok } = await runDelete(() => deleteAdvertisement(id), {
+        if (!confirmed) {
+            return;
+        }
+
+        setDeleting(ad.id);
+
+        const { ok } = await runDelete(() => deleteAdvertisement(ad.id), {
             success: "Advertisement deleted.",
             retry: true
         });
@@ -325,7 +341,7 @@ function Advertisements() {
                                         <td className="px-4 py-3 text-right">
                                             <div className="flex justify-end gap-2">
                                                 <Button size="sm" variant="secondary" onClick={() => handleEdit(ad)}>Edit</Button>
-                                                <Button size="sm" variant="danger" loading={deleting === ad.id} onClick={() => handleDelete(ad.id)}>Delete</Button>
+                                                <Button size="sm" variant="danger" loading={deleting === ad.id} onClick={() => handleDelete(ad)}>Delete</Button>
                                             </div>
                                         </td>
                                     </tr>
@@ -377,7 +393,7 @@ function Advertisements() {
                                             variant="danger"
                                             className="flex-1"
                                             loading={deleting === ad.id}
-                                            onClick={() => handleDelete(ad.id)}
+                                            onClick={() => handleDelete(ad)}
                                         >
                                             Delete
                                         </Button>

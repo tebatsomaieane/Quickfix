@@ -14,6 +14,7 @@ import Spinner from "../../components/ui/Spinner";
 import EmptyState from "../../components/ui/EmptyState";
 import SmartImage from "../../components/ui/SmartImage";
 import FileUpload from "../../components/ui/FileUpload";
+import { useConfirm } from "../../components/ui/ConfirmProvider";
 import useActionFeedback from "../../hooks/useActionFeedback";
 import { rules } from "../../lib/validation";
 import { formatCurrency, formatDate } from "../../lib/format";
@@ -53,6 +54,8 @@ const SCHEMA = {
 };
 
 function Products() {
+    const confirm = useConfirm();
+
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
@@ -167,10 +170,23 @@ function Products() {
 
     // The toast is the right home for a delete failure: it happened in the
 // table, not in the form, so a banner above the form would be misleading.
-    const handleDelete = async (id) => {
-        setDeleting(id);
+    const handleDelete = async (product) => {
+        const confirmed = await confirm({
+            title: "Delete this product?",
+            description: product.name
+                ? `"${product.name}" will be removed permanently.`
+                : "This product will be removed permanently.",
+            confirmLabel: "Delete",
+            danger: true
+        });
 
-        const { ok } = await runDelete(() => deleteProduct(id), {
+        if (!confirmed) {
+            return;
+        }
+
+        setDeleting(product.id);
+
+        const { ok } = await runDelete(() => deleteProduct(product.id), {
             success: "Product deleted.",
             retry: true
         });
@@ -312,7 +328,7 @@ function Products() {
                                             <td className="px-4 py-3 text-right">
                                                 <div className="flex justify-end gap-2">
                                                     <Button size="sm" variant="secondary" onClick={() => handleEdit(product)}>Edit</Button>
-                                                    <Button size="sm" variant="danger" loading={deleting === product.id} onClick={() => handleDelete(product.id)}>Delete</Button>
+                                                    <Button size="sm" variant="danger" loading={deleting === product.id} onClick={() => handleDelete(product)}>Delete</Button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -369,7 +385,7 @@ function Products() {
                                         variant="danger"
                                         className="flex-1"
                                         loading={deleting === product.id}
-                                        onClick={() => handleDelete(product.id)}
+                                        onClick={() => handleDelete(product)}
                                     >
                                         Delete
                                     </Button>

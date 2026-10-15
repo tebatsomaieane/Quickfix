@@ -16,6 +16,7 @@ import Textarea from "../../components/ui/Textarea";
 import Spinner from "../../components/ui/Spinner";
 import EmptyState from "../../components/ui/EmptyState";
 import Icon from "../../components/ui/Icon";
+import { useConfirm } from "../../components/ui/ConfirmProvider";
 import { formatCurrency, formatDate } from "../../lib/format";
 import { useActionFeedback } from "../../hooks/useActionFeedback";
 import { rules } from "../../lib/validation";
@@ -55,6 +56,7 @@ const SCHEMA = {
 
 function ProviderRequestDetail() {
     const { id } = useParams();
+    const confirm = useConfirm();
 
     const [request, setRequest] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -156,7 +158,15 @@ function ProviderRequestDetail() {
     };
 
     const handleWithdraw = async () => {
-        if (!window.confirm("Withdraw this offer?")) {
+        const confirmed = await confirm({
+            title: "Withdraw this offer?",
+            description: "You can still resubmit while the request is open.",
+            confirmLabel: "Withdraw offer",
+            cancelLabel: "Keep offer",
+            danger: true
+        });
+
+        if (!confirmed) {
             return;
         }
 

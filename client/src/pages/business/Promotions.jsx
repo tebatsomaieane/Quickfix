@@ -12,6 +12,7 @@ import Input from "../../components/ui/Input";
 import Textarea from "../../components/ui/Textarea";
 import Spinner from "../../components/ui/Spinner";
 import EmptyState from "../../components/ui/EmptyState";
+import { useConfirm } from "../../components/ui/ConfirmProvider";
 import useActionFeedback from "../../hooks/useActionFeedback";
 import { rules } from "../../lib/validation";
 import { describeError } from "../../lib/errorMessages";
@@ -53,6 +54,8 @@ const SCHEMA = {
 };
 
 function Promotions() {
+    const confirm = useConfirm();
+
     const [promotions, setPromotions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
@@ -154,10 +157,23 @@ function Promotions() {
         }
     };
 
-    const handleDelete = async (id) => {
-        setDeleting(id);
+    const handleDelete = async (promo) => {
+        const confirmed = await confirm({
+            title: "Delete this promotion?",
+            description: promo.title
+                ? `"${promo.title}" will be removed permanently.`
+                : "This promotion will be removed permanently.",
+            confirmLabel: "Delete",
+            danger: true
+        });
 
-        const { ok } = await runDelete(() => deletePromotion(id), {
+        if (!confirmed) {
+            return;
+        }
+
+        setDeleting(promo.id);
+
+        const { ok } = await runDelete(() => deletePromotion(promo.id), {
             success: "Promotion deleted.",
             retry: true
         });
@@ -304,7 +320,7 @@ function Promotions() {
                                             <td className="px-4 py-3 text-right">
                                                 <div className="flex justify-end gap-2">
                                                     <Button size="sm" variant="secondary" onClick={() => handleEdit(promo)}>Edit</Button>
-                                                    <Button size="sm" variant="danger" loading={deleting === promo.id} onClick={() => handleDelete(promo.id)}>Delete</Button>
+                                                    <Button size="sm" variant="danger" loading={deleting === promo.id} onClick={() => handleDelete(promo)}>Delete</Button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -341,7 +357,7 @@ function Promotions() {
                                     </Badge>
                                     <div className="flex gap-2">
                                         <Button size="md" variant="secondary" onClick={() => handleEdit(promo)}>Edit</Button>
-                                        <Button size="md" variant="danger" loading={deleting === promo.id} onClick={() => handleDelete(promo.id)}>Delete</Button>
+                                        <Button size="md" variant="danger" loading={deleting === promo.id} onClick={() => handleDelete(promo)}>Delete</Button>
                                     </div>
                                 </div>
                             </Card>

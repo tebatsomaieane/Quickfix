@@ -6,6 +6,7 @@ import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import Spinner from "../../components/ui/Spinner";
 import EmptyState from "../../components/ui/EmptyState";
+import { useConfirm } from "../../components/ui/ConfirmProvider";
 import { formatCurrency, formatDate } from "../../lib/format";
 
 const OFFER_COLORS = {
@@ -17,6 +18,8 @@ const OFFER_COLORS = {
 };
 
 function MyOffers() {
+    const confirm = useConfirm();
+
     const [offers, setOffers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -37,7 +40,15 @@ function MyOffers() {
     }, []);
 
     const handleWithdraw = async (offer) => {
-        if (!window.confirm("Withdraw this offer? You can still resubmit if the request is open.")) {
+        const confirmed = await confirm({
+            title: "Withdraw this offer?",
+            description: "You can still resubmit while the request is open.",
+            confirmLabel: "Withdraw offer",
+            cancelLabel: "Keep offer",
+            danger: true
+        });
+
+        if (!confirmed) {
             return;
         }
 
