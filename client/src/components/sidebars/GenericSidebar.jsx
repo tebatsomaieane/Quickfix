@@ -8,7 +8,8 @@ function GenericSidebar({
     navItems,
     brand = "QuickFix",
     onNavigate,
-    onClose
+    onClose,
+    badges
 }) {
     const { user, logout } = useAuth();
     const groups = groupNavItems(navItems);
@@ -43,6 +44,7 @@ function GenericSidebar({
                 groups={groups}
                 variant="light"
                 onNavigate={onNavigate}
+                badges={badges}
                 className="mt-3"
             />
 

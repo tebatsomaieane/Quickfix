@@ -14,16 +14,31 @@ const isItemActive = (item, pathname) => {
     return pathname === item.to || pathname.startsWith(`${item.to}/`);
 };
 
+const badgeTone = (tone) =>
+    tone === "indigo"
+        ? "bg-gradient-to-br from-indigo-500 to-violet-600"
+        : "bg-gradient-to-br from-rose-500 to-pink-600";
+
 function MobileTabBar({
     navItems,
     unread = 0,
     notificationsPath,
+    badges = {},
     order = []
 }) {
     const { pathname } = useLocation();
     const [moreOpen, setMoreOpen] = useState(false);
     const [trackWidth, setTrackWidth] = useState(0);
     const trackRef = useRef(null);
+
+    const badgeFor = useCallback(
+        (path) =>
+            badges[path] ||
+            (path === notificationsPath && unread > 0
+                ? { count: unread, tone: "rose" }
+                : null),
+        [badges, notificationsPath, unread]
+    );
 
     const { tabs, overflow, overflowActive } = useMemo(() => {
         const resolved = order
@@ -76,6 +91,17 @@ function MobileTabBar({
                   ]
                 : tabs,
         [tabs, overflow.length]
+    );
+
+    // A small dot on the More tab tells the user unread items are tucked away
+    // behind it, so nothing is silently out of reach on a phone.
+    const overflowUnread = useMemo(
+        () =>
+            overflow.reduce(
+                (total, item) => total + (badgeFor(item.to)?.count || 0),
+                0
+            ),
+        [overflow, badgeFor]
     );
 
     const matchedIndex = tabsWithMore.findIndex((item) =>
@@ -148,7 +174,7 @@ function MobileTabBar({
                             const active = isMore
                                 ? overflowActive
                                 : isItemActive(item, pathname);
-                            const isNotify = item.to === notificationsPath;
+                            const badge = isMore ? null : badgeFor(item.to);
 
                             const className = [
                                 "qf-tap-sm relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-2xl px-0.5 py-2",
@@ -165,12 +191,19 @@ function MobileTabBar({
                                             name={item.icon}
                                             className="h-[22px] w-[22px]"
                                         />
-                                        {isNotify && unread > 0 && (
-                                            <span className="absolute -right-1.5 -top-1.5 flex h-[18px] min-w-[18px] animate-badge-pop items-center justify-center rounded-full bg-gradient-to-br from-rose-500 to-pink-600 px-1 text-[9px] font-bold leading-none text-white shadow-sm ring-2 ring-white">
-                                                {unread > 9
+                                        {badge && (
+                                            <span
+                                                className={`absolute -right-1.5 -top-1.5 flex h-[18px] min-w-[18px] animate-badge-pop items-center justify-center rounded-full px-1 text-[9px] font-bold leading-none text-white shadow-sm ring-2 ring-white ${badgeTone(
+                                                    badge.tone
+                                                )}`}
+                                            >
+                                                {badge.count > 9
                                                     ? "9+"
-                                                    : unread}
+                                                    : badge.count}
                                             </span>
+                                        )}
+                                        {isMore && overflowUnread > 0 && (
+                                            <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-white" />
                                         )}
                                     </span>
                                     <span className="max-w-full truncate">
@@ -226,8 +259,7 @@ function MobileTabBar({
                                         item,
                                         pathname
                                     );
-                                    const isNotify =
-                                        item.to === notificationsPath;
+                                    const badge = badgeFor(item.to);
 
                                     return (
                                         <li key={item.to}>
@@ -259,14 +291,17 @@ function MobileTabBar({
                                                 <span className="min-w-0 flex-1 truncate">
                                                     {item.label}
                                                 </span>
-                                                {isNotify &&
-                                                    unread > 0 && (
-                                                        <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-rose-500 to-pink-600 px-1.5 text-[10px] font-bold text-white">
-                                                            {unread > 99
-                                                                ? "99+"
-                                                                : unread}
-                                                        </span>
-                                                    )}
+                                                {badge && (
+                                                    <span
+                                                        className={`flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-bold text-white ${badgeTone(
+                                                            badge.tone
+                                                        )}`}
+                                                    >
+                                                        {badge.count > 99
+                                                            ? "99+"
+                                                            : badge.count}
+                                                    </span>
+                                                )}
                                             </Link>
                                         </li>
                                     );

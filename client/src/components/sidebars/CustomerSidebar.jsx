@@ -5,7 +5,7 @@ import SidebarNav from "./SidebarNav";
 import Icon from "../ui/Icon";
 import Logo from "../ui/Logo";
 
-function CustomerSidebar({ navItems, onNavigate, onClose }) {
+function CustomerSidebar({ navItems, onNavigate, onClose, badges }) {
     const { user, logout } = useAuth();
     const groups = groupNavItems(navItems);
 
@@ -48,6 +48,7 @@ function CustomerSidebar({ navItems, onNavigate, onClose }) {
                 groups={groups}
                 variant="light"
                 onNavigate={onNavigate}
+                badges={badges}
                 className="mt-3"
             />
 

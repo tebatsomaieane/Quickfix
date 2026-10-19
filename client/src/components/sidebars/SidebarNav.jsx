@@ -9,10 +9,16 @@ const isItemActive = (item, pathname) => {
     return pathname === item.to || pathname.startsWith(`${item.to}/`);
 };
 
+const badgeTone = (tone) =>
+    tone === "indigo"
+        ? "bg-gradient-to-br from-indigo-500 to-violet-600"
+        : "bg-gradient-to-br from-rose-500 to-pink-600";
+
 function SidebarNav({
     groups,
     variant = "light",
     onNavigate,
+    badges = {},
     className = ""
 }) {
     const { pathname } = useLocation();
@@ -83,7 +89,22 @@ function SidebarNav({
                                                 className="h-4 w-4"
                                             />
                                         </span>
-                                        <span className="truncate">{item.label}</span>
+                                        <span className="min-w-0 flex-1 truncate">
+                                            {item.label}
+                                        </span>
+
+                                        {badges[item.to] &&
+                                            badges[item.to].count > 0 && (
+                                                <span
+                                                    className={`ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-bold text-white shadow-sm ring-2 ring-white/60 ${badgeTone(
+                                                        badges[item.to].tone
+                                                    )}`}
+                                                >
+                                                    {badges[item.to].count > 99
+                                                        ? "99+"
+                                                        : badges[item.to].count}
+                                                </span>
+                                            )}
                                     </Link>
                                 </li>
                             );

@@ -83,6 +83,11 @@ export const ROLE_NOTIFICATIONS_PATH = {
     BUSINESS_OWNER: "/business/notifications"
 };
 
+export const ROLE_MESSAGES_PATH = {
+    CUSTOMER: "/customer/messages",
+    PROVIDER: "/provider/messages"
+};
+
 export const ROLE_LABEL = {
     CUSTOMER: "Customer",
     PROVIDER: "Provider",

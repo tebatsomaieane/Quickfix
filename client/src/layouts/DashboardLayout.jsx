@@ -6,8 +6,10 @@ import { fetchMyProviderProfile } from "../services/catalogueService";
 import {
     ROLE_DASHBOARD_PATH,
     ROLE_NOTIFICATIONS_PATH,
+    ROLE_MESSAGES_PATH,
     ROLE_LABEL
 } from "../constants/navigation";
+import useUnreadMessages from "../hooks/useUnreadMessages";
 import Icon from "../components/ui/Icon";
 import CustomerSidebar from "../components/sidebars/CustomerSidebar";
 import ProviderSidebar from "../components/sidebars/ProviderSidebar";
@@ -64,11 +66,30 @@ function DashboardLayout({ navItems }) {
 
     const dashboardPath = ROLE_DASHBOARD_PATH[role];
     const notificationsPath = ROLE_NOTIFICATIONS_PATH[role];
+    const messagesPath = ROLE_MESSAGES_PATH[role];
 
     const [unread, setUnread] = useState(0);
     const [profile, setProfile] = useState(null);
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [condensed, setCondensed] = useState(false);
+
+    const { unread: unreadMessages } = useUnreadMessages(Boolean(messagesPath));
+
+    // One lookup table drives every badge surface (sidebar, app bar, tab rail,
+    // More sheet) so a count can never disagree between two places on screen.
+    const badges = useMemo(() => {
+        const map = {};
+
+        if (notificationsPath && unread > 0) {
+            map[notificationsPath] = { count: unread, tone: "rose" };
+        }
+
+        if (messagesPath && unreadMessages > 0) {
+            map[messagesPath] = { count: unreadMessages, tone: "indigo" };
+        }
+
+        return map;
+    }, [notificationsPath, unread, messagesPath, unreadMessages]);
 
     useScrollLock(drawerOpen);
 
@@ -191,13 +212,18 @@ function DashboardLayout({ navItems }) {
     // The sidebars render a close button whenever `onClose` is supplied, so the
     // desktop instance must not receive it or a stray "X" shows on wide screens.
     const desktopSidebar = useMemo(
-        () => ({ navItems, onNavigate: closeDrawer }),
-        [navItems, closeDrawer]
+        () => ({ navItems, onNavigate: closeDrawer, badges }),
+        [navItems, closeDrawer, badges]
     );
 
     const drawerSidebar = useMemo(
-        () => ({ navItems, onNavigate: closeDrawer, onClose: closeDrawer }),
-        [navItems, closeDrawer]
+        () => ({
+            navItems,
+            onNavigate: closeDrawer,
+            onClose: closeDrawer,
+            badges
+        }),
+        [navItems, closeDrawer, badges]
     );
 
     const providerSidebar = (props) => (
@@ -217,6 +243,26 @@ function DashboardLayout({ navItems }) {
             {unread > 0 && (
                 <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 animate-badge-pop items-center justify-center rounded-full bg-gradient-to-br from-rose-500 to-pink-600 px-1 text-[10px] font-bold leading-none text-white shadow-sm ring-2 ring-white">
                     {unread > 9 ? "9+" : unread}
+                </span>
+            )}
+        </Link>
+    ) : null;
+
+    const messagesButton = messagesPath ? (
+        <Link
+            to={messagesPath}
+            className="qf-tap-sm relative flex items-center rounded-xl p-2.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-indigo-600"
+            title="Messages"
+            aria-label={
+                unreadMessages > 0
+                    ? `Messages, ${unreadMessages} unread`
+                    : "Messages"
+            }
+        >
+            <Icon name="chat" className="h-5 w-5" />
+            {unreadMessages > 0 && (
+                <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 animate-badge-pop items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 px-1 text-[10px] font-bold leading-none text-white shadow-sm ring-2 ring-white">
+                    {unreadMessages > 9 ? "9+" : unreadMessages}
                 </span>
             )}
         </Link>
@@ -306,6 +352,8 @@ function DashboardLayout({ navItems }) {
                         </div>
 
                         <div className="ml-auto flex shrink-0 items-center gap-0.5">
+                            {messagesButton}
+
                             {notificationButton}
 
                             <button
@@ -352,6 +400,7 @@ function DashboardLayout({ navItems }) {
                 navItems={navItems}
                 unread={unread}
                 notificationsPath={notificationsPath}
+                badges={badges}
                 order={ROLE_TAB_ORDER[role]}
             />
         </div>

@@ -846,6 +846,25 @@ body {
     }
 }
 
+/* ---------- Chat bubbles ----------
+   Bubbles settle in with a small rise rather than popping, so a fast
+   back-and-forth reads as one continuous conversation instead of a series of
+   re-renders. */
+.qf-msg-in {
+    animation: qf-msg-in var(--qf-dur-slow) var(--qf-ease-emphasized) both;
+}
+
+@keyframes qf-msg-in {
+    from {
+        opacity: 0;
+        transform: translate3d(0, 8px, 0) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) scale(1);
+    }
+}
+
 /* Guarantee emission of theme keyframes referenced by .qf-* helpers and
    tokens even when the matching Tailwind utility is not used. */
 @keyframes fade-in-up {

@@ -7,7 +7,7 @@ import Logo from "../ui/Logo";
 import ProviderAvatar from "../ui/ProviderAvatar";
 import VerificationBadge from "../ui/VerificationBadge";
 
-function ProviderSidebar({ navItems, onNavigate, onClose, profile }) {
+function ProviderSidebar({ navItems, onNavigate, onClose, badges, profile }) {
     const { user, logout } = useAuth();
     const groups = groupNavItems(navItems);
     const verified = profile?.verification_status === "APPROVED";
@@ -66,6 +66,7 @@ function ProviderSidebar({ navItems, onNavigate, onClose, profile }) {
                 groups={groups}
                 variant="dark"
                 onNavigate={onNavigate}
+                badges={badges}
                 className="mt-3"
             />
 

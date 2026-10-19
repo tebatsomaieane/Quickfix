@@ -43,6 +43,27 @@ function Messages() {
             .catch(() => setError("Unable to load conversations."));
     };
 
+    // Keeps a just-typed message on screen while a background refresh (poll or
+    // real-time hint) lands, so the thread never blinks back a beat mid-chat.
+    const mergePending = useCallback((conversation) => {
+        setActive((prev) => {
+            if (!conversation || !prev || prev.id !== conversation.id) {
+                return conversation;
+            }
+
+            const pending = (prev.messages || []).filter((m) => m.pending);
+
+            if (pending.length === 0) {
+                return conversation;
+            }
+
+            return {
+                ...conversation,
+                messages: [...conversation.messages, ...pending]
+            };
+        });
+    }, []);
+
     useEffect(() => {
         let cancelled = false;
 
@@ -124,7 +145,7 @@ function Messages() {
 
                 const conversation = data?.data ?? null;
 
-                setActive(conversation);
+                mergePending(conversation);
 
                 if (conversation?.unread_count > 0) {
                     await markConversationRead(conversationId);
@@ -140,7 +161,7 @@ function Messages() {
             stopped = true;
             clearInterval(timer);
         };
-    }, [conversationId]);
+    }, [conversationId, mergePending]);
 
     // Near-instant updates via the real-time stream; the interval poll above
     // stays as a safety net when the stream is unavailable.
@@ -157,7 +178,7 @@ function Messages() {
 
                 const conversation = data?.data ?? null;
 
-                setActive(conversation);
+                mergePending(conversation);
 
                 if (conversation?.unread_count > 0) {
                     await markConversationRead(conversationId);
@@ -173,7 +194,7 @@ function Messages() {
         });
 
         return unsubscribe;
-    }, [conversationId]);
+    }, [conversationId, mergePending]);
 
     const threadRef = useRef(null);
 
@@ -208,35 +229,71 @@ function Messages() {
         // the form cannot be submitted with the keyboard while it is disabled.
         const text = draft.trim();
 
-        if (!text) {
+        if (!text || !active) {
             return;
         }
 
-        const { ok } = await run(() => sendMessage(active.id, text), {
+        // Paint the bubble instantly. Waiting on the round trip made a normal
+        // send feel laggy on a phone, so the message shows as pending and is
+        // swapped for the server's copy the moment it lands.
+        const tempId = `pending-${Date.now()}`;
+        const optimistic = {
+            id: tempId,
+            sender_id: user?.id,
+            message: text,
+            is_read: false,
+            pending: true,
+            created_at: new Date().toISOString()
+        };
+
+        setActive((prev) =>
+            prev
+                ? { ...prev, messages: [...(prev.messages || []), optimistic] }
+                : prev
+        );
+        setDraft("");
+
+        const { ok, data } = await run(() => sendMessage(active.id, text), {
             retry: true
         });
 
-        // The draft is kept on failure so a dropped connection does not cost the
-        // user the message they had already typed.
+        // On failure the optimistic bubble is rolled back and the typed text is
+        // restored, so a dropped connection never costs the user the message.
         if (!ok) {
+            setActive((prev) =>
+                prev
+                    ? {
+                          ...prev,
+                          messages: (prev.messages || []).filter(
+                              (m) => m.id !== tempId
+                          )
+                      }
+                    : prev
+            );
+            setDraft(text);
+
             return;
         }
 
-        setDraft("");
+        const sent = data?.data;
 
-        try {
-            const data = await fetchConversation(active.id);
-
-            if (data?.data) {
-                setActive(data.data);
+        // Replace the pending bubble with the server's canonical row (real id,
+        // timestamp). Falling back to dropping it still leaves the thread
+        // correct because the next refresh re-reads from the server.
+        setActive((prev) => {
+            if (!prev) {
+                return prev;
             }
 
-            loadList();
-        } catch {
-            setError(
-                "Your message was sent, but the thread could not be refreshed."
-            );
-        }
+            const rest = (prev.messages || []).filter((m) => m.id !== tempId);
+
+            return {
+                ...prev,
+                messages: sent ? [...rest, sent] : rest
+            };
+        });
+
+        loadList();
     };
 
     const otherParty = active
@@ -411,15 +468,19 @@ function Messages() {
                                         return (
                                             <div
                                                 key={message.id}
-                                                className={
+                                                className={[
+                                                    "qf-msg-in",
                                                     mine
                                                         ? "flex justify-end"
                                                         : "flex justify-start"
-                                                }
+                                                ].join(" ")}
                                             >
                                                 <div
                                                     className={[
                                                         "max-w-[75%] rounded-2xl px-4 py-2 text-sm",
+                                                        message.pending
+                                                            ? "opacity-60"
+                                                            : "",
                                                         mine
                                                             ? "rounded-br-sm bg-indigo-600 text-white"
                                                             : "rounded-bl-sm border border-slate-200 bg-white text-slate-700"
