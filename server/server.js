@@ -5,6 +5,7 @@ const db = require("./config/db");
 const ensureSchema = require("./utils/ensureSchema");
 const { startScheduler } = require("./utils/stateScheduler");
 const { startUploadCleanup } = require("./utils/cleanupUploads");
+const { startEmailWorker } = require("./utils/email/worker");
 const { envNumber } = require("./utils/helpers");
 
 const PORT = process.env.PORT || 5000;
@@ -50,6 +51,11 @@ async function startServer() {
         // 0 disables the job.
         startScheduler(
             envNumber("SCHEDULER_INTERVAL_MINUTES", 15)
+        );
+
+        // Drain the transactional email outbox. 0 disables it.
+        startEmailWorker(
+            envNumber("EMAIL_WORKER_INTERVAL_SECONDS", 60)
         );
 
         const server = app.listen(PORT, () => {

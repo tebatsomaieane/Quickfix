@@ -15,6 +15,19 @@ async function columnExists(connection, table, column) {
 }
 
 
+async function tableExists(connection, table) {
+    const [rows] = await connection.query(
+        `SELECT COUNT(*) AS n
+         FROM information_schema.TABLES
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = ?`,
+        [table]
+    );
+
+    return Number(rows[0].n) > 0;
+}
+
+
 async function indexExists(connection, table, indexName) {
     const [rows] = await connection.query(
         `SELECT COUNT(*) AS n
@@ -84,6 +97,47 @@ async function ensureSchema() {
         }
 
         for (const [table, indexName, columns] of REQUIRED_INDEXES) {
+            if (!(await indexExists(connection, table, indexName))) {
+                await connection.query(
+                    `CREATE INDEX ${indexName} ON ${table} ${columns}`
+                );
+            }
+        }
+
+        // Transactional email outbox. Created here so an existing database
+        // gains the queue (and its worker can start) without a manual
+        // migration. Mirrors database/schema.sql.
+        if (!(await tableExists(connection, "email_outbox"))) {
+            await connection.query(
+                `CREATE TABLE email_outbox (
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                    to_email VARCHAR(255) NOT NULL,
+                    to_name VARCHAR(150),
+                    template VARCHAR(64) NOT NULL,
+                    payload JSON,
+                    status ENUM('PENDING', 'SENDING', 'SENT', 'FAILED')
+                        NOT NULL DEFAULT 'PENDING',
+                    attempts INT NOT NULL DEFAULT 0,
+                    max_attempts INT NOT NULL DEFAULT 5,
+                    last_error VARCHAR(500),
+                    provider_message_id VARCHAR(255),
+                    body_text MEDIUMTEXT,
+                    body_html MEDIUMTEXT,
+                    next_attempt_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    sent_at DATETIME,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        ON UPDATE CURRENT_TIMESTAMP
+                )`
+            );
+        }
+
+        const EMAIL_INDEXES = [
+            ["email_outbox", "idx_email_outbox_due", "(status, next_attempt_at)"],
+            ["email_outbox", "idx_email_outbox_recipient", "(to_email)"]
+        ];
+
+        for (const [table, indexName, columns] of EMAIL_INDEXES) {
             if (!(await indexExists(connection, table, indexName))) {
                 await connection.query(
                     `CREATE INDEX ${indexName} ON ${table} ${columns}`

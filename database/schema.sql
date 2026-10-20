@@ -539,6 +539,62 @@ CREATE TABLE password_reset_tokens (
 
 
 -- =========================================================
+-- 16b. TRANSACTIONAL EMAIL OUTBOX
+-- =========================================================
+-- Durable queue for all outgoing mail. A request enqueues a row and returns;
+-- a background worker delivers it with retries. This keeps SMTP latency and
+-- outages out of the request path and means a mail that could not be handed
+-- off is retried rather than lost.
+--
+-- No foreign keys: mail must still be deliverable/auditable even if the
+-- account is later deleted, and a failed send is an operational event, not
+-- user data.
+
+CREATE TABLE email_outbox (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+
+    to_email VARCHAR(255) NOT NULL,
+    to_name VARCHAR(150),
+
+    template VARCHAR(64) NOT NULL,
+
+    -- Template variables. Holds the reset link / OTP until delivery, then is
+    -- cleared to NULL on every terminal state so no secret lingers in storage.
+    payload JSON,
+
+    status ENUM('PENDING', 'SENDING', 'SENT', 'FAILED')
+        NOT NULL DEFAULT 'PENDING',
+
+    -- `attempts` is incremented as each try is claimed, so it always equals
+    -- the number of tries made (1 on first send).
+    attempts INT NOT NULL DEFAULT 0,
+    max_attempts INT NOT NULL DEFAULT 5,
+
+    last_error VARCHAR(500),
+    provider_message_id VARCHAR(255),
+
+    -- Rendered bodies, retained ONLY by the development capture transport.
+    -- Real sends leave these NULL so message contents are never stored.
+    body_text MEDIUMTEXT,
+    body_html MEDIUMTEXT,
+
+    next_attempt_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    sent_at DATETIME,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP
+);
+
+
+CREATE INDEX idx_email_outbox_due
+    ON email_outbox(status, next_attempt_at);
+
+CREATE INDEX idx_email_outbox_recipient
+    ON email_outbox(to_email);
+
+
+-- =========================================================
 -- 17. COMPLAINTS
 -- =========================================================
 
