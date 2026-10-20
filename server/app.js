@@ -126,6 +126,11 @@ app.use((req, res, next) => {
 
 // Request logging (skip in test environments)
 if (process.env.NODE_ENV !== "test") {
+    // The default format below logs `:id`. Morgan does not define that token
+    // itself, so it must be registered here or every logged request throws
+    // "tokens.id is not a function" from the logger's finish listener.
+    morgan.token("id", (req) => req.id || "-");
+
     app.use(
         morgan(process.env.LOG_FORMAT || ":id :method :url :status :res[content-length] - :response-time ms")
     );

@@ -106,6 +106,17 @@ function Login() {
         } catch (requestError) {
             const serverError = requestError.response?.data;
 
+            // The password was right, but the address has never been
+            // confirmed. Send the user to the verify screen with the address
+            // in hand rather than showing a dead-end error.
+            if (serverError?.code === "EMAIL_NOT_VERIFIED") {
+                navigate("/verify-email", {
+                    state: { email: serverError.email || formData.email.trim() }
+                });
+
+                return;
+            }
+
             // Delivery being down says nothing about the address the user
             // typed, so it is never blamed on the email field. Checked first
             // because the message does mention email, which would otherwise

@@ -5,6 +5,7 @@ import RouteTitle from "./components/RouteTitle";
 import Home from "./pages/public/Home";
 import Login from "./pages/public/Login";
 import Register from "./pages/public/Register";
+import VerifyEmail from "./pages/public/VerifyEmail";
 import ForgotPassword from "./pages/public/ForgotPassword";
 import ResetPassword from "./pages/public/ResetPassword";
 import NotFound from "./pages/public/NotFound";
@@ -96,11 +97,12 @@ function App() {
                             <Route path="/" element={<Home />} />
                             <Route path="/login" element={<Login />} />
                             <Route path="/register" element={<Register />} />
-                            {/* Email verification was removed: old links and
-                                bookmarks land on login rather than a 404. */}
+                            {/* New sign-ups land here to confirm the
+                               6-digit code emailed at registration before a
+                               session is issued. */}
                             <Route
                                 path="/verify-email"
-                                element={<Navigate to="/login" replace />}
+                                element={<VerifyEmail />}
                             />
                             <Route
                                 path="/forgot-password"

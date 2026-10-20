@@ -159,7 +159,16 @@ const auth = {
         pin: [rules.required("Verification code"), rules.otp("Verification code")]
     },
 
+    verifyEmail: {
+        email: [rules.required("Email"), rules.email()],
+        pin: [rules.required("Verification code"), rules.otp("Verification code")]
+    },
+
     resend: {
+        email: [rules.required("Email"), rules.email()]
+    },
+
+    resendVerification: {
         email: [rules.required("Email"), rules.email()]
     },
 

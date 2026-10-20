@@ -34,8 +34,10 @@ CREATE TABLE users (
         'ADMIN'
     ) NOT NULL DEFAULT 'CUSTOMER',
 
-    -- Kept for account display (admin user list). Registration creates
-    -- accounts already set to TRUE: there is no email verification step.
+    -- Registration creates accounts as FALSE and emails a PIN to prove
+    -- ownership; the account becomes usable once verified. When email
+    -- delivery is unavailable the account is created TRUE, so a mail outage
+    -- cannot block sign-up (see authController.register).
     email_verified BOOLEAN NOT NULL DEFAULT TRUE,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
 
@@ -46,6 +48,12 @@ CREATE TABLE users (
     login_otp_hash VARCHAR(64),
     login_otp_expires DATETIME,
     login_otp_attempts INT NOT NULL DEFAULT 0,
+
+    -- Email-address verification PIN, stored hashed like the login OTP.
+    -- Written when registration sends a code; cleared once verified.
+    email_verify_otp_hash VARCHAR(64),
+    email_verify_otp_expires DATETIME,
+    email_verify_otp_attempts INT NOT NULL DEFAULT 0,
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

@@ -537,6 +537,38 @@ test("a verification PIN must be exactly six digits", () => {
     assert.equal(nexted, true);
 });
 
+test("an email-verification PIN is held to the same six-digit rule", () => {
+    const { nexted, res } = execute(auth.verifyEmail, {
+        email: "someone@example.com",
+        pin: "12345"
+    });
+
+    assert.equal(nexted, false);
+    assert.deepEqual(errorKeys(res), ["pin"]);
+
+    const { nexted: accepted } = execute(auth.verifyEmail, {
+        email: "someone@example.com",
+        pin: "123456"
+    });
+
+    assert.equal(accepted, true);
+});
+
+test("a verification resend needs a well-formed address", () => {
+    const { nexted, res } = execute(auth.resendVerification, {
+        email: "not-an-email"
+    });
+
+    assert.equal(nexted, false);
+    assert.deepEqual(errorKeys(res), ["email"]);
+
+    const { nexted: accepted } = execute(auth.resendVerification, {
+        email: "someone@example.com"
+    });
+
+    assert.equal(accepted, true);
+});
+
 test("a reset token that is not 64 hex characters is rejected", () => {
     const { nexted, res } = execute(auth.resetPassword, {
         token: "not-a-real-token",

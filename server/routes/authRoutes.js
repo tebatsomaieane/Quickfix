@@ -12,6 +12,8 @@ const {
     resetPassword,
     verifyTwoFactor,
     resendOtp,
+    verifyEmail,
+    resendVerification,
     updateTwoFactor
 } = require("../controllers/authController");
 
@@ -63,6 +65,18 @@ router.post(
     rateLimit({ max: 5 }),
     validate(auth.resend),
     resendOtp
+);
+router.post(
+    "/verify-email",
+    rateLimit({ max: 10 }),
+    validate(auth.verifyEmail),
+    verifyEmail
+);
+router.post(
+    "/resend-verification",
+    rateLimit({ max: 5 }),
+    validate(auth.resendVerification),
+    resendVerification
 );
 router.get("/me", protect, me);
 router.get("/session", session);

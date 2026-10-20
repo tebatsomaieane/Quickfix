@@ -160,11 +160,30 @@ function Register() {
             });
 
             if (data.success) {
-                // The API issues the session cookie in the same response, so
+                reset(INITIAL_VALUES);
+
+                // A verification code was emailed: no session exists yet, so
+                // the auth state is deliberately not seeded. Hand the address
+                // to the verify screen, which finishes sign-in once the code
+                // is confirmed.
+                if (data.requires_verification) {
+                    setSuccess(
+                        "Account created! Check your email for a 6-digit code to finish signing in."
+                    );
+
+                    await new Promise((resolve) => setTimeout(resolve, 900));
+
+                    navigate("/verify-email", {
+                        state: { email: data.email || payload.email }
+                    });
+
+                    return;
+                }
+
+                // The API issued the session cookie in the same response, so
                 // the account is usable immediately: seed the auth state and
                 // go straight to the dashboard the role was chosen for.
                 setSuccess("Account created! Taking you to your dashboard…");
-                reset(INITIAL_VALUES);
                 setUser(data.user);
 
                 // Let the success message register before the route changes,

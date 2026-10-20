@@ -4,8 +4,10 @@ const USER_STORAGE_KEY = "quickfix_user";
 
 // ==========================================
 // REGISTER USER
-// The API creates the account and issues the session cookie in one
-// response, so the user is signed in from the moment this resolves.
+// The API creates the account and issues the session cookie in the same
+// response, so the user is signed in from the moment this resolves -- unless
+// the account needs email verification, in which case no session is issued
+// and the response carries `requires_verification: true`.
 // ==========================================
 export const registerUser = async (userData) => {
     const response = await api.post(
@@ -183,6 +185,39 @@ export const updateTwoFactor = async (enabled) => {
 // ==========================================
 export const resendOtp = async (email) => {
     const response = await api.post("/auth/resend-otp", { email });
+
+    return response.data;
+};
+
+
+// ==========================================
+// VERIFY EMAIL ADDRESS (public)
+// Completes sign-up once the 6-digit code emailed at
+// registration is confirmed. On success the API issues the
+// session cookie, so the user is signed in from here.
+// ==========================================
+export const verifyEmail = async (email, pin) => {
+    const response = await api.post(
+        "/auth/verify-email",
+        { email, pin }
+    );
+
+    if (response.data.success) {
+        cacheUser(response.data.user);
+    }
+
+    return response.data;
+};
+
+
+// ==========================================
+// RESEND EMAIL VERIFICATION CODE (public)
+// ==========================================
+export const resendVerification = async (email) => {
+    const response = await api.post(
+        "/auth/resend-verification",
+        { email }
+    );
 
     return response.data;
 };

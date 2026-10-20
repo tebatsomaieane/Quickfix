@@ -5,6 +5,7 @@ const db = require("../config/db");
 const {
     sendPasswordResetEmail,
     sendLoginOtp,
+    sendEmailVerificationPin,
     isEmailConfigured,
     EmailDeliveryError
 } = require("../utils/email");
@@ -109,32 +110,40 @@ const emailUnavailable = (res) =>
         message: EMAIL_UNAVAILABLE_MESSAGE
     });
 
-// Anti-spam: at most one OTP resend per email per window.
+// Anti-spam: at most one OTP resend per email per window. Two independent
+// maps so the login-code and email-verification limits never share a clock.
 const OTP_RESEND_WINDOW_MS = 60 * 1000;
 const otpResendCooldowns = new Map(); // email -> last attempt timestamp
+const verificationResendCooldowns = new Map(); // email -> last attempt timestamp
 
-// Records an OTP resend attempt for `email` and returns the remaining
+// Records a resend attempt for `email` in `store` and returns the remaining
 // cooldown in ms (0 when the resend is allowed right now). Runs on the
 // raw email string BEFORE any account lookup so it behaves identically
 // for unknown and existing accounts - a 429 can never reveal whether an
 // email is registered. Attempts are recorded even when blocked, so an
 // attacker cannot reset the window by spamming.
-const consumeOtpResendCooldown = (email) => {
+const consumeResendCooldown = (store, email) => {
     const now = Date.now();
-    const last = otpResendCooldowns.get(email) || 0;
+    const last = store.get(email) || 0;
 
-    otpResendCooldowns.set(email, now);
+    store.set(email, now);
 
-    if (otpResendCooldowns.size > 5000) {
-        for (const [key, ts] of otpResendCooldowns) {
+    if (store.size > 5000) {
+        for (const [key, ts] of store) {
             if (now - ts >= OTP_RESEND_WINDOW_MS) {
-                otpResendCooldowns.delete(key);
+                store.delete(key);
             }
         }
     }
 
     return Math.max(0, OTP_RESEND_WINDOW_MS - (now - last));
 };
+
+const consumeOtpResendCooldown = (email) =>
+    consumeResendCooldown(otpResendCooldowns, email);
+
+const consumeVerificationResendCooldown = (email) =>
+    consumeResendCooldown(verificationResendCooldowns, email);
 
 const COOKIE_OPTIONS = {
     httpOnly: true,
@@ -194,6 +203,13 @@ const register = async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
+        // Email verification is only possible when a transport can actually
+        // deliver. When it cannot (production with SMTP unset), the account is
+        // created already verified so a mail outage never blocks sign-up --
+        // the same fallback used for login 2FA, and logged for the operator.
+        let requiresVerification = isEmailConfigured();
+        const verificationCode = requiresVerification ? generateOtp() : null;
+
         // Create the user and their profile atomically
         const connection = await db.getConnection();
 
@@ -204,18 +220,30 @@ const register = async (req, res) => {
                 `INSERT INTO users
                 (first_name, last_name, email, phone, password, role,
                  email_verified, two_factor_enabled)
-                VALUES (?, ?, ?, ?, ?, ?, TRUE, FALSE)`,
+                VALUES (?, ?, ?, ?, ?, ?, ?, FALSE)`,
                 [
                     firstName,
                     lastName,
                     emailValue,
                     phoneValue,
                     hashedPassword,
-                    role
+                    role,
+                    requiresVerification ? false : true
                 ]
             );
 
             const userId = result.insertId;
+
+            if (verificationCode) {
+                await connection.query(
+                    `UPDATE users
+                     SET email_verify_otp_hash = ?,
+                         email_verify_otp_expires = ?,
+                         email_verify_otp_attempts = 0
+                     WHERE id = ?`,
+                    [hashOtp(verificationCode), otpExpiry(), userId]
+                );
+            }
 
             if (role === "CUSTOMER") {
                 await connection.query(
@@ -240,15 +268,65 @@ const register = async (req, res) => {
 
             await connection.commit();
 
-            // Two-factor login is opt-in (Settings -> Two-factor login), not
-            // a default: a flag that is on for everyone but silently skipped
-            // whenever SMTP is missing is worse than an honest default, and it
-            // would otherwise put a code screen between every new user and
-            // their dashboard.
-            //
-            // The session is issued now, so registration ends signed in: the
-            // account is usable the moment it exists, with no email round
-            // trip standing between the form and the dashboard.
+            // Queue the verification PIN. If even enqueueing fails there is no
+            // route to verification, so the account falls back to verified
+            // rather than locking the new user out of their own account.
+            if (verificationCode) {
+                try {
+                    await sendEmailVerificationPin(
+                        emailValue,
+                        firstName,
+                        verificationCode
+                    );
+                } catch (error) {
+                    console.error(
+                        "[auth] Failed to queue verification email:",
+                        error.message
+                    );
+
+                    await db.query(
+                        `UPDATE users
+                         SET email_verified = TRUE,
+                             email_verify_otp_hash = NULL,
+                             email_verify_otp_expires = NULL
+                         WHERE id = ?`,
+                        [userId]
+                    );
+
+                    requiresVerification = false;
+                }
+            }
+
+            const baseUser = {
+                id: userId,
+                first_name: firstName,
+                last_name: lastName,
+                email: emailValue,
+                phone: phoneValue,
+                role,
+                email_verified: !requiresVerification,
+                two_factor_enabled: false,
+                profile_image: null,
+                location: null
+            };
+
+            // Unverified: no session is issued yet. The client sends the user
+            // to the verify screen, and the cookie is created only once the
+            // address is proven, so an address the user mistyped cannot hold a
+            // session.
+            if (requiresVerification) {
+                return res.status(201).json({
+                    success: true,
+                    requires_verification: true,
+                    email: emailValue,
+                    message:
+                        "We emailed you a 6-digit code. Enter it to finish setting up your account.",
+                    user: baseUser
+                });
+            }
+
+            // Verified (no verification step was possible): sign in now, as
+            // registration always has.
             const token = jwt.sign(
                 {
                     id: userId,
@@ -266,18 +344,7 @@ const register = async (req, res) => {
             res.status(201).json({
                 success: true,
                 message: "Registration successful. You are now signed in.",
-                user: {
-                    id: userId,
-                    first_name: firstName,
-                    last_name: lastName,
-                    email: emailValue,
-                    phone: phoneValue,
-                    role,
-                    email_verified: true,
-                    two_factor_enabled: false,
-                    profile_image: null,
-                    location: null
-                }
+                user: baseUser
             });
         } catch (error) {
             await connection.rollback();
@@ -370,6 +437,20 @@ const login = async (req, res) => {
         // A correct password is proof of ownership: clear the counter so a
         // user who simply mistyped a few times is not punished afterwards.
         loginFailures.delete(email);
+
+        // 3b. The address must be proven before a session exists. The account
+        // was created unverified because a verification PIN is on its way; a
+        // 200 with a code (not a 401) so the client can guide the user to the
+        // verify screen without treating it as a bad password.
+        if (!user.email_verified) {
+            return res.status(403).json({
+                success: false,
+                code: "EMAIL_NOT_VERIFIED",
+                email: user.email,
+                message:
+                    "Please verify your email address before signing in."
+            });
+        }
 
         // 4. Two-factor step: correct password is only the first factor.
         // A fresh 6-digit code is emailed and the session is created only
@@ -484,9 +565,9 @@ const login = async (req, res) => {
 
 
 // Build the session JWT, set the httpOnly cookie and respond with the
-// authenticated user. Used after the password check (no 2FA) and after a
-// verified login code.
-const issueSession = (user, res) => {
+// authenticated user. Used after the password check (no 2FA), after a
+// verified login code, and once an email address is verified.
+const issueSession = (user, res, message = "Login successful") => {
     const token = jwt.sign(
         {
             id: user.id,
@@ -503,7 +584,7 @@ const issueSession = (user, res) => {
 
     return res.json({
         success: true,
-        message: "Login successful",
+        message,
         user: {
             id: user.id,
             first_name: user.first_name,
@@ -672,6 +753,181 @@ const resendOtp = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "Server error while resending login code"
+        });
+    }
+};
+
+
+// VERIFY EMAIL ADDRESS  (public)
+// POST /api/auth/verify-email  { email, pin }
+// The PIN proves the address typed at registration belongs to whoever
+// registered. On success the account is marked verified and a session is
+// issued, so a new user finishes signing up signed in rather than being
+// bounced back to a login form.
+const verifyEmail = async (req, res) => {
+    try {
+        const { email, pin } = req.body;
+
+        const [rows] = await db.query(
+            `SELECT id, first_name, last_name, email, phone,
+                    role, email_verified, is_active, two_factor_enabled,
+                    email_verify_otp_hash, email_verify_otp_expires,
+                    email_verify_otp_attempts
+             FROM users
+             WHERE email = ?`,
+            [email]
+        );
+
+        if (rows.length === 0 || !rows[0].is_active) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid email or verification code"
+            });
+        }
+
+        const user = rows[0];
+
+        // Already verified -- e.g. a double submit or a stale tab. Sign the
+        // user in rather than complaining about a code that no longer matters.
+        if (user.email_verified) {
+            return issueSession(
+                user,
+                res,
+                "Your email is already verified. You are signed in."
+            );
+        }
+
+        if (
+            !user.email_verify_otp_hash ||
+            !user.email_verify_otp_expires ||
+            new Date(user.email_verify_otp_expires).getTime() < Date.now()
+        ) {
+            return res.status(400).json({
+                success: false,
+                code: "OTP_EXPIRED",
+                message:
+                    "This code has expired. Request a new one to continue."
+            });
+        }
+
+        if (!safeEqual(user.email_verify_otp_hash, hashOtp(pin))) {
+            const attempts = user.email_verify_otp_attempts + 1;
+            const lockedOut = attempts >= MAX_OTP_ATTEMPTS;
+
+            await db.query(
+                `UPDATE users
+                 SET email_verify_otp_attempts = ?,
+                     email_verify_otp_hash = CASE WHEN ? THEN NULL ELSE email_verify_otp_hash END,
+                     email_verify_otp_expires = CASE WHEN ? THEN NULL ELSE email_verify_otp_expires END
+                 WHERE id = ?`,
+                [attempts, lockedOut ? 1 : 0, lockedOut ? 1 : 0, user.id]
+            );
+
+            return res.status(400).json({
+                success: false,
+                message: lockedOut
+                    ? "Too many incorrect attempts. Request a new code to continue."
+                    : "Incorrect verification code. Please try again."
+            });
+        }
+
+        // Code confirmed: mark the address verified, clear the spent PIN and
+        // create the session.
+        await db.query(
+            `UPDATE users
+             SET email_verified = TRUE,
+                 email_verify_otp_hash = NULL,
+                 email_verify_otp_expires = NULL,
+                 email_verify_otp_attempts = 0
+             WHERE id = ?`,
+            [user.id]
+        );
+
+        return issueSession(
+            { ...user, email_verified: true },
+            res,
+            "Email verified. You are now signed in."
+        );
+    } catch (error) {
+        console.error("Email verification error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Server error while verifying email"
+        });
+    }
+};
+
+
+// RESEND EMAIL VERIFICATION CODE  (public)
+// POST /api/auth/resend-verification  { email }
+const resendVerification = async (req, res) => {
+    try {
+        const emailValue = req.body.email;
+
+        const waitMs = consumeVerificationResendCooldown(emailValue);
+
+        if (waitMs > 0) {
+            return res.status(429).json({
+                success: false,
+                code: "RESEND_TOO_SOON",
+                message: `Please wait about ${Math.ceil(waitMs / 1000)}s before requesting another code.`
+            });
+        }
+
+        const [rows] = await db.query(
+            `SELECT id, first_name, email_verified
+             FROM users
+             WHERE email = ? AND is_active = TRUE`,
+            [emailValue]
+        );
+
+        // Generic response - never reveal whether the account exists, and
+        // there is nothing to resend for an account that is already verified.
+        if (rows.length === 0 || rows[0].email_verified) {
+            return res.json({
+                success: true,
+                message:
+                    "If that address still needs verifying, a new code has been sent."
+            });
+        }
+
+        const user = rows[0];
+        const verificationCode = generateOtp();
+
+        await db.query(
+            `UPDATE users
+             SET email_verify_otp_hash = ?,
+                 email_verify_otp_expires = ?,
+                 email_verify_otp_attempts = 0
+             WHERE id = ?`,
+            [hashOtp(verificationCode), otpExpiry(), user.id]
+        );
+
+        try {
+            await sendEmailVerificationPin(
+                user.email,
+                user.first_name,
+                verificationCode
+            );
+        } catch (error) {
+            console.error("[auth] Failed to resend verification code:", error);
+
+            if (error instanceof EmailDeliveryError) {
+                return emailUnavailable(res);
+            }
+        }
+
+        return res.json({
+            success: true,
+            message: "A new verification code has been sent to your email."
+        });
+    } catch (error) {
+        console.error("Resend verification code error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Server error while resending verification code"
         });
     }
 };
@@ -1156,6 +1412,8 @@ module.exports = {
     login,
     verifyTwoFactor,
     resendOtp,
+    verifyEmail,
+    resendVerification,
     me,
     session,
     updateProfile,
