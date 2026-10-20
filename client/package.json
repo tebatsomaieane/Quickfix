@@ -22,8 +22,6 @@
     "preview": "vite preview",
     "deploy": "npm run build && npm run verify:pages && wrangler pages deploy dist --project-name quickfix --commit-dirty=true",
     "deploy:cloudflare": "npm run deploy",
-    "deploy:vercel": "npm run build && cd .. && vercel --prod --yes",
-    "deploy:vercel:preview": "npm run build && cd .. && vercel --yes",
     "deploy:cloudflare:preview": "npm run build && npm run verify:pages && wrangler pages deploy dist --project-name quickfix --branch preview --commit-dirty=true"
   },
   "dependencies": {

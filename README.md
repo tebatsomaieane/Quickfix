@@ -237,8 +237,7 @@ npx wrangler login                                   # once
 npm run deploy                                       # deploys dist/ to Pages
 ```
 
-Optional secondary target: `npm run deploy:vercel` still publishes the same
-`dist/` to Vercel (kept working, but Cloudflare Pages is the primary host).
+Cloudflare Pages is the primary host.
 
 The repo ships `wrangler.toml`, `client/public/_redirects` (SPA fallback),
 `client/public/_headers` (security headers) and `.nvmrc` already configured.
