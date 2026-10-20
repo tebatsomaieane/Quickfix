@@ -81,7 +81,8 @@ async function ensureSchema() {
             ["login_otp_attempts", "INT NOT NULL DEFAULT 0"],
             ["email_verify_otp_hash", "VARCHAR(64) NULL"],
             ["email_verify_otp_expires", "DATETIME NULL"],
-            ["email_verify_otp_attempts", "INT NOT NULL DEFAULT 0"]
+            ["email_verify_otp_attempts", "INT NOT NULL DEFAULT 0"],
+            ["pending_email", "VARCHAR(255) NULL"]
         ];
 
         for (const [column, definition] of otpColumns) {

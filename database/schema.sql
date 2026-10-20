@@ -50,10 +50,16 @@ CREATE TABLE users (
     login_otp_attempts INT NOT NULL DEFAULT 0,
 
     -- Email-address verification PIN, stored hashed like the login OTP.
-    -- Written when registration sends a code; cleared once verified.
+    -- Written when registration sends a code; also reused for an email
+    -- address change, in which case `pending_email` holds the address being
+    -- confirmed and `email` keeps working until the change is proven.
     email_verify_otp_hash VARCHAR(64),
     email_verify_otp_expires DATETIME,
     email_verify_otp_attempts INT NOT NULL DEFAULT 0,
+
+    -- A requested-but-unconfirmed new address. NULL when no change is
+    -- pending; cleared once confirmed or cancelled.
+    pending_email VARCHAR(255),
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

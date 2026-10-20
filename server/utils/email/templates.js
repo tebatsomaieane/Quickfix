@@ -133,6 +133,40 @@ const rawTemplate = ({ subject, text, html }) => ({
     html: html || text || ""
 });
 
+// A notification about a change to the account's security settings (password
+// changed/reset, two-factor toggled). Not an OTP: it tells the rightful owner
+// what just happened and how to react, which is what turns a silent takeover
+// into a visible one.
+const securityAlertTemplate = ({ firstName, action, when }) => {
+    const lines = [
+        `Hi ${firstName},`,
+        "",
+        `${action}.`,
+        ...(when ? ["", `When: ${when}`] : []),
+        "",
+        "If this was you, no action is needed.",
+        "If you did not do this, reset your password immediately and contact support.",
+        "",
+        SUPPORT_LINE
+    ];
+
+    const text = lines.join("\n");
+
+    const html = wrapHtml(
+        [
+            "<h2 style=\"color:#1e293b\">Security notice</h2>",
+            `<p style="color:#475569">Hi ${escapeHtml(firstName)},</p>`,
+            `<p style="color:#475569">${escapeHtml(action)}.</p>`,
+            ...(when
+                ? [`<p style="color:#64748b;font-size:13px">When: ${escapeHtml(when)}</p>`]
+                : []),
+            "<p style=\"color:#64748b;font-size:13px\">If this was you, no action is needed. If you did not do this, reset your password immediately and contact support.</p>"
+        ].join("\n")
+    );
+
+    return { subject: `Security notice: ${action}`, text, html };
+};
+
 const TEMPLATES = {
     login_otp: (payload) =>
         otpTemplate({
@@ -150,8 +184,17 @@ const TEMPLATES = {
             expiresInMinutes: 10,
             ...payload
         }),
+    email_change: (payload) =>
+        otpTemplate({
+            subject: "Confirm your new QuickFix email",
+            heading: "Confirm your new email address",
+            body: "Enter the 6-digit code below to finish changing the email address on your QuickFix account.",
+            expiresInMinutes: 10,
+            ...payload
+        }),
     password_reset: passwordResetTemplate,
     welcome: welcomeTemplate,
+    security_alert: securityAlertTemplate,
     raw: rawTemplate
 };
 

@@ -6,6 +6,8 @@ const {
     sendPasswordResetEmail,
     sendLoginOtp,
     sendEmailVerificationPin,
+    sendEmailChangePin,
+    sendSecurityAlert,
     isEmailConfigured,
     EmailDeliveryError
 } = require("../utils/email");
@@ -110,6 +112,24 @@ const emailUnavailable = (res) =>
         message: EMAIL_UNAVAILABLE_MESSAGE
     });
 
+// A security notice is best-effort: it must never turn a completed password
+// change or 2FA toggle into an error the user can act on, so a delivery
+// failure is logged and swallowed rather than surfaced.
+const sendSecurityAlertSafe = async (to, firstName, action) => {
+    if (!isEmailConfigured()) {
+        return;
+    }
+
+    try {
+        await sendSecurityAlert(to, firstName, {
+            action,
+            when: new Date().toUTCString()
+        });
+    } catch (error) {
+        console.error("[auth] Failed to queue security alert:", error.message);
+    }
+};
+
 // Anti-spam: at most one OTP resend per email per window. Two independent
 // maps so the login-code and email-verification limits never share a clock.
 const OTP_RESEND_WINDOW_MS = 60 * 1000;
@@ -144,6 +164,13 @@ const consumeOtpResendCooldown = (email) =>
 
 const consumeVerificationResendCooldown = (email) =>
     consumeResendCooldown(verificationResendCooldowns, email);
+
+// Keyed by user id, not address, so it can never share a clock with the
+// sign-up resend for whatever address happens to be proposed.
+const changeResendCooldowns = new Map(); // user id -> last attempt timestamp
+
+const consumeChangeResendCooldown = (userId) =>
+    consumeResendCooldown(changeResendCooldowns, `user:${userId}`);
 
 const COOKIE_OPTIONS = {
     httpOnly: true,
@@ -306,6 +333,7 @@ const register = async (req, res) => {
                 role,
                 email_verified: !requiresVerification,
                 two_factor_enabled: false,
+                pending_email: null,
                 profile_image: null,
                 location: null
             };
@@ -391,7 +419,7 @@ const login = async (req, res) => {
         const [users] = await db.query(
             `SELECT id, first_name, last_name, email, phone,
                     password, role, email_verified, is_active,
-                    two_factor_enabled
+                    two_factor_enabled, pending_email
              FROM users
              WHERE email = ?`,
             [email]
@@ -548,6 +576,7 @@ const login = async (req, res) => {
                 role: user.role,
                 email_verified: user.email_verified,
                 two_factor_enabled: user.two_factor_enabled,
+                pending_email: user.pending_email || null,
                 profile_image: customerProfile[0]?.profile_image || null,
                 location: customerProfile[0]?.location || null
             }
@@ -593,7 +622,8 @@ const issueSession = (user, res, message = "Login successful") => {
             phone: user.phone,
             role: user.role,
             email_verified: user.email_verified,
-            two_factor_enabled: user.two_factor_enabled
+            two_factor_enabled: user.two_factor_enabled,
+            pending_email: user.pending_email || null
         }
     });
 };
@@ -974,7 +1004,7 @@ const session = async (req, res) => {
         const [users] = await db.query(
             `SELECT id, first_name, last_name, email, phone,
                     role, email_verified, is_active,
-                    two_factor_enabled
+                    two_factor_enabled, pending_email
              FROM users
              WHERE id = ?`,
             [decoded.id]
@@ -1022,7 +1052,7 @@ const me = async (req, res) => {
         const [users] = await db.query(
             `SELECT id, first_name, last_name, email, phone,
                     role, email_verified, is_active,
-                    two_factor_enabled
+                    two_factor_enabled, pending_email
              FROM users
              WHERE id = ?`,
             [req.user.id]
@@ -1194,7 +1224,7 @@ const changePassword = async (req, res) => {
         // submitted current password is the real one, and that the new password
         // is not simply the old one back again.
         const [users] = await db.query(
-            "SELECT id, password FROM users WHERE id = ?",
+            "SELECT id, first_name, email, password FROM users WHERE id = ?",
             [req.user.id]
         );
 
@@ -1223,6 +1253,12 @@ const changePassword = async (req, res) => {
             hashedPassword,
             req.user.id
         ]);
+
+        await sendSecurityAlertSafe(
+            users[0].email,
+            users[0].first_name,
+            "Your QuickFix password was changed"
+        );
 
         return res.json({
             success: true,
@@ -1253,6 +1289,21 @@ const updateTwoFactor = async (req, res) => {
             "UPDATE users SET two_factor_enabled = ? WHERE id = ?",
             [enabled ? 1 : 0, req.user.id]
         );
+
+        const [users] = await db.query(
+            "SELECT first_name, email FROM users WHERE id = ?",
+            [req.user.id]
+        );
+
+        if (users.length > 0) {
+            await sendSecurityAlertSafe(
+                users[0].email,
+                users[0].first_name,
+                enabled
+                    ? "Two-factor login was turned on"
+                    : "Two-factor login was turned off"
+            );
+        }
 
         return res.json({
             success: true,
@@ -1354,7 +1405,7 @@ const resetPassword = async (req, res) => {
             .digest("hex");
 
         const [rows] = await db.query(
-            `SELECT prt.id AS token_id, u.id AS user_id, u.email
+            `SELECT prt.id AS token_id, u.id AS user_id, u.email, u.first_name
              FROM password_reset_tokens prt
              JOIN users u ON u.id = prt.user_id
              WHERE prt.token_hash = ?
@@ -1392,16 +1443,336 @@ const resetPassword = async (req, res) => {
             [rows[0].token_id]
         );
 
+        await sendSecurityAlertSafe(
+            rows[0].email,
+            rows[0].first_name,
+            "Your QuickFix password was reset"
+        );
+
+    return res.json({
+        success: true,
+        message: "Password reset successfully. You can now log in."
+    });
+} catch (error) {
+    console.error("Password reset error:", error);
+
+    return res.status(500).json({
+        success: false,
+        message: "Server error while resetting password"
+    });
+}
+};
+
+
+// REQUEST EMAIL CHANGE (authenticated)
+const requestEmailChange = async (req, res) => {
+    try {
+        const email = req.body.email;
+
+        // Normalize like other places
+        const newEmail = String(email).trim().toLowerCase();
+
+        // Check if email already in use
+        const [existing] = await db.query(
+            "SELECT id FROM users WHERE email = ? AND id != ?",
+            [newEmail, req.user.id]
+        );
+
+        if (existing.length > 0) {
+            return res.status(409).json({
+                success: false,
+                message: "That email address is already in use."
+            });
+        }
+
+        // Also check if another pending change is using it
+        const [existingPending] = await db.query(
+            "SELECT id FROM users WHERE pending_email = ? AND id != ?",
+            [newEmail, req.user.id]
+        );
+
+        if (existingPending.length > 0) {
+            return res.status(409).json({
+                success: false,
+                message: "That email address is already in use."
+            });
+        }
+
+        const waitMs = consumeChangeResendCooldown(req.user.id);
+
+        if (waitMs > 0) {
+            return res.status(429).json({
+                success: false,
+                code: "RESEND_TOO_SOON",
+                message: `Please wait about ${Math.ceil(waitMs / 1000)}s before requesting another code.`
+            });
+        }
+
+        const [users] = await db.query(
+            "SELECT id, first_name, email, email_verify_otp_hash FROM users WHERE id = ?",
+            [req.user.id]
+        );
+
+        if (users.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        const verificationCode = generateOtp();
+
+        await db.query(
+            `UPDATE users
+             SET pending_email = ?,
+                 email_verify_otp_hash = ?,
+                 email_verify_otp_expires = ?,
+                 email_verify_otp_attempts = 0
+             WHERE id = ?`,
+            [newEmail, hashOtp(verificationCode), otpExpiry(), req.user.id]
+        );
+
+        try {
+            await sendEmailChangePin(newEmail, users[0].first_name, verificationCode);
+        } catch (error) {
+            console.error("[auth] Failed to send email change code:", error);
+
+            if (error instanceof EmailDeliveryError) {
+                return emailUnavailable(res);
+            }
+        }
+
         return res.json({
             success: true,
-            message: "Password reset successfully. You can now log in."
+            message: "We sent a 6-digit code to your new email address. Enter it to confirm the change.",
+            pending_email: newEmail
         });
     } catch (error) {
-        console.error("Password reset error:", error);
+        console.error("Request email change error:", error);
 
         return res.status(500).json({
             success: false,
-            message: "Server error while resetting password"
+            message: "Server error while requesting email change"
+        });
+    }
+};
+
+
+// VERIFY EMAIL CHANGE (authenticated)
+const verifyEmailChange = async (req, res) => {
+    try {
+        const { email, pin } = req.body;
+        const newEmail = String(email).trim().toLowerCase();
+
+        const [rows] = await db.query(
+            `SELECT id, first_name, last_name, phone, role,
+                    email, pending_email,
+                    email_verify_otp_hash, email_verify_otp_expires,
+                    email_verify_otp_attempts, is_active
+             FROM users
+             WHERE id = ?`,
+            [req.user.id]
+        );
+
+        if (rows.length === 0 || !rows[0].is_active) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid verification code"
+            });
+        }
+
+        const user = rows[0];
+
+        if (!user.pending_email || user.pending_email !== newEmail) {
+            return res.status(400).json({
+                success: false,
+                message: "No email change pending for this address"
+            });
+        }
+
+        if (
+            !user.email_verify_otp_hash ||
+            !user.email_verify_otp_expires ||
+            new Date(user.email_verify_otp_expires).getTime() < Date.now()
+        ) {
+            return res.status(400).json({
+                success: false,
+                code: "OTP_EXPIRED",
+                message: "This code has expired. Request a new one to continue."
+            });
+        }
+
+        if (!safeEqual(user.email_verify_otp_hash, hashOtp(pin))) {
+            const attempts = user.email_verify_otp_attempts + 1;
+            const lockedOut = attempts >= MAX_OTP_ATTEMPTS;
+
+            await db.query(
+                `UPDATE users
+                 SET email_verify_otp_attempts = ?,
+                     email_verify_otp_hash = CASE WHEN ? THEN NULL ELSE email_verify_otp_hash END,
+                     email_verify_otp_expires = CASE WHEN ? THEN NULL ELSE email_verify_otp_expires END
+                 WHERE id = ?`,
+                [attempts, lockedOut ? 1 : 0, lockedOut ? 1 : 0, user.id]
+            );
+
+            return res.status(400).json({
+                success: false,
+                message: lockedOut
+                    ? "Too many incorrect attempts. Request a new code to continue."
+                    : "Incorrect verification code. Please try again."
+            });
+        }
+
+        // Apply the change
+        await db.query(
+            `UPDATE users
+             SET email = ?,
+                 pending_email = NULL,
+                 email_verify_otp_hash = NULL,
+                 email_verify_otp_expires = NULL,
+                 email_verify_otp_attempts = 0
+             WHERE id = ?`,
+            [user.pending_email, user.id]
+        );
+
+        try {
+            await sendSecurityAlertSafe(
+                user.pending_email,
+                user.first_name,
+                "Your QuickFix email address was changed"
+            );
+            await sendSecurityAlertSafe(
+                user.email,
+                user.first_name,
+                "Your QuickFix email address was changed"
+            );
+        } catch (e) {
+            console.error("[auth] Failed to send email change alerts:", e.message);
+        }
+
+        const updatedUser = {
+            id: user.id,
+            first_name: user.first_name,
+            last_name: user.last_name,
+            email: user.pending_email,
+            phone: user.phone,
+            role: user.role,
+            email_verified: true,
+            two_factor_enabled: user.two_factor_enabled,
+            pending_email: null
+        };
+
+        // Update cached user
+        return res.json({
+            success: true,
+            message: "Email address updated successfully.",
+            user: updatedUser
+        });
+    } catch (error) {
+        console.error("Verify email change error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Server error while verifying email change"
+        });
+    }
+};
+
+
+// RESEND EMAIL CHANGE CODE (authenticated)
+const resendEmailChange = async (req, res) => {
+    try {
+        const email = req.body.email;
+        const newEmail = String(email).trim().toLowerCase();
+
+        const waitMs = consumeChangeResendCooldown(req.user.id);
+
+        if (waitMs > 0) {
+            return res.status(429).json({
+                success: false,
+                code: "RESEND_TOO_SOON",
+                message: `Please wait about ${Math.ceil(waitMs / 1000)}s before requesting another code.`
+            });
+        }
+
+        const [rows] = await db.query(
+            "SELECT id, first_name, pending_email FROM users WHERE id = ? AND is_active = TRUE",
+            [req.user.id]
+        );
+
+        if (rows.length === 0 || !rows[0].pending_email) {
+            return res.json({
+                success: true,
+                message: "If a change is pending, a new code has been sent."
+            });
+        }
+
+        if (rows[0].pending_email !== newEmail) {
+            return res.json({
+                success: true,
+                message: "If a change is pending, a new code has been sent."
+            });
+        }
+
+        const verificationCode = generateOtp();
+
+        await db.query(
+            `UPDATE users
+             SET email_verify_otp_hash = ?,
+                 email_verify_otp_expires = ?,
+                 email_verify_otp_attempts = 0
+             WHERE id = ?`,
+            [hashOtp(verificationCode), otpExpiry(), req.user.id]
+        );
+
+        try {
+            await sendEmailChangePin(newEmail, rows[0].first_name, verificationCode);
+        } catch (error) {
+            console.error("[auth] Failed to resend email change code:", error);
+
+            if (error instanceof EmailDeliveryError) {
+                return emailUnavailable(res);
+            }
+        }
+
+        return res.json({
+            success: true,
+            message: "A new verification code has been sent to your new email address."
+        });
+    } catch (error) {
+        console.error("Resend email change code error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Server error while resending email change code"
+        });
+    }
+};
+
+
+// CANCEL EMAIL CHANGE (authenticated)
+const cancelEmailChange = async (req, res) => {
+    try {
+        await db.query(
+            `UPDATE users
+             SET pending_email = NULL,
+                 email_verify_otp_hash = NULL,
+                 email_verify_otp_expires = NULL,
+                 email_verify_otp_attempts = 0
+             WHERE id = ?`,
+            [req.user.id]
+        );
+
+        return res.json({
+            success: true,
+            message: "Email change cancelled."
+        });
+    } catch (error) {
+        console.error("Cancel email change error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Server error while cancelling email change"
         });
     }
 };
@@ -1421,5 +1792,9 @@ module.exports = {
     changePassword,
     updateTwoFactor,
     requestPasswordReset,
-    resetPassword
+    resetPassword,
+    requestEmailChange,
+    verifyEmailChange,
+    resendEmailChange,
+    cancelEmailChange
 };

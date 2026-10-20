@@ -221,3 +221,47 @@ export const resendVerification = async (email) => {
 
     return response.data;
 };
+
+
+// ==========================================
+// REQUEST EMAIL CHANGE (authenticated)
+// ==========================================
+export const requestEmailChange = async (email) => {
+    const response = await api.post("/auth/change-email", { email });
+
+    return response.data;
+};
+
+
+// ==========================================
+// VERIFY EMAIL CHANGE (authenticated)
+// ==========================================
+export const verifyEmailChange = async (email, pin) => {
+    const response = await api.post("/auth/change-email/verify", { email, pin });
+
+    if (response.data.success && response.data.user) {
+        cacheUser(response.data.user);
+    }
+
+    return response.data;
+};
+
+
+// ==========================================
+// RESEND EMAIL CHANGE CODE (authenticated)
+// ==========================================
+export const resendEmailChange = async (email) => {
+    const response = await api.post("/auth/change-email/resend", { email });
+
+    return response.data;
+};
+
+
+// ==========================================
+// CANCEL EMAIL CHANGE (authenticated)
+// ==========================================
+export const cancelEmailChange = async () => {
+    const response = await api.post("/auth/change-email/cancel");
+
+    return response.data;
+};

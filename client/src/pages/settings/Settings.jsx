@@ -3,7 +3,11 @@ import { useAuth } from "../../context/AuthContext";
 import {
     changePassword,
     updateProfile,
-    updateTwoFactor
+    updateTwoFactor,
+    requestEmailChange,
+    verifyEmailChange,
+    resendEmailChange,
+    cancelEmailChange
 } from "../../services/authService";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
@@ -99,6 +103,12 @@ function Settings() {
     const [twoFactorMessage, setTwoFactorMessage] = useState("");
     const [twoFactorError, setTwoFactorError] = useState("");
     const [twoFactorLoading, setTwoFactorLoading] = useState(false);
+
+    const [emailForm, setEmailForm] = useState({ new_email: "", pin: "" });
+    const [emailStep, setEmailStep] = useState(user?.pending_email ? "verify" : "request");
+    const [emailMessage, setEmailMessage] = useState("");
+    const [emailError, setEmailError] = useState("");
+    const [emailLoading, setEmailLoading] = useState(false);
 
     const handleTwoFactorToggle = async () => {
         setTwoFactorMessage("");
@@ -223,6 +233,104 @@ function Settings() {
         }
     };
 
+    const handleEmailChange = (e) => {
+        setEmailForm({ ...emailForm, [e.target.name]: e.target.value });
+    };
+
+    const requestEmail = async (e) => {
+        e.preventDefault();
+        setEmailError("");
+        setEmailMessage("");
+        setEmailLoading(true);
+
+        try {
+            const data = await requestEmailChange(emailForm.new_email);
+            if (data.success) {
+                setEmailMessage(data.message);
+                setEmailStep("verify");
+                if (setUser && user) {
+                    setUser({ ...user, pending_email: data.pending_email });
+                }
+            } else {
+                setEmailError(data.message);
+            }
+        } catch (err) {
+            setEmailError(err.response?.data?.message || "Unable to request email change");
+        } finally {
+            setEmailLoading(false);
+        }
+    };
+
+    const verifyEmail = async (e) => {
+        e.preventDefault();
+        setEmailError("");
+        setEmailMessage("");
+        setEmailLoading(true);
+
+        try {
+            const data = await verifyEmailChange(
+                user?.pending_email || emailForm.new_email,
+                emailForm.pin
+            );
+            if (data.success) {
+                setEmailMessage(data.message);
+                setEmailStep("request");
+                setEmailForm({ new_email: "", pin: "" });
+                if (setUser && data.user) {
+                    setUser({ ...user, ...data.user });
+                }
+            } else {
+                setEmailError(data.message);
+            }
+        } catch (err) {
+            setEmailError(err.response?.data?.message || "Unable to verify email change");
+        } finally {
+            setEmailLoading(false);
+        }
+    };
+
+    const resendEmail = async () => {
+        setEmailError("");
+        setEmailMessage("");
+        setEmailLoading(true);
+
+        try {
+            const data = await resendEmailChange(user?.pending_email || emailForm.new_email);
+            if (data.success) {
+                setEmailMessage(data.message);
+            } else {
+                setEmailError(data.message);
+            }
+        } catch (err) {
+            setEmailError(err.response?.data?.message || "Unable to resend code");
+        } finally {
+            setEmailLoading(false);
+        }
+    };
+
+    const cancelEmail = async () => {
+        setEmailError("");
+        setEmailMessage("");
+        setEmailLoading(true);
+
+        try {
+            const data = await cancelEmailChange();
+            if (data.success) {
+                setEmailMessage(data.message);
+                setEmailStep("request");
+                if (setUser && user) {
+                    setUser({ ...user, pending_email: null });
+                }
+            } else {
+                setEmailError(data.message);
+            }
+        } catch (err) {
+            setEmailError(err.response?.data?.message || "Unable to cancel email change");
+        } finally {
+            setEmailLoading(false);
+        }
+    };
+
     return (
         <div>
             <div className="mb-6">
@@ -242,6 +350,12 @@ function Settings() {
                     <p className="mt-1 text-sm text-slate-500">
                         Signed in as {user?.email}.
                     </p>
+                    {user?.pending_email && (
+                        <div className="mt-3 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                            <div className="font-medium">Email change pending</div>
+                            <div className="mt-1">Waiting for confirmation at {user.pending_email}.</div>
+                        </div>
+                    )}
 
                     {profileMessage && (
                         <div role="status" className="mt-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
@@ -325,6 +439,71 @@ function Settings() {
                             Update profile
                         </Button>
                     </form>
+
+                    <div className="mt-8 border-t border-slate-100 pt-6">
+                        <h3 className="font-semibold text-slate-900">
+                            Change email
+                        </h3>
+                        <p className="mt-1 text-sm text-slate-500">
+                            Update your login email address.
+                        </p>
+
+                        {emailMessage && (
+                            <div role="status" className="mt-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
+                                {emailMessage}
+                            </div>
+                        )}
+
+                        {emailError && (
+                            <div role="alert" className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+                                {emailError}
+                            </div>
+                        )}
+
+                        {emailStep === "request" && !user?.pending_email ? (
+                            <form onSubmit={requestEmail} className="mt-5 space-y-4">
+                                <Input
+                                    label="New email"
+                                    id="new_email"
+                                    name="new_email"
+                                    type="email"
+                                    value={emailForm.new_email}
+                                    onChange={handleEmailChange}
+                                />
+                                <Button type="submit" loading={emailLoading}>
+                                    Send verification code
+                                </Button>
+                            </form>
+                        ) : (
+                            <form onSubmit={verifyEmail} className="mt-5 space-y-4">
+                                {user?.pending_email && (
+                                    <p className="text-sm text-slate-600">
+                                        Code sent to {user.pending_email}
+                                    </p>
+                                )}
+                                <Input
+                                    label="Verification code"
+                                    id="pin"
+                                    name="pin"
+                                    value={emailForm.pin}
+                                    onChange={handleEmailChange}
+                                    placeholder="6-digit code"
+                                    maxLength={6}
+                                />
+                                <div className="flex gap-2 flex-wrap">
+                                    <Button type="submit" loading={emailLoading}>
+                                        Verify and update
+                                    </Button>
+                                    <Button type="button" variant="outline" onClick={resendEmail} loading={emailLoading}>
+                                        Resend code
+                                    </Button>
+                                    <Button type="button" variant="outline" onClick={cancelEmail} loading={emailLoading}>
+                                        Cancel
+                                    </Button>
+                                </div>
+                            </form>
+                        )}
+                    </div>
                 </Card>
 
                 <Card className="p-6">

@@ -14,7 +14,11 @@ const {
     resendOtp,
     verifyEmail,
     resendVerification,
-    updateTwoFactor
+    updateTwoFactor,
+    requestEmailChange,
+    verifyEmailChange,
+    resendEmailChange,
+    cancelEmailChange
 } = require("../controllers/authController");
 
 const {
@@ -114,6 +118,33 @@ router.post(
     rateLimit({ max: 5 }),
     validate(auth.resetPassword),
     resetPassword
+);
+router.post(
+    "/change-email",
+    protect,
+    rateLimit({ max: 5 }),
+    validate(auth.requestEmailChange),
+    requestEmailChange
+);
+router.post(
+    "/change-email/verify",
+    protect,
+    rateLimit({ max: 10 }),
+    validate(auth.verifyEmailChange),
+    verifyEmailChange
+);
+router.post(
+    "/change-email/resend",
+    protect,
+    rateLimit({ max: 5 }),
+    validate(auth.resendEmailChange),
+    resendEmailChange
+);
+router.post(
+    "/change-email/cancel",
+    protect,
+    rateLimit({ max: 10 }),
+    cancelEmailChange
 );
 
 module.exports = router;

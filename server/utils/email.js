@@ -74,6 +74,19 @@ const sendEmailVerificationPin = async (to, firstName, code) => {
     });
 };
 
+// Email-address change PIN, sent to the proposed new address so its owner can
+// prove they control the inbox before the change is applied.
+const sendEmailChangePin = async (to, firstName, code) => {
+    logDev(`email change PIN for ${to} queued (dev: ${code})`);
+
+    return enqueueMail({
+        to,
+        toName: firstName,
+        template: "email_change",
+        payload: { firstName, code }
+    });
+};
+
 // Login two-factor authentication code.
 const sendLoginOtp = async (to, firstName, code) => {
     logDev(`login code for ${to} queued (dev: ${code})`);
@@ -108,6 +121,17 @@ const sendWelcome = async (to, firstName) =>
         payload: { firstName }
     });
 
+// Security notice about an account change (password changed/reset, two-factor
+// toggled). `when` is an optional human-readable timestamp supplied by the
+// caller, keeping this module free of the clock.
+const sendSecurityAlert = async (to, firstName, { action, when } = {}) =>
+    enqueueMail({
+        to,
+        toName: firstName,
+        template: "security_alert",
+        payload: { firstName, action, when }
+    });
+
 // Low-level escape hatch for internal/system mail with finished parts.
 const sendMail = async ({ to, subject, text, html }) =>
     enqueueMail({
@@ -122,7 +146,9 @@ module.exports = {
     EmailDeliveryError,
     sendMail,
     sendEmailVerificationPin,
+    sendEmailChangePin,
     sendLoginOtp,
     sendPasswordResetEmail,
-    sendWelcome
+    sendWelcome,
+    sendSecurityAlert
 };

@@ -219,6 +219,31 @@ const auth = {
             strongPassword("New password"),
             rules.maxLength(LIMITS.password, "New password")
         ]
+    },
+
+    requestEmailChange: {
+        email: [
+            rules.required("Email"),
+            rules.email(),
+            rules.maxLength(LIMITS.email, "Email")
+        ]
+    },
+
+    verifyEmailChange: {
+        email: [
+            rules.required("Email"),
+            rules.email(),
+            rules.maxLength(LIMITS.email, "Email")
+        ],
+        pin: [rules.required("Verification code"), rules.otp("Verification code")]
+    },
+
+    resendEmailChange: {
+        email: [
+            rules.required("Email"),
+            rules.email(),
+            rules.maxLength(LIMITS.email, "Email")
+        ]
     }
 };
 
