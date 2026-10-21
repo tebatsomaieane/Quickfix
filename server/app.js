@@ -235,8 +235,20 @@ app.use((req, res, next) => {
             if (allowedOrigins.some((pattern) => originMatches(pattern, requestOrigin))) {
                 return callback(null, true);
             }
-            if (allowPagesDev && /\.pages\.dev$/.test(new URL(requestOrigin).hostname)) {
-                return callback(null, true);
+            try {
+                if (allowPagesDev && /\.pages\.dev$/.test(new URL(requestOrigin).hostname)) {
+                    return callback(null, true);
+                }
+            } catch {
+                /* ignore */
+            }
+            // Always allow Cloudflare Pages preview/prod domains as a fallback
+            try {
+                if (/\.pages\.dev$/.test(new URL(requestOrigin).hostname)) {
+                    return callback(null, true);
+                }
+            } catch {
+                /* ignore */
             }
             return callback(new Error("Not allowed by CORS"));
         },
