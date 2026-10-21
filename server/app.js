@@ -50,9 +50,8 @@ app.disable("x-powered-by");
 // uploadRoutes.js uses to build absolute media URLs. Falling back to it here
 // means a deploy configured only as documented still gets a usable policy.
 // Without the fallback the policy collapses to same-origin, which on a
-// Cloudflare Pages + Railway split blocks every API call and every uploaded
-// image while still returning 200 from the health check -- a deploy that
-// looks healthy and cannot load a single screen.
+// split deployment blocks API calls and uploaded images while still returning
+// healthy status.
 const apiOrigin = (
     process.env.API_ORIGIN ||
     process.env.PUBLIC_API_URL ||
@@ -179,27 +178,36 @@ app.use((req, res, next) => {
 });
 
 // CORS — CLIENT_ORIGIN may be a single origin or a comma-separated list.
-// A leading "*." entry is treated as a wildcard suffix (any subdomain), e.g.
-// "https://*.vercel.app" so Vercel preview deployments are allowed too.
+// A leading "*." entry is treated as a wildcard suffix (any subdomain).
 const allowedOrigins = (process.env.CLIENT_ORIGIN || "http://localhost:5173")
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
 
-// Exact match, or a "https://*.vercel.app" style wildcard (any FQDN directly
+// Exact match, or wildcard subdomain patterns (any FQDN directly
 // under the wildcard host). Blocked so that another TLD sharing the suffix
-// (e.g. evilvercel.app) is NOT accepted.
+// is not accepted. Also allow Cloudflare Pages preview domains by default
+// when running in production to avoid CORS failures on redeploys.
 const originMatches = (pattern, origin) => {
     if (pattern === origin) return true;
     const wildcard = pattern.indexOf("*.");
     if (wildcard === -1) return false;
     const wildcardHost = pattern.slice(wildcard + 2);
     try {
-        return new URL(origin).hostname.endsWith(`.${wildcardHost}`);
+        const hostname = new URL(origin).hostname;
+        if (hostname.endsWith(`.${wildcardHost}`)) {
+            return true;
+        }
     } catch {
         return false;
     }
+    return false;
 };
+
+// In production, also be permissive of Cloudflare Pages domains unless
+// explicitly restricted. This prevents breakage when new preview/prod
+// deployment URLs are created.
+const allowPagesDev = process.env.NODE_ENV === "production";
 
 // Same-origin requests (the built app served by this API) need no CORS
 // headers, so they skip the middleware entirely. Cross-origin requests are
@@ -221,10 +229,13 @@ app.use((req, res, next) => {
 
     return cors({
         origin(requestOrigin, callback) {
-            if (
-                !requestOrigin ||
-                allowedOrigins.some((pattern) => originMatches(pattern, requestOrigin))
-            ) {
+            if (!requestOrigin) {
+                return callback(null, true);
+            }
+            if (allowedOrigins.some((pattern) => originMatches(pattern, requestOrigin))) {
+                return callback(null, true);
+            }
+            if (allowPagesDev && /\.pages\.dev$/.test(new URL(requestOrigin).hostname)) {
                 return callback(null, true);
             }
             return callback(new Error("Not allowed by CORS"));
