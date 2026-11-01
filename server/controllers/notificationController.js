@@ -5,7 +5,7 @@ const db = require("../config/db");
 const listMine = async (req, res) => {
     try {
         const [notifications] = await db.query(
-            `SELECT id, title, message, type, is_read, created_at
+            `SELECT id, title, message, type, link, is_read, created_at
              FROM notifications
              WHERE user_id = ?
              ORDER BY created_at DESC

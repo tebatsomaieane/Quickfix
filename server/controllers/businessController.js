@@ -878,7 +878,9 @@ const requestVerification = async (req, res) => {
                 admin.id,
                 "Business verification request",
                 "A business owner has submitted a verification request.",
-                "BUSINESS_VERIFICATION_SUBMITTED"
+                "BUSINESS_VERIFICATION_SUBMITTED",
+                null,
+                "/admin/verification"
             );
         }
 

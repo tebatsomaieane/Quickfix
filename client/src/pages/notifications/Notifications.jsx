@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
@@ -15,6 +15,7 @@ import EmptyState from "../../components/ui/EmptyState";
 import Icon from "../../components/ui/Icon";
 import { formatDateTime } from "../../lib/format";
 import { describeError } from "../../lib/errorMessages";
+import { onEvent } from "../../services/realtimeService";
 
 const ROLE_DASHBOARD = {
     CUSTOMER: "/customer/dashboard",
@@ -30,13 +31,29 @@ function Notifications() {
     const [marking, setMarking] = useState(false);
     const [error, setError] = useState("");
 
-    const load = () => {
-        setLoading(true);
-        setError("");
+    // `silent` refreshes keep the page usable while a background poll or a
+    // real-time hint lands; only a first load may replace the list with a
+    // spinner. A failed background refresh keeps the notifications already on
+    // screen rather than blanking them.
+    const load = useCallback(({ silent = false } = {}) => {
+        if (!silent) {
+            setLoading(true);
+            setError("");
+        }
 
-        fetchMyNotifications()
-            .then((data) => setNotifications(data?.data?.notifications || []))
+        return fetchMyNotifications()
+            .then((data) => {
+                setNotifications(data?.data?.notifications || []);
+
+                if (silent) {
+                    setError("");
+                }
+            })
             .catch((err) => {
+                if (silent) {
+                    return;
+                }
+
                 // Otherwise a failed load is indistinguishable from an empty
                 // inbox, and the user is told "no notifications" when the
                 // request never succeeded.
@@ -47,19 +64,61 @@ function Notifications() {
                 setError(detail ? `${title}. ${detail}` : title);
                 setNotifications([]);
             })
-            .finally(() => setLoading(false));
-    };
+            .finally(() => {
+                if (!silent) {
+                    setLoading(false);
+                }
+            });
+    }, []);
 
     useEffect(() => {
         load();
-    }, []);
+
+        let stopped = false;
+        let debounce = null;
+
+        const refresh = () => {
+            if (!document.hidden) {
+                load({ silent: true });
+            }
+        };
+
+        const timer = setInterval(refresh, 30000);
+
+        // New notifications arrive as a lightweight hint, so the open page
+        // updates without a reload. Debounced so a burst produces one fetch.
+        const unsubscribe = onEvent("notification", () => {
+            clearTimeout(debounce);
+            debounce = setTimeout(() => {
+                if (!stopped) {
+                    refresh();
+                }
+            }, 500);
+        });
+
+        const onVisible = () => {
+            if (!document.hidden) {
+                load({ silent: true });
+            }
+        };
+
+        document.addEventListener("visibilitychange", onVisible);
+
+        return () => {
+            stopped = true;
+            clearTimeout(debounce);
+            clearInterval(timer);
+            unsubscribe();
+            document.removeEventListener("visibilitychange", onVisible);
+        };
+    }, [load]);
 
     const handleMarkAll = async () => {
         setMarking(true);
 
         try {
             await markAllNotificationsRead();
-            load();
+            load({ silent: true });
         } catch {
             // ignore - notifications still load
         } finally {
@@ -96,6 +155,22 @@ function Notifications() {
     const unread = notifications.filter(
         (notification) => !notification.is_read
     ).length;
+
+    // Only a site-relative path is followed, so a bad value in the database
+    // cannot turn a notification into an open redirect.
+    const linkFor = (notification) =>
+        typeof notification.link === "string" &&
+        notification.link.startsWith("/")
+            ? notification.link
+            : null;
+
+    // Following the notification counts as reading it, so the badge clears
+    // without a second tap.
+    const markReadOnOpen = (notification) => {
+        if (!notification.is_read) {
+            handleMarkOne(notification.id);
+        }
+    };
 
     return (
         <div>
@@ -146,7 +221,10 @@ function Notifications() {
                 />
             ) : (
                 <div className="space-y-3">
-                    {notifications.map((notification) => (
+                    {notifications.map((notification) => {
+                        const link = linkFor(notification);
+
+                        return (
                         <Card
                             key={notification.id}
                             className={`flex items-start gap-4 p-4 ${
@@ -159,9 +237,21 @@ function Notifications() {
 
                             <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-2">
-                                    <h3 className="font-semibold text-slate-900">
-                                        {notification.title}
-                                    </h3>
+                                    {link ? (
+                                        <Link
+                                            to={link}
+                                            onClick={() =>
+                                                markReadOnOpen(notification)
+                                            }
+                                            className="font-semibold text-slate-900 hover:text-indigo-700 hover:underline"
+                                        >
+                                            {notification.title}
+                                        </Link>
+                                    ) : (
+                                        <h3 className="font-semibold text-slate-900">
+                                            {notification.title}
+                                        </h3>
+                                    )}
                                     {!notification.is_read && (
                                         <Badge color="blue">New</Badge>
                                     )}
@@ -175,6 +265,22 @@ function Notifications() {
                             </div>
 
                             <div className="flex shrink-0 items-center gap-1.5">
+                                {link && (
+                                    <Link
+                                        to={link}
+                                        onClick={() =>
+                                            markReadOnOpen(notification)
+                                        }
+                                        title="Open"
+                                        aria-label={`Open: ${notification.title}`}
+                                        className="rounded-lg p-2.5 text-slate-400 transition hover:bg-indigo-50 hover:text-indigo-600"
+                                    >
+                                        <Icon
+                                            name="chevronRight"
+                                            className="h-5 w-5"
+                                        />
+                                    </Link>
+                                )}
                                 {!notification.is_read && (
                                     <button
                                         type="button"
@@ -204,7 +310,8 @@ function Notifications() {
                                 </button>
                             </div>
                         </Card>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
 

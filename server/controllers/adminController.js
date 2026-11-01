@@ -293,7 +293,9 @@ const reviewVerification = async (req, res) => {
                 message,
                 nextStatus === "APPROVED"
                     ? "VERIFICATION_APPROVED"
-                    : "VERIFICATION_REJECTED"
+                    : "VERIFICATION_REJECTED",
+                null,
+                "/provider/verification"
             );
         }
 
@@ -409,7 +411,9 @@ const reviewBusinessVerification = async (req, res) => {
                 message,
                 nextStatus === "APPROVED"
                     ? "BUSINESS_VERIFICATION_APPROVED"
-                    : "BUSINESS_VERIFICATION_REJECTED"
+                    : "BUSINESS_VERIFICATION_REJECTED",
+                null,
+                "/business/profile"
             );
         }
 

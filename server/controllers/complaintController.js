@@ -67,7 +67,9 @@ const create = async (req, res) => {
                 admin.id,
                 "New complaint",
                 "A complaint has been submitted and needs review.",
-                "COMPLAINT_RECEIVED"
+                "COMPLAINT_RECEIVED",
+                null,
+                "/admin/complaints"
             );
         }
 

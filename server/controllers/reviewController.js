@@ -88,7 +88,9 @@ const create = async (req, res) => {
                 providerUser[0].user_id,
                 "New review received",
                 `A customer rated your work ${ratingNum}/5.`,
-                "REVIEW_RECEIVED"
+                "REVIEW_RECEIVED",
+                null,
+                "/provider/dashboard"
             );
         }
 

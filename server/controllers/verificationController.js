@@ -82,7 +82,9 @@ const request = async (req, res) => {
                 admin.id,
                 "New verification request",
                 "A provider has submitted a verification request.",
-                "VERIFICATION_SUBMITTED"
+                "VERIFICATION_SUBMITTED",
+                null,
+                "/admin/verification"
             );
         }
 

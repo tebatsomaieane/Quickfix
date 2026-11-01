@@ -239,7 +239,8 @@ const start = async (req, res) => {
                     "Job started",
                     "Your provider has started the job.",
                     "JOB_STARTED",
-                    connection
+                    connection,
+                    `/customer/jobs/${id}`
                 );
             }
 
@@ -359,7 +360,8 @@ const complete = async (req, res) => {
                     "Job completed",
                     "Your provider has completed the job. Please leave a review.",
                     "JOB_COMPLETED",
-                    connection
+                    connection,
+                    `/customer/jobs/${id}`
                 );
             }
 

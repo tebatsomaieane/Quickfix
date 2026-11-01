@@ -545,7 +545,8 @@ const accept = async (req, res) => {
                 "Offer accepted",
                 "A customer accepted your offer. A job has been created.",
                 "OFFER_ACCEPTED",
-                connection
+                connection,
+                `/provider/jobs/${jobResult.insertId}`
             );
         }
 
