@@ -25,7 +25,7 @@
     "deploy:cloudflare:preview": "npm run build && npm run verify:pages && wrangler pages deploy dist --project-name quickfix --branch preview --commit-dirty=true"
   },
   "dependencies": {
-    "axios": "^1.20.0",
+    "axios": "^1.21.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-router-dom": "^7.18.4"
