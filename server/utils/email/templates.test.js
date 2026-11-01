@@ -30,6 +30,31 @@ test("verify_email uses its own subject and copy", () => {
     assert.match(rendered.html, /Verify your email address/);
 });
 
+test("email_change confirms the new address with its own copy", () => {
+    const rendered = renderTemplate("email_change", {
+        firstName: "Ada",
+        code: "222333"
+    });
+
+    assert.equal(rendered.subject, "Confirm your new QuickFix email");
+    assert.match(rendered.text, /222333/);
+    assert.match(rendered.html, /Confirm your new email address/);
+});
+
+test("security_alert names the action and warns the owner", () => {
+    const rendered = renderTemplate("security_alert", {
+        firstName: "Ada",
+        action: "Your password was changed",
+        when: "1 Nov 2026, 09:30"
+    });
+
+    assert.match(rendered.subject, /Your password was changed/);
+    assert.match(rendered.text, /Ada/);
+    assert.match(rendered.text, /1 Nov 2026, 09:30/);
+    assert.match(rendered.html, /Security notice/);
+    assert.match(rendered.html, /If you did not do this/);
+});
+
 test("password_reset embeds the reset url in both parts", () => {
     const url = "https://app.quickfix.test/reset-password?token=abc123";
     const rendered = renderTemplate("password_reset", { resetUrl: url });
@@ -94,6 +119,14 @@ test("escapeHtml covers the five dangerous characters", () => {
 test("the template catalogue is stable", () => {
     assert.deepEqual(
         [...TEMPLATE_NAMES].sort(),
-        ["login_otp", "password_reset", "raw", "verify_email", "welcome"]
+        [
+            "email_change",
+            "login_otp",
+            "password_reset",
+            "raw",
+            "security_alert",
+            "verify_email",
+            "welcome"
+        ]
     );
 });

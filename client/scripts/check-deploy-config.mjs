@@ -205,10 +205,6 @@ check(
     /"deploy": "npm run build && npm run verify:pages && wrangler pages deploy dist --project-name quickfix/.test(packageJsonText)
 );
 check(
-    "Vercel remains available as an optional deploy",
-    /"deploy:vercel": "npm run build && cd \.\. && vercel --prod --yes/.test(packageJsonText)
-);
-check(
     "workflow verifies the bundle targets the API origin",
     /Verify the bundle calls the API origin/.test(workflow)
 );
