@@ -92,7 +92,11 @@ function JobDetail() {
                 ? "/provider/messages"
                 : "/customer/messages";
 
-            const conversationId = data?.data?.conversation?.id;
+            // The API returns the conversation row directly (the same shape
+            // the list and detail endpoints use); older clients looked for a
+            // nested `conversation` key and never found the id.
+            const conversationId =
+                data?.data?.id ?? data?.data?.conversation?.id;
 
             if (!conversationId) {
                 throw new Error("The conversation could not be opened.");

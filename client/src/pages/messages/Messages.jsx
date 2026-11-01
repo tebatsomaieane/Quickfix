@@ -37,11 +37,41 @@ function Messages() {
     const isProvider = user?.role === "PROVIDER";
     const basePath = isProvider ? "/provider/messages" : "/customer/messages";
 
-    const loadList = () => {
+    const loadList = useCallback(({ silent = false } = {}) => {
         fetchMyConversations()
             .then((data) => setConversations(data?.data?.conversations || []))
-            .catch(() => setError("Unable to load conversations."));
-    };
+            .catch(() => {
+                // A background refresh must not replace a working thread with
+                // an error banner; the next tick retries.
+                if (!silent) {
+                    setError("Unable to load conversations.");
+                }
+            });
+    }, []);
+
+    // Marking read clears the nav badge, so it may only happen while the user
+    // can actually see the thread. A hidden tab polling an open conversation
+    // used to consume new messages the user had never looked at.
+    const markReadIfVisible = useCallback(
+        async (conversation) => {
+            if (
+                !conversation ||
+                !(conversation.unread_count > 0) ||
+                (typeof document !== "undefined" &&
+                    document.visibilityState !== "visible")
+            ) {
+                return;
+            }
+
+            try {
+                await markConversationRead(conversation.id);
+                loadList({ silent: true });
+            } catch {
+                // the next refresh retries
+            }
+        },
+        [loadList]
+    );
 
     // Keeps a just-typed message on screen while a background refresh (poll or
     // real-time hint) lands, so the thread never blinks back a beat mid-chat.
@@ -107,11 +137,7 @@ function Messages() {
                 const conversation = data?.data ?? null;
 
                 setActive(conversation);
-
-                if (conversation?.unread_count > 0) {
-                    await markConversationRead(conversationId);
-                    loadList();
-                }
+                await markReadIfVisible(conversation);
             })
             .catch(() => {
                 if (!cancelled) {
@@ -127,17 +153,26 @@ function Messages() {
         return () => {
             cancelled = true;
         };
-    }, [conversationId]);
+    }, [conversationId, markReadIfVisible]);
 
-    // Refresh the open thread so new messages appear without a manual reload
+    // Refresh the open thread - or the inbox when no thread is open - so new
+    // messages appear without a manual reload. The inbox needs its own timer:
+    // without it a dropped real-time stream leaves the list frozen until the
+    // page is reloaded. Ticks are skipped while the tab is hidden.
     useEffect(() => {
-        if (!conversationId) {
-            return undefined;
-        }
-
         let stopped = false;
 
-        const timer = setInterval(async () => {
+        const tick = async () => {
+            if (stopped || document.hidden) {
+                return;
+            }
+
+            if (!conversationId) {
+                loadList({ silent: true });
+
+                return;
+            }
+
             try {
                 const data = await fetchConversation(conversationId);
 
@@ -146,29 +181,40 @@ function Messages() {
                 const conversation = data?.data ?? null;
 
                 mergePending(conversation);
-
-                if (conversation?.unread_count > 0) {
-                    await markConversationRead(conversationId);
-                }
-
-                loadList();
+                await markReadIfVisible(conversation);
+                loadList({ silent: true });
             } catch {
                 // ignore transient network failures
             }
-        }, 15000);
+        };
+
+        const timer = setInterval(tick, conversationId ? 15000 : 20000);
+
+        // Coming back to the tab should show the latest immediately rather
+        // than waiting out the rest of the interval.
+        const onVisible = () => {
+            if (!document.hidden) {
+                tick();
+            }
+        };
+
+        document.addEventListener("visibilitychange", onVisible);
+        window.addEventListener("focus", onVisible);
 
         return () => {
             stopped = true;
             clearInterval(timer);
+            document.removeEventListener("visibilitychange", onVisible);
+            window.removeEventListener("focus", onVisible);
         };
-    }, [conversationId, mergePending]);
+    }, [conversationId, mergePending, markReadIfVisible, loadList]);
 
     // Near-instant updates via the real-time stream; the interval poll above
     // stays as a safety net when the stream is unavailable.
     useEffect(() => {
         const refreshThread = async () => {
             if (!conversationId) {
-                loadList();
+                loadList({ silent: true });
 
                 return;
             }
@@ -179,11 +225,7 @@ function Messages() {
                 const conversation = data?.data ?? null;
 
                 mergePending(conversation);
-
-                if (conversation?.unread_count > 0) {
-                    await markConversationRead(conversationId);
-                    loadList();
-                }
+                await markReadIfVisible(conversation);
             } catch {
                 // ignore - the poll will retry
             }
@@ -194,9 +236,14 @@ function Messages() {
         });
 
         return unsubscribe;
-    }, [conversationId, mergePending]);
+    }, [conversationId, mergePending, markReadIfVisible, loadList]);
 
     const threadRef = useRef(null);
+
+    // While the user is reading back through history, a new message must not
+    // yank them to the bottom. Only follow the conversation when they were
+    // already at (or near) the end.
+    const stickToBottomRef = useRef(true);
 
     // Scrolls the thread itself, not the document — `scrollIntoView` on the
     // page would yank the whole screen down on a phone every time a message
@@ -213,8 +260,28 @@ function Messages() {
         });
     }, []);
 
+    const handleThreadScroll = () => {
+        const el = threadRef.current;
+
+        if (!el) {
+            return;
+        }
+
+        stickToBottomRef.current =
+            el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    };
+
+    // Opening a thread (or switching to another) always starts at the newest
+    // message, even if the previous thread was scrolled up.
     useEffect(() => {
+        stickToBottomRef.current = true;
         scrollToBottom();
+    }, [conversationId, scrollToBottom]);
+
+    useEffect(() => {
+        if (stickToBottomRef.current) {
+            scrollToBottom();
+        }
     }, [active?.messages?.length, scrollToBottom]);
 
     const selectConversation = (id) => {
@@ -232,6 +299,10 @@ function Messages() {
         if (!text || !active) {
             return;
         }
+
+        // Sending is a deliberate action, so always reveal the new bubble even
+        // if the user had scrolled up to read history.
+        stickToBottomRef.current = true;
 
         // Paint the bubble instantly. Waiting on the round trip made a normal
         // send feel laggy on a phone, so the message shows as pending and is
@@ -454,6 +525,7 @@ function Messages() {
                             {/* Messages */}
                             <div
                                 ref={threadRef}
+                                onScroll={handleThreadScroll}
                                 className="qf-scroll-x min-h-0 flex-1 space-y-2.5 overflow-y-auto overscroll-contain bg-slate-50 p-3 sm:p-4"
                             >
                                 {active.messages.length === 0 ? (
