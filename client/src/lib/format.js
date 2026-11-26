@@ -78,6 +78,81 @@ export const formatDateTime = (dateString) => {
     });
 };
 
+const startOfLocalDay = (date) =>
+    new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// A compact timestamp for inbox rows: "now", "5m", "3h", "Yesterday",
+// "27 Sep", "27 Sep 2025". Falls back to an empty string rather than
+// rendering "Invalid Date" beside a conversation.
+export const formatRelativeTime = (dateString, now = new Date()) => {
+    if (!dateString) {
+        return "";
+    }
+
+    const date = toLocalDate(dateString);
+
+    if (Number.isNaN(date.getTime())) {
+        return "";
+    }
+
+    const diff = now.getTime() - date.getTime();
+
+    if (diff < 60 * 1000) {
+        return "now";
+    }
+
+    if (diff < 60 * 60 * 1000) {
+        return `${Math.floor(diff / (60 * 1000))}m`;
+    }
+
+    const today = startOfLocalDay(now);
+    const day = startOfLocalDay(date);
+
+    if (day === today) {
+        return `${Math.floor(diff / (60 * 60 * 1000))}h`;
+    }
+
+    if (today - day === DAY_MS) {
+        return "Yesterday";
+    }
+
+    const sameYear = date.getFullYear() === now.getFullYear();
+
+    return date.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        ...(sameYear ? {} : { year: "numeric" })
+    });
+};
+
+// The label above a group of messages from the same calendar day.
+export const formatMessageDay = (dateString, now = new Date()) => {
+    if (!dateString) {
+        return "";
+    }
+
+    const date = toLocalDate(dateString);
+
+    if (Number.isNaN(date.getTime())) {
+        return "";
+    }
+
+    const today = startOfLocalDay(now);
+    const day = startOfLocalDay(date);
+
+    if (day === today) {
+        return "Today";
+    }
+
+    if (today - day === DAY_MS) {
+        return "Yesterday";
+    }
+
+    return formatDate(dateString);
+};
+
 // Map a database status to a Tailwind badge color
 export const statusColor = (status) => {
     const map = {

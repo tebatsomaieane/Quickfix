@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 
 const {
     processOutbox,
+    sendNow,
     backoffSeconds,
     createMemoryStore,
     BACKOFF_SECONDS
@@ -172,4 +173,50 @@ test("the recipient and rendered subject reach the transport", async () => {
     assert.equal(transport.calls.length, 1);
     assert.equal(transport.calls[0].to, "ada@example.com");
     assert.equal(transport.calls[0].subject, "Verify your QuickFix account");
+});
+
+test("sendNow delivers immediately and leaves nothing for the worker", async () => {
+    const store = createMemoryStore();
+    const transport = okTransport(false);
+
+    await sendNow(
+        {
+            to: "ada@example.com",
+            toName: "Ada",
+            template: "verify_email",
+            payload: { firstName: "Ada", code: "654321" }
+        },
+        { store, transport }
+    );
+
+    const row = store.rows.get(1);
+
+    assert.equal(transport.calls.length, 1);
+    assert.equal(row.status, "SENT");
+    assert.equal(row.payload, null);
+    assert.equal(row.body_text, null);
+    assert.equal((await store.claimDue()).length, 0);
+});
+
+test("sendNow marks the row FAILED and rethrows delivery errors", async () => {
+    const store = createMemoryStore();
+    const transport = failTransport("SMTP authentication failed");
+
+    await assert.rejects(
+        sendNow(
+            {
+                to: "ada@example.com",
+                template: "verify_email",
+                payload: { firstName: "Ada", code: "654321" }
+            },
+            { store, transport }
+        ),
+        /SMTP authentication failed/
+    );
+
+    const row = store.rows.get(1);
+
+    assert.equal(row.status, "FAILED");
+    assert.equal(row.payload, null);
+    assert.match(row.last_error, /SMTP authentication failed/);
 });

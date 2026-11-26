@@ -1,16 +1,16 @@
 // Public email API.
 //
-// Callers keep the same three functions they always used, but a send is now a
-// durable enqueue rather than an inline SMTP call. `isEmailConfigured()` now
-// means "a transport can actually deliver" (SMTP credentials, or the
-// development capture transport), so the 2FA/reset controllers keep making the
-// same decision.
+// Callers keep the same public functions, but a send is now a durable enqueue
+// unless the caller explicitly asks for immediate delivery. `isEmailConfigured()`
+// means "a transport can actually deliver" (Apps Script, SMTP credentials, or
+// the development capture transport), so controllers keep making the same
+// decision.
 //
 // Secrets in the payload (the OTP, the reset link) are cleared from the outbox
 // row once the message reaches a terminal state -- see outbox.js.
 
 const { canDeliver, resolveMode } = require("./email/transport");
-const { enqueue } = require("./email/outbox");
+const { enqueue, sendNow } = require("./email/outbox");
 
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
@@ -31,8 +31,8 @@ class EmailDeliveryError extends Error {
     }
 }
 
-// "Can an email actually get out right now?" -- true with SMTP credentials, or
-// with the capture transport outside production.
+// "Can an email actually get out right now?" -- true with Apps Script or SMTP
+// credentials, or with the capture transport outside production.
 const isEmailConfigured = () => canDeliver();
 
 const assertDeliverable = () => {
@@ -60,6 +60,23 @@ const enqueueMail = async ({ to, toName, template, payload }) => {
     assertDeliverable();
 
     return enqueue({ to, toName, template, payload });
+};
+
+const deliverMailNow = async ({ to, toName, template, payload }) => {
+    assertDeliverable();
+
+    return sendNow({ to, toName, template, payload });
+};
+
+const sendEmailVerificationPinNow = async (to, firstName, code) => {
+    logDev(`verification PIN for ${to} delivered (dev: ${code})`);
+
+    return deliverMailNow({
+        to,
+        toName: firstName,
+        template: "verify_email",
+        payload: { firstName, code }
+    });
 };
 
 // Registration email verification PIN.
@@ -145,7 +162,9 @@ module.exports = {
     canDeliver,
     EmailDeliveryError,
     sendMail,
+    deliverMailNow,
     sendEmailVerificationPin,
+    sendEmailVerificationPinNow,
     sendEmailChangePin,
     sendLoginOtp,
     sendPasswordResetEmail,

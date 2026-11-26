@@ -93,6 +93,32 @@ async function ensureSchema() {
             }
         }
 
+        if (!(await tableExists(connection, "registration_verifications"))) {
+            await connection.query(
+                `CREATE TABLE registration_verifications (
+                    email VARCHAR(255) NOT NULL PRIMARY KEY,
+                    first_name VARCHAR(100) NOT NULL,
+                    last_name VARCHAR(100) NOT NULL,
+                    phone VARCHAR(30) NOT NULL,
+                    password_hash VARCHAR(255) NOT NULL,
+                    role ENUM('CUSTOMER', 'PROVIDER', 'BUSINESS_OWNER') NOT NULL,
+                    otp_hash VARCHAR(64) NOT NULL,
+                    otp_expires DATETIME NOT NULL,
+                    otp_attempts INT NOT NULL DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        ON UPDATE CURRENT_TIMESTAMP
+                )`
+            );
+        }
+
+        if (!(await indexExists(connection, "registration_verifications", "idx_registration_otp_expires"))) {
+            await connection.query(
+                `CREATE INDEX idx_registration_otp_expires
+                 ON registration_verifications (otp_expires)`
+            );
+        }
+
         if (!(await columnExists(connection, "service_requests", "preferred_provider_id"))) {
             await connection.query(
                 `ALTER TABLE service_requests

@@ -34,10 +34,9 @@ CREATE TABLE users (
         'ADMIN'
     ) NOT NULL DEFAULT 'CUSTOMER',
 
-    -- Registration creates accounts as FALSE and emails a PIN to prove
-    -- ownership; the account becomes usable once verified. When email
-    -- delivery is unavailable the account is created TRUE, so a mail outage
-    -- cannot block sign-up (see authController.register).
+    -- Accounts are inserted only after a registration PIN is verified, so
+    -- user rows are usable from the start. The column remains for seeded
+    -- accounts and email-change flows.
     email_verified BOOLEAN NOT NULL DEFAULT TRUE,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
 
@@ -64,6 +63,22 @@ CREATE TABLE users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE registration_verifications (
+    email VARCHAR(255) NOT NULL PRIMARY KEY,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
+    phone VARCHAR(30) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    role ENUM('CUSTOMER', 'PROVIDER', 'BUSINESS_OWNER') NOT NULL,
+    otp_hash VARCHAR(64) NOT NULL,
+    otp_expires DATETIME NOT NULL,
+    otp_attempts INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_registration_otp_expires (otp_expires)
 );
 
 

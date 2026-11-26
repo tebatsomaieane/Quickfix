@@ -29,12 +29,6 @@ const HIGHLIGHTS = [
 
 const PIN_PATTERN = /^\d{6}$/;
 
-/**
- * Finishes sign-up: the account was created by /register but left unverified,
- * and a 6-digit code was emailed to the address that was typed. Confirming the
- * code proves the address belongs to the person registering, and the API
- * issues the session cookie on success, so the user lands signed in.
- */
 function VerifyEmail() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -42,16 +36,15 @@ function VerifyEmail() {
     const { user, loading, setUser } = useAuth();
 
     const seededEmail =
-        location.state?.email ||
         searchParams.get("email") ||
+        location.state?.email ||
         "";
 
-    const [email, setEmail] = useState(seededEmail);
     const [pin, setPin] = useState("");
     const [error, setError] = useState("");
     const [pinError, setPinError] = useState("");
-    const [emailError, setEmailError] = useState("");
     const [status, setStatus] = useState("");
+    const [restart, setRestart] = useState(false);
     const [verifying, setVerifying] = useState(false);
     const [resending, setResending] = useState(false);
 
@@ -67,12 +60,11 @@ function VerifyEmail() {
         setError("");
         setStatus("");
         setPinError("");
-        setEmailError("");
+        setRestart(false);
 
-        const trimmedEmail = email.trim();
-
-        if (!trimmedEmail) {
-            setEmailError("Enter the email address you signed up with.");
+        if (!seededEmail) {
+            setError("Your verification email is missing. Please start registration again.");
+            setRestart(true);
 
             return;
         }
@@ -86,20 +78,31 @@ function VerifyEmail() {
         setVerifying(true);
 
         try {
-            const data = await verifyEmail(trimmedEmail, pin);
+            const data = await verifyEmail(seededEmail, pin);
 
             if (data.success) {
                 setUser(data.user);
                 navigate(ROLE_PATHS[data.user.role] || "/");
-            } else {
-                setError(data.message || "That code could not be verified.");
+
+                return;
             }
+
+            setError(data.message || "That code could not be verified.");
         } catch (requestError) {
             const serverError = requestError.response?.data;
+            const code = serverError?.code;
+
+            if (
+                code === "REGISTRATION_EXPIRED" ||
+                code === "REGISTRATION_NOT_FOUND" ||
+                code === "REGISTRATION_REJECTED"
+            ) {
+                setRestart(true);
+            }
 
             setError(
                 serverError?.message ||
-                "That code could not be verified. Try again."
+                    "That code could not be verified. Try again."
             );
         } finally {
             setVerifying(false);
@@ -109,11 +112,11 @@ function VerifyEmail() {
     const handleResend = async () => {
         setError("");
         setStatus("");
+        setRestart(false);
 
-        const trimmedEmail = email.trim();
-
-        if (!trimmedEmail) {
-            setEmailError("Enter the email address you signed up with.");
+        if (!seededEmail) {
+            setError("Your verification email is missing. Please start registration again.");
+            setRestart(true);
 
             return;
         }
@@ -121,7 +124,7 @@ function VerifyEmail() {
         setResending(true);
 
         try {
-            const data = await resendVerification(trimmedEmail);
+            const data = await resendVerification(seededEmail);
 
             setStatus(
                 data?.success
@@ -129,9 +132,28 @@ function VerifyEmail() {
                     : data?.message || "Could not resend the code. Try again later."
             );
         } catch (requestError) {
+            const serverError = requestError.response?.data;
+            const code = serverError?.code;
+
+            if (code === "REGISTRATION_NOT_FOUND") {
+                setRestart(true);
+            }
+
+            if (
+                code === "EMAIL_DELIVERY_FAILED" ||
+                code === "EMAIL_DELIVERY_UNAVAILABLE"
+            ) {
+                setError(
+                    serverError?.message ||
+                        "Could not deliver a new code. Try again later."
+                );
+
+                return;
+            }
+
             setStatus(
-                requestError.response?.data?.message ||
-                "Could not resend the code. Try again later."
+                serverError?.message ||
+                    "Could not resend the code. Try again later."
             );
         } finally {
             setResending(false);
@@ -152,9 +174,7 @@ function VerifyEmail() {
                     Verify your email
                 </h1>
                 <p className="mt-2 text-sm text-slate-600">
-                    {seededEmail
-                        ? `We emailed a 6-digit code to ${seededEmail}. Enter it below to finish setting up your account.`
-                        : "Enter your email address and the 6-digit code we sent you to finish setting up your account."}
+                    Enter the single 6-digit code we emailed you to finish creating your account.
                 </p>
 
                 <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
@@ -163,29 +183,36 @@ function VerifyEmail() {
                             role="alert"
                             className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700"
                         >
-                            {error}
+                            <p>{error}</p>
+                            {restart && (
+                                <Link
+                                    to="/register"
+                                    className="mt-1 inline-block font-semibold underline"
+                                >
+                                    Start registration again
+                                </Link>
+                            )}
+                        </div>
+                    )}
+
+                    {seededEmail && (
+                        <div className="mb-4 rounded-lg bg-slate-50 px-4 py-3">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Verification code sent to
+                            </p>
+                            <p className="mt-1 break-all text-sm font-medium text-slate-800">
+                                {seededEmail}
+                            </p>
+                            <Link
+                                to="/register"
+                                className="mt-1 inline-block text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                            >
+                                Use a different email
+                            </Link>
                         </div>
                     )}
 
                     <form onSubmit={handleSubmit} noValidate className="space-y-4">
-                        <Input
-                            label="Email address"
-                            id="email"
-                            type="email"
-                            name="email"
-                            placeholder="example@email.com"
-                            value={email}
-                            onChange={(e) => {
-                                setEmail(e.target.value);
-                                setEmailError("");
-                            }}
-                            autoComplete="email"
-                            autoCapitalize="none"
-                            spellCheck="false"
-                            error={emailError}
-                            required
-                        />
-
                         <Input
                             label="6-digit verification code"
                             id="pin"
@@ -227,7 +254,7 @@ function VerifyEmail() {
                             variant="ghost"
                             className="mt-2"
                             onClick={handleResend}
-                            disabled={resending || verifying}
+                            disabled={resending || verifying || !seededEmail}
                         >
                             {resending ? "Sending…" : "Resend code"}
                         </Button>

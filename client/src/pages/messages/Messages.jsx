@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
@@ -14,6 +14,7 @@ import Spinner from "../../components/ui/Spinner";
 import Icon from "../../components/ui/Icon";
 import { onEvent } from "../../services/realtimeService";
 import useActionFeedback from "../../hooks/useActionFeedback";
+import { formatMessageDay, formatRelativeTime } from "../../lib/format";
 
 function Messages() {
     const { user } = useAuth();
@@ -25,6 +26,7 @@ function Messages() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [draft, setDraft] = useState("");
+    const [query, setQuery] = useState("");
 
     // Sending goes through the shared feedback path so a dropped connection
     // offers a "Try again" that re-sends the same text, instead of a banner
@@ -36,6 +38,40 @@ function Messages() {
 
     const isProvider = user?.role === "PROVIDER";
     const basePath = isProvider ? "/provider/messages" : "/customer/messages";
+
+    const nameFor = useCallback(
+        (conversation) =>
+            isProvider
+                ? `${conversation.customer_first_name || ""} ${conversation.customer_last_name || ""}`.trim()
+                : `${conversation.provider_first_name || ""} ${conversation.provider_last_name || ""}`.trim(),
+        [isProvider]
+    );
+
+    const totalUnread = useMemo(
+        () =>
+            conversations.reduce(
+                (sum, conversation) =>
+                    sum + (Number(conversation.unread_count) || 0),
+                0
+            ),
+        [conversations]
+    );
+
+    // Filtering happens on the already-loaded inbox, so typing in the search
+    // box stays instant and never fires a request per keystroke.
+    const visibleConversations = useMemo(() => {
+        const term = query.trim().toLowerCase();
+
+        if (!term) {
+            return conversations;
+        }
+
+        return conversations.filter((conversation) =>
+            [nameFor(conversation), conversation.request_title]
+                .filter(Boolean)
+                .some((value) => value.toLowerCase().includes(term))
+        );
+    }, [conversations, nameFor, query]);
 
     const loadList = useCallback(({ silent = false } = {}) => {
         fetchMyConversations()
@@ -399,17 +435,48 @@ function Messages() {
                         conversationId ? "hidden lg:flex" : ""
                     }`}
                 >
-                    <div className="shrink-0 border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-500">
-                        Conversations
+                    <div className="shrink-0 border-b border-slate-100 px-4 py-3">
+                        <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-semibold text-slate-500">
+                                Conversations
+                            </span>
+                            {totalUnread > 0 && (
+                                <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700">
+                                    {totalUnread} unread
+                                </span>
+                            )}
+                        </div>
+
+                        <div className="relative mt-2">
+                            <Icon
+                                name="search"
+                                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                            />
+                            <input
+                                type="search"
+                                value={query}
+                                onChange={(event) =>
+                                    setQuery(event.target.value)
+                                }
+                                placeholder="Search conversations"
+                                aria-label="Search conversations"
+                                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                            />
+                        </div>
                     </div>
 
                     <div className="qf-scroll-x min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto overscroll-contain">
-                        {conversations.map((conversation) => (
+                        {visibleConversations.map((conversation) => (
                             <button
                                 key={conversation.id}
                                 type="button"
                                 onClick={() =>
                                     selectConversation(conversation.id)
+                                }
+                                aria-current={
+                                    Number(conversationId) === conversation.id
+                                        ? "true"
+                                        : undefined
                                 }
                                 className={[
                                     "qf-press-dim flex w-full items-start gap-3 px-4 py-3 text-left transition-colors",
@@ -419,38 +486,61 @@ function Messages() {
                                 ].join(" ")}
                             >
                                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
-                                    {isProvider
-                                        ? (conversation.customer_first_name || "?")[0]
-                                        : (conversation.provider_first_name || "?")[0]}
+                                    {(nameFor(conversation) || "?")[0]}
                                 </span>
 
                                 <div className="min-w-0 flex-1">
-                                    <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-baseline justify-between gap-2">
                                         <p className="truncate text-sm font-medium text-slate-900">
-                                            {isProvider
-                                                ? `${conversation.customer_first_name} ${conversation.customer_last_name}`
-                                                : `${conversation.provider_first_name} ${conversation.provider_last_name}`}
+                                            {nameFor(conversation) ||
+                                                "Conversation"}
                                         </p>
-                                        {conversation.unread_count > 0 && (
-                                            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-indigo-600 px-1.5 text-xs font-bold text-white">
+                                        <span className="shrink-0 text-[11px] font-medium text-slate-400">
+                                            {formatRelativeTime(
+                                                conversation.last_message_at ||
+                                                    conversation.created_at
+                                            )}
+                                        </span>
+                                    </div>
+                                    <div className="mt-0.5 flex items-center justify-between gap-2">
+                                        <p
+                                            className={[
+                                                "truncate text-sm",
+                                                Number(
+                                                    conversation.unread_count
+                                                ) > 0
+                                                    ? "font-medium text-slate-700"
+                                                    : "text-slate-500"
+                                            ].join(" ")}
+                                        >
+                                            {conversation.last_message ||
+                                                conversation.request_title ||
+                                                "No messages yet"}
+                                        </p>
+                                        {Number(conversation.unread_count) >
+                                            0 && (
+                                            <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-indigo-600 px-1.5 text-xs font-bold text-white">
                                                 {conversation.unread_count}
                                             </span>
                                         )}
                                     </div>
-                                    <p className="mt-0.5 truncate text-sm text-slate-500">
-                                        {conversation.last_message ||
-                                            conversation.request_title ||
-                                            "No messages yet"}
-                                    </p>
                                 </div>
                             </button>
                         ))}
 
                         {conversations.length === 0 && (
                             <div className="px-4 py-10 text-center text-sm text-slate-400">
-                                No conversations yet.
+                                No conversations yet. A thread opens once a
+                                provider is hired for a request.
                             </div>
                         )}
+
+                        {conversations.length > 0 &&
+                            visibleConversations.length === 0 && (
+                                <div className="px-4 py-10 text-center text-sm text-slate-400">
+                                    No conversations match “{query.trim()}”.
+                                </div>
+                            )}
                     </div>
                 </Card>
 
@@ -533,53 +623,105 @@ function Messages() {
                                         No messages yet. Say hello.
                                     </p>
                                 ) : (
-                                    active.messages.map((message) => {
-                                        const mine =
-                                            message.sender_id === user?.id;
+                                    active.messages.map(
+                                        (message, index) => {
+                                            const mine =
+                                                message.sender_id === user?.id;
+                                            const dayLabel = formatMessageDay(
+                                                message.created_at
+                                            );
+                                            const previous =
+                                                index > 0
+                                                    ? active.messages[index - 1]
+                                                    : null;
+                                            const showDay =
+                                                dayLabel &&
+                                                formatMessageDay(
+                                                    previous?.created_at
+                                                ) !== dayLabel;
+                                            const showReceipt =
+                                                mine &&
+                                                index ===
+                                                    active.messages.length - 1;
 
-                                        return (
-                                            <div
-                                                key={message.id}
-                                                className={[
-                                                    "qf-msg-in",
-                                                    mine
-                                                        ? "flex justify-end"
-                                                        : "flex justify-start"
-                                                ].join(" ")}
-                                            >
-                                                <div
-                                                    className={[
-                                                        "max-w-[75%] rounded-2xl px-4 py-2 text-sm",
-                                                        message.pending
-                                                            ? "opacity-60"
-                                                            : "",
-                                                        mine
-                                                            ? "rounded-br-sm bg-indigo-600 text-white"
-                                                            : "rounded-bl-sm border border-slate-200 bg-white text-slate-700"
-                                                    ].join(" ")}
-                                                >
-                                                    <p>{message.message}</p>
-                                                    <p
+                                            return (
+                                                <Fragment key={message.id}>
+                                                    {showDay && (
+                                                        <div className="flex items-center justify-center py-1">
+                                                            <span className="rounded-full bg-slate-200/70 px-3 py-0.5 text-[11px] font-semibold text-slate-500">
+                                                                {dayLabel}
+                                                            </span>
+                                                        </div>
+                                                    )}
+
+                                                    <div
                                                         className={[
-                                                            "mt-1 text-[10px]",
+                                                            "qf-msg-in",
                                                             mine
-                                                                ? "text-indigo-200"
-                                                                : "text-slate-400"
+                                                                ? "flex justify-end"
+                                                                : "flex justify-start"
                                                         ].join(" ")}
                                                     >
-                                                        {new Date(
-                                                            message.created_at
-                                                        ).toLocaleString("en-GB", {
-                                                            day: "2-digit",
-                                                            month: "short",
-                                                            hour: "2-digit",
-                                                            minute: "2-digit"
-                                                        })}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        );
-                                    })
+                                                        <div className="max-w-[75%]">
+                                                            <div
+                                                                className={[
+                                                                    "rounded-2xl px-4 py-2 text-sm",
+                                                                    message.pending
+                                                                        ? "opacity-60"
+                                                                        : "",
+                                                                    mine
+                                                                        ? "rounded-br-sm bg-indigo-600 text-white"
+                                                                        : "rounded-bl-sm border border-slate-200 bg-white text-slate-700"
+                                                                ].join(" ")}
+                                                            >
+                                                                <p className="whitespace-pre-wrap break-words">
+                                                                    {
+                                                                        message.message
+                                                                    }
+                                                                </p>
+                                                                <p
+                                                                    className={[
+                                                                        "mt-1 text-[10px]",
+                                                                        mine
+                                                                            ? "text-indigo-200"
+                                                                            : "text-slate-400"
+                                                                    ].join(" ")}
+                                                                >
+                                                                    {new Date(
+                                                                        message.created_at
+                                                                    ).toLocaleTimeString(
+                                                                        "en-GB",
+                                                                        {
+                                                                            hour: "2-digit",
+                                                                            minute: "2-digit"
+                                                                        }
+                                                                    )}
+                                                                    {message.pending &&
+                                                                        " · Sending…"}
+                                                                </p>
+                                                            </div>
+
+                                                            {showReceipt &&
+                                                                !message.pending && (
+                                                                <p
+                                                                    className={[
+                                                                        "mt-1 text-right text-[10px] font-semibold",
+                                                                        message.is_read
+                                                                            ? "text-indigo-600"
+                                                                            : "text-slate-400"
+                                                                    ].join(" ")}
+                                                                >
+                                                                    {message.is_read
+                                                                        ? "Seen"
+                                                                        : "Sent"}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </Fragment>
+                                            );
+                                        }
+                                    )
                                 )}
                                 <div ref={threadEndRef} />
                             </div>
@@ -626,6 +768,12 @@ function Messages() {
                                             autoComplete="off"
                                             maxLength={5000}
                                         />
+
+                                        {draft.length > 4500 && (
+                                            <p className="mt-1 text-right text-[10px] font-medium text-amber-600">
+                                                {draft.length}/5000 characters
+                                            </p>
+                                        )}
                                     </div>
                                     <Button
                                         type="submit"

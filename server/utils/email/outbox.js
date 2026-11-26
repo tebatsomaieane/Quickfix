@@ -1,12 +1,13 @@
 // Durable transactional-email outbox.
 //
-// A request never talks to SMTP directly: it writes a PENDING row here and a
-// background worker drains the queue. That gives three real-world properties
-// the old inline send did not have:
+// A request writes a PENDING row here and `sendNow` can await an immediate
+// delivery for flows that must fail before they succeed. A background worker
+// also drains queued mail. That gives three real-world properties the old
+// inline send did not have:
 //
-//   - a slow or down mail server cannot hold up an HTTP response;
-//   - a transient failure is retried on a backoff instead of being lost;
-//   - every send is auditable, with attempt count and last error.
+//   - transient failures are retried on a backoff instead of being lost;
+//   - every send is auditable, with attempt count and last error;
+//   - callers can choose between awaiting delivery and queueing it.
 //
 // The store and transport are injected, so the whole state machine is tested
 // without a database or network (see outbox.test.js).
@@ -285,10 +286,41 @@ const processOutbox = async ({
     return summary;
 };
 
+const sendNow = async (
+    options,
+    { store = dbStore, transport = getTransport() } = {}
+) => {
+    const id = await store.enqueue(options);
+
+    try {
+        const rendered = renderTemplate(options.template, options.payload);
+        const result = await transport.send({
+            to: options.to,
+            toName: options.toName,
+            subject: rendered.subject,
+            text: rendered.text,
+            html: rendered.html
+        });
+
+        await store.markSent(id, {
+            messageId: result?.messageId,
+            bodyText: result?.captured ? rendered.text : null,
+            bodyHtml: result?.captured ? rendered.html : null
+        });
+
+        return { id, ...result };
+    } catch (error) {
+        await store.markFailed(id, { error: error.message });
+
+        throw error;
+    }
+};
+
 const enqueue = (options, store = dbStore) => store.enqueue(options);
 
 module.exports = {
     enqueue,
+    sendNow,
     processOutbox,
     backoffSeconds,
     createDbStore,

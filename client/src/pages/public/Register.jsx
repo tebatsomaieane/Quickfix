@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { registerUser } from "../../services/authService";
-import { useAuth } from "../../context/AuthContext";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
 import Select from "../../components/ui/Select";
@@ -43,12 +42,6 @@ const HIGHLIGHTS = [
     "Get matched with verified local providers",
     "Stores and cafés can advertise products too"
 ];
-
-const ROLE_PATHS = {
-    CUSTOMER: "/customer/dashboard",
-    PROVIDER: "/provider/dashboard",
-    BUSINESS_OWNER: "/business/dashboard"
-};
 
 const INITIAL_VALUES = {
     first_name: "",
@@ -110,7 +103,6 @@ const SCHEMA = {
 
 function Register() {
     const navigate = useNavigate();
-    const { setUser } = useAuth();
 
     const {
         values,
@@ -162,38 +154,20 @@ function Register() {
             if (data.success) {
                 reset(INITIAL_VALUES);
 
-                // A verification code was emailed: no session exists yet, so
-                // the auth state is deliberately not seeded. Hand the address
-                // to the verify screen, which finishes sign-in once the code
-                // is confirmed.
-                if (data.requires_verification) {
-                    setSuccess(
-                        "Account created! Check your email for a 6-digit code to finish signing in."
-                    );
+                setSuccess(
+                    "We emailed you a 6-digit code. Enter it on the next screen to create your account."
+                );
 
-                    await new Promise((resolve) => setTimeout(resolve, 900));
-
-                    navigate("/verify-email", {
-                        state: { email: data.email || payload.email }
-                    });
-
-                    return;
-                }
-
-                // The API issued the session cookie in the same response, so
-                // the account is usable immediately: seed the auth state and
-                // go straight to the dashboard the role was chosen for.
-                setSuccess("Account created! Taking you to your dashboard…");
-                setUser(data.user);
-
-                // Let the success message register before the route changes,
-                // so the user is not left wondering whether it worked.
                 await new Promise((resolve) => setTimeout(resolve, 900));
 
-                navigate(ROLE_PATHS[data.user.role] || "/");
-            } else {
-                applyServerError({ data });
+                navigate(
+                    `/verify-email?email=${encodeURIComponent(data.email || payload.email)}`
+                );
+
+                return;
             }
+
+            applyServerError({ data });
         } catch (requestError) {
             applyServerError(requestError);
         } finally {
@@ -284,7 +258,7 @@ function Register() {
                             autoCapitalize="none"
                             spellCheck="false"
                             error={errors.email}
-                            hint="You'll sign in with this address."
+                            hint="We'll send your verification code here."
                             required
                         />
 

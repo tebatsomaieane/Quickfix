@@ -37,7 +37,7 @@ if (!apiBase) {
         "VITE_API_URL is not set. Pages cannot serve /api, so the build would " +
             "call its own origin and every request would fail (405 on POST). " +
             "Set VITE_API_URL to the API origin, e.g. " +
-            "https://your-api.up.railway.app/api"
+            "https://quickfix-api-production-3666bcec.up.railway.app/api"
     );
 }
 

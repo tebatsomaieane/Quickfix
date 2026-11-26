@@ -6,6 +6,12 @@ import Icon from "./ui/Icon";
 import MobileMenu from "./ui/MobileMenu";
 import ScrollProgress from "./motion/ScrollProgress";
 import useScrollLock from "../hooks/useScrollLock";
+import useUnreadMessages from "../hooks/useUnreadMessages";
+import useUnreadNotifications from "../hooks/useUnreadNotifications";
+import {
+    ROLE_MESSAGES_PATH,
+    ROLE_NOTIFICATIONS_PATH
+} from "../constants/navigation";
 
 const ROLE_PATHS = {
     CUSTOMER: "/customer/dashboard",
@@ -45,6 +51,25 @@ const linkClasses = (active) =>
             : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
     ].join(" ");
 
+function CountBadge({ count, tone = "indigo" }) {
+    if (!count) {
+        return null;
+    }
+
+    return (
+        <span
+            className={[
+                "flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-bold text-white",
+                tone === "rose"
+                    ? "bg-gradient-to-br from-rose-500 to-pink-600"
+                    : "bg-gradient-to-br from-indigo-500 to-violet-600"
+            ].join(" ")}
+        >
+            {count > 99 ? "99+" : count}
+        </span>
+    );
+}
+
 function Navbar() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -61,6 +86,16 @@ function Navbar() {
 
     const loggedIn = !!user;
     const onHome = location.pathname === "/";
+
+    const messagesPath = loggedIn ? ROLE_MESSAGES_PATH[user?.role] : null;
+    const notificationsPath = loggedIn
+        ? ROLE_NOTIFICATIONS_PATH[user?.role]
+        : null;
+
+    const { unread: unreadMessages } = useUnreadMessages(Boolean(messagesPath));
+    const { unread: unreadNotifications } = useUnreadNotifications(
+        Boolean(notificationsPath)
+    );
 
     useEffect(() => {
         const el = headerRef.current;
@@ -257,22 +292,71 @@ function Navbar() {
                             {menuOpen && (
                                 <div
                                     role="menu"
-                                    className="qf-fade-in absolute right-0 mt-2 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white/95 py-1.5 shadow-xl shadow-slate-900/10 backdrop-blur-xl"
+                                    className="qf-fade-in absolute right-0 mt-2 w-52 overflow-hidden rounded-xl border border-slate-200 bg-white/95 py-1.5 shadow-xl shadow-slate-900/10 backdrop-blur-xl"
                                 >
+                                    {messagesPath && (
+                                        <Link
+                                            to={messagesPath}
+                                            role="menuitem"
+                                            className="flex items-center justify-between gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-indigo-50 hover:text-indigo-700"
+                                            onClick={() => setMenuOpen(false)}
+                                        >
+                                            <span className="flex items-center gap-2">
+                                                <Icon
+                                                    name="chat"
+                                                    className="h-4 w-4 text-slate-400"
+                                                />
+                                                Messages
+                                            </span>
+                                            <CountBadge
+                                                count={unreadMessages}
+                                            />
+                                        </Link>
+                                    )}
+
+                                    {notificationsPath && (
+                                        <Link
+                                            to={notificationsPath}
+                                            role="menuitem"
+                                            className="flex items-center justify-between gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-indigo-50 hover:text-indigo-700"
+                                            onClick={() => setMenuOpen(false)}
+                                        >
+                                            <span className="flex items-center gap-2">
+                                                <Icon
+                                                    name="bell"
+                                                    className="h-4 w-4 text-slate-400"
+                                                />
+                                                Notifications
+                                            </span>
+                                            <CountBadge
+                                                count={unreadNotifications}
+                                                tone="rose"
+                                            />
+                                        </Link>
+                                    )}
+
                                     <Link
                                         to={ROLE_PATHS[user?.role]}
                                         role="menuitem"
-                                        className="block px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-indigo-50 hover:text-indigo-700"
+                                        className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-indigo-50 hover:text-indigo-700"
                                         onClick={() => setMenuOpen(false)}
                                     >
+                                        <Icon
+                                            name="grid"
+                                            className="h-4 w-4 text-slate-400"
+                                        />
                                         Dashboard
                                     </Link>
                                     <button
                                         type="button"
                                         role="menuitem"
                                         onClick={handleLogout}
-                                        className="block w-full px-4 py-2.5 text-left text-sm font-medium text-red-600 transition hover:bg-rose-50"
+                                        className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-red-600 transition hover:bg-rose-50"
                                     >
+                                        <Icon
+                                            name="logout"
+                                            className="h-4 w-4 text-red-400"
+                                        />
                                         Log out
                                     </button>
                                 </div>
@@ -334,6 +418,41 @@ function Navbar() {
                             <p className="px-1 text-[11px] font-bold uppercase tracking-widest text-slate-400">
                                 Signed in as {user?.first_name}
                             </p>
+                            {messagesPath && (
+                                <Link
+                                    to={messagesPath}
+                                    onClick={closeMobile}
+                                    className="qf-tap-smooth flex items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm font-bold text-slate-700"
+                                >
+                                    <span className="flex items-center gap-2">
+                                        <Icon
+                                            name="chat"
+                                            className="h-4 w-4 text-indigo-500"
+                                        />
+                                        Messages
+                                    </span>
+                                    <CountBadge count={unreadMessages} />
+                                </Link>
+                            )}
+                            {notificationsPath && (
+                                <Link
+                                    to={notificationsPath}
+                                    onClick={closeMobile}
+                                    className="qf-tap-smooth flex items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm font-bold text-slate-700"
+                                >
+                                    <span className="flex items-center gap-2">
+                                        <Icon
+                                            name="bell"
+                                            className="h-4 w-4 text-rose-500"
+                                        />
+                                        Notifications
+                                    </span>
+                                    <CountBadge
+                                        count={unreadNotifications}
+                                        tone="rose"
+                                    />
+                                </Link>
+                            )}
                             <Link
                                 to={ROLE_PATHS[user?.role]}
                                 onClick={closeMobile}

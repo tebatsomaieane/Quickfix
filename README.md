@@ -159,20 +159,31 @@ provides the MySQL database and a free `*.up.railway.app` subdomain.
    PUBLIC_API_URL=https://<your-service>.up.railway.app
    PUBLIC_APP_URL=https://quickfix-85x.pages.dev
    ```
-   For real two-factor login codes and password-reset emails, also add SMTP
-   credentials (any provider that speaks SMTP — Resend, Brevo, Mailtrap,
-   SendGrid…):
+   Add a Gmail-backed Google Apps Script webhook before allowing public
+   sign-up. This sends over HTTPS and works on hosts that block SMTP egress:
    ```
-   SMTP_HOST=smtp.resend.com          # or your provider's host / port
-   SMTP_PORT=465
-   SMTP_USER=resend                   # provider-specific (often the API key)
-   SMTP_PASSWORD=<api-key-or-password>
+   EMAIL_PROVIDER=apps-script
+   APPS_SCRIPT_URL=https://script.google.com/macros/s/<id>/exec
+   APPS_SCRIPT_SECRET=<long-random-secret>
+   GMAIL_FROM_NAME=QuickFix
+   ```
+   Deploy the script as a web app, execute as the Gmail account, set access to
+   **Anyone**, and have its `doPost(e)` check `APPS_SCRIPT_SECRET` before calling
+   `GmailApp.sendEmail(body.to, body.subject, body.text, { name: body.fromName, htmlBody: body.html })`.
+    SMTP can be used instead where outbound `25`/`465`/`587` is allowed:
+   ```
+   SMTP_HOST=smtp.example.com
+   SMTP_PORT=587
+   SMTP_USER=<smtp-user>
+   SMTP_PASSWORD=<smtp-password>
    SMTP_FROM="QuickFix <no-reply@quickfix.co.ls>"
    ```
-   Without SMTP, every code is printed to the server logs instead and no email
-   is sent — fine for local development, and fine for sign-up/sign-in, which
-   do not depend on email. Only opt-in two-factor login and password resets
-   need a working mail server.
+   Registration sends one verification PIN and creates the user only after it
+   is confirmed. A wrong or expired PIN rejects the pending registration, and
+   an email cannot be registered twice. Delivery is awaited before success:
+   if the provider rejects the send, the pending registration is rolled back
+   and the API returns 503 with `EMAIL_DELIVERY_FAILED`. Login itself still
+   works without email unless two-factor login is enabled on the account.
 5. **Settings → Networking → Generate Domain** → that
    `https://<name>.up.railway.app` URL is your `VITE_API_URL`.
 6. Add a **Volume** mounted at `/app/uploads` so uploaded media survives deploys.
@@ -340,10 +351,15 @@ uploads are ephemeral unless you attach a disk.
 | `LOG_FORMAT` | No | `combined` | Morgan log format |
 | `PUBLIC_API_URL` | No | derived from request | Absolute base used when building uploaded-file URLs |
 | `PUBLIC_APP_URL` | No | `CLIENT_ORIGIN` | Frontend origin used in password-reset email links |
-| `SMTP_HOST` | No | — | SMTP host for two-factor login codes and password-reset emails; unset → codes go to the server log |
-| `SMTP_PORT` | No | `465` | SMTP port (465 = SMTPS, 587 = STARTTLS) |
-| `SMTP_USER` | No | — | SMTP username |
-| `SMTP_PASSWORD` | No | — | SMTP password or API key |
+| `EMAIL_PROVIDER` | Yes in production | — | Set to `apps-script` to send through the Gmail-backed webhook |
+| `APPS_SCRIPT_URL` | With Apps Script | — | Deployed Google Apps Script web app URL |
+| `APPS_SCRIPT_SECRET` | With Apps Script | — | Shared secret checked inside the webhook |
+| `GMAIL_FROM_NAME` | No | `QuickFix` | Display name used by Apps Script Gmail sends |
+| `EMAIL_TRANSPORT` | No | `auto` | `apps-script` / `smtp` / `capture` / `auto` |
+| `SMTP_HOST` | With SMTP | — | SMTP host for registration PINs, two-factor login codes and password-reset emails |
+| `SMTP_PORT` | No | `587` | SMTP port (465 = SMTPS, 587 = STARTTLS) |
+| `SMTP_USER` | With SMTP | — | SMTP username |
+| `SMTP_PASSWORD` | With SMTP | — | SMTP password or API key |
 | `SMTP_FROM` | No | `QuickFix <no-reply@quickfix.co.ls>` | From address for transactional emails |
 
 ### Client (`client/.env`, build-time)
@@ -417,7 +433,9 @@ All API routes are prefixed with `/api`. Responses follow the format:
 ### Auth
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/api/auth/register` | — | Create account (CUSTOMER/PROVIDER/BUSINESS_OWNER); signs the user in immediately |
+| POST | `/api/auth/register` | — | Start account creation (CUSTOMER/PROVIDER/BUSINESS_OWNER) and email one verification PIN; requires Apps Script or SMTP |
+| POST | `/api/auth/verify-email` | — | Confirm the PIN, create the user and issue the session cookie |
+| POST | `/api/auth/resend-verification` | — | Resend the registration PIN (60s cooldown) |
 | POST | `/api/auth/login` | — | Login; with 2FA on returns `code:"OTP_REQUIRED"` (first factor OK) |
 | POST | `/api/auth/verify-2fa` | — | Complete login with the 6-digit login code |
 | POST | `/api/auth/resend-otp` | — | Resend the login code (60s cooldown) |
@@ -550,8 +568,9 @@ All API routes are prefixed with `/api`. Responses follow the format:
   only admins may approve them for public visibility.
 - Password-reset tokens are hashed in storage and never leaked through the
   API; they are delivered by email in a real deployment.
-- Registration and login work without email: accounts are usable from the
-  moment they are created, and there is no email-verification step.
+- Registration requires a deliverable email transport: the PIN is sent before
+  the account is created, and failed delivery returns `EMAIL_DELIVERY_FAILED`.
+  Login works without email unless two-factor login is enabled on the account.
 - Sign-in is defended in depth: a generous per-IP limiter (shared public IPs
   are common in Lesotho), a per-account counter   that locks an address after 8
   failed attempts in 15 minutes, a fixed bcrypt cost on unknown addresses so

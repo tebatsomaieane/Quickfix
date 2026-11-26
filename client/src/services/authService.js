@@ -4,10 +4,8 @@ const USER_STORAGE_KEY = "quickfix_user";
 
 // ==========================================
 // REGISTER USER
-// The API creates the account and issues the session cookie in the same
-// response, so the user is signed in from the moment this resolves -- unless
-// the account needs email verification, in which case no session is issued
-// and the response carries `requires_verification: true`.
+// Starts a pending registration and emails a single verification PIN. The
+// user row and session are created only after /auth/verify-email succeeds.
 // ==========================================
 export const registerUser = async (userData) => {
     const response = await api.post(

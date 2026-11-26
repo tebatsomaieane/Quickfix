@@ -15,6 +15,11 @@ const smtpEnv = {
     SMTP_PORT: "587"
 };
 
+const appsScriptEnv = {
+    APPS_SCRIPT_URL: "https://script.google.com/macros/s/test/exec",
+    APPS_SCRIPT_SECRET: "secret"
+};
+
 test("auto resolves to capture in development without SMTP", () => {
     const env = { NODE_ENV: "development" };
 
@@ -35,6 +40,20 @@ test("auto uses smtp whenever credentials are present", () => {
     assert.equal(resolveMode(env), "smtp");
     assert.equal(canDeliver(env), true);
     assert.equal(smtpConfigured(env), true);
+});
+
+test("auto uses Apps Script when configured", () => {
+    const env = { NODE_ENV: "production", ...appsScriptEnv };
+
+    assert.equal(resolveMode(env), "apps-script");
+    assert.equal(canDeliver(env), true);
+});
+
+test("an explicit Apps Script provider is refused without credentials", () => {
+    const env = { NODE_ENV: "production", EMAIL_PROVIDER: "apps-script" };
+
+    assert.equal(resolveMode(env), "apps-script");
+    assert.equal(canDeliver(env), false);
 });
 
 test("smtp is not considered configured without user or password", () => {
